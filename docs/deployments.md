@@ -29,6 +29,33 @@
 | Scoped EVM window (`MsgOpenEVMWindow`: 15,000 blocks / 200 txs / 30 QOR) | `B6C2AB7E…5D724A` | `pqc` (hybrid, 1 ML-DSA-87 layer) |
 | Contract deploys (EVM lane, inside the window) | see above | `classical` — protected by the window; release/refund authorization happens inside `SweeftVault` via `pqcVerify` |
 
+## End-to-end evidence (19 Nov 2026)
+
+**Complete market scenario** (`tools/e2e_marketplace.py`): fund seller + verifier →
+register their PQ keys → open their scoped windows → DAO approves the verifier
+(propose → vote → execute, tx `0x3306B058…`) → seller lists → buyer purchases
+(escrow funded atomically) → seller marks delivered → verifier attests evidence
+→ inspection window passes → buyer's ML-DSA-87 signature verified on-chain by
+`pqcVerify` → **seller paid 0.1 QOR**.
+
+| Step | Transaction |
+|---|---|
+| Seller PQ registration | `DF0284D6…AAFC` (height 10386444) |
+| Seller scoped EVM window | `B78A20AB…9A0C` (pqc_hybrid_verify event) |
+| Listing #0 created | `0xf5a4823073c28046870350cc0a60377cc15486a8733a8ee4811fd8212d6f1e45` |
+| Purchase → escrow #3 funded | `0xa9b9c7a883eb2d3b02f53ebd58a4f53f38abee0d8b68c14057ce0000255f674c` |
+| Mark delivered | `0x40330819f59afa59ea1dcaaad1d5ef2969c5dc541ef8e1376d2e6d9104a772d6` |
+| Verifier attestation | `0x9be3bce4bb160bb3eced723bc8911003a326b085af73e4bdd200f76ce9ce1f2e` |
+| PQ-signed release | `0x2718991de9f16232580771084858d54f1a1078cf39d8af1b12319754a46c44d3` |
+
+**Attack simulation** (`tools/e2e_attack.py`) — both blocked on-chain:
+
+| Attack | Transaction | Result |
+|---|---|---|
+| Release signed with the wrong ML-DSA-87 key | `0xafde26a0345a35f26a9d231b289682a0069ead63465efd900f22b04394956361` | reverted, escrow untouched |
+| Signature over a tampered amount | `0x10e2fb73ea43e311bb7ed67391a2a5bb7fbee7a6380788ac0c9e695526a16825` | reverted |
+| Control: correct buyer signature | `0x921dd1e148016aadb08e60873d267e5f6a0bbc576fbdee4b74dd5cb3c7da5b19` | settled |
+
 ## Reproduce
 
 ```bash

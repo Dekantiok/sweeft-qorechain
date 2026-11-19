@@ -41,12 +41,12 @@ AI assistant     ────────▶ apps/ai       (draft/execute w/ man
 
 | Component | Purpose | Status |
 |---|---|---|
-| **Sweeft Market** | On-chain listings + Django discovery/search | 🚧 in progress |
-| **Sweeft Vault** | Escrow with PQ-gated release (`pqcVerify`) | 🚧 in progress |
-| **Sweeft Oracle** | Fulfilment evidence + verifier attestations | 🚧 in progress |
-| **Sweeft Cred** | Reputation from verified outcomes only | 🚧 in progress |
-| **Sweeft AI** | Natural-language commerce, mandate-capped autonomous buying (Meta Model API) | 🚧 in progress |
-| **Sweeft DAO** | Proposal registry; governs oracle verifier approval | 🚧 in progress |
+| **Sweeft Market** | On-chain listings + Django discovery/search | contracts deployed + purchase flow proven on testnet, UI in progress |
+| **Sweeft Vault** | Escrow with PQ-gated release (`pqcVerify`) | deployed + end-to-end release and attack tests passing on testnet |
+| **Sweeft Oracle** | Fulfilment evidence + verifier attestations | registry deployed, DAO-governed verifiers proven on-chain, UI in progress |
+| **Sweeft Cred** | Reputation from verified outcomes only | models in place, scoring in progress |
+| **Sweeft AI** | Natural-language commerce, mandate-capped autonomous buying (Meta Model API) | in progress |
+| **Sweeft DAO** | Proposal registry; governs oracle verifier approval | deployed + proposal/vote/execute proven on-chain |
 
 ## Quick start (development)
 
