@@ -17,7 +17,10 @@ class Order(models.Model):
         CANCELLED = "cancelled", "Cancelled"
 
     reference = models.CharField(max_length=24, unique=True, help_text="Human-friendly order reference")
-    listing = models.ForeignKey(Listing, on_delete=models.PROTECT, related_name="orders")
+    listing = models.ForeignKey(
+        Listing, on_delete=models.PROTECT, related_name="orders", null=True, blank=True,
+        help_text="Absent for direct escrows created outside the marketplace",
+    )
     buyer = models.ForeignKey(Participant, on_delete=models.PROTECT, related_name="orders")
     seller = models.ForeignKey(Participant, on_delete=models.PROTECT, related_name="sales")
 
@@ -33,7 +36,7 @@ class Order(models.Model):
         ordering = ["-created_at"]
 
     def __str__(self) -> str:
-        return f"{self.reference} — {self.listing.title}"
+        return f"{self.reference} — {self.listing.title if self.listing else 'direct escrow'}"
 
     @property
     def total_qor(self) -> str:

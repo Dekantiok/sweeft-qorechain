@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Governance — Sweeft{% endblock %}
+
+{% block content %}
+<div>
+    <h1 class="text-2xl font-bold">Sweeft DAO</h1>
+    <p class="mt-1 text-sm text-slate-400">
+        One wallet, one vote. Passed proposals execute on-chain — the DAO owns the oracle
+        verifier registry, so governance changes who may attest fulfilment.
+    </p>
+</div>
+
+<div class="mt-8 space-y-4">
+    {% for proposal in proposals %}
+    <div class="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <span class="text-xs text-slate-500">#{{ proposal.pk }}</span>
+                <span class="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider
+                    {% if proposal.state == 'executed' %}bg-teal-500/10 text-teal-400
+                    {% elif proposal.state == 'open' %}bg-amber-500/10 text-amber-400
+                    {% else %}bg-slate-700/50 text-slate-400{% endif %}">{{ proposal.state }}</span>
+                <span class="rounded-full bg-slate-800 px-2 py-0.5 text-[10px] text-slate-400">{{ proposal.get_kind_display }}</span>
+            </div>
+            <span class="text-xs text-slate-500">{{ proposal.created_at|date:"M d, H:i" }}</span>
+        </div>
+        <h3 class="mt-3 font-semibold">{{ proposal.title }}</h3>
+        <p class="mt-1 text-sm text-slate-400">{{ proposal.description }}</p>
+        <div class="mt-4 flex items-center gap-6 text-xs text-slate-400">
+            <span>For: <span class="text-teal-400">{{ proposal.votes_for }}</span></span>
+            <span>Against: <span class="text-red-400">{{ proposal.votes_against }}</span></span>
+            {% if proposal.target_verifier %}<span>Verifier: <span class="hash">{{ proposal.target_verifier.evm_address }}</span></span>{% endif %}
+            {% if proposal.execution_tx %}<span class="hash text-teal-400">executed: {{ proposal.execution_tx|truncatechars:24 }}</span>{% endif %}
+        </div>
+    </div>
+    {% empty %}
+    <div class="rounded-xl border border-dashed border-slate-700 p-12 text-center text-slate-500">
+        No proposals yet. Verifier approvals are proposed through the DAO contract and appear
+        here after the indexer syncs.
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

@@ -38,7 +38,7 @@ def fetch_events(contract, event_name: str, from_block: int, to_block: int) -> l
     start = from_block
     while start <= to_block:
         end = min(start + MAX_BLOCK_RANGE - 1, to_block)
-        raw = getattr(contract.events, event_name).get_logs(from_block=start, to_block=end)
+        raw = getattr(contract.events, event_name).get_logs(fromBlock=start, toBlock=end)
         for entry in raw:
             events.append(
                 ChainEvent(

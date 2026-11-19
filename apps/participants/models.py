@@ -20,7 +20,14 @@ class Participant(models.Model):
         BOTH = "both", "Buyer & Seller"
         VERIFIER = "verifier", "Oracle Verifier"
 
-    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="participant")
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="participant",
+        null=True,
+        blank=True,
+        help_text="Django login; indexer-managed chain accounts may have none",
+    )
     display_name = models.CharField(max_length=120)
     role = models.CharField(max_length=16, choices=Role.choices, default=Role.BUYER)
 
