@@ -1,0 +1,17 @@
+# Core
+Django>=4.2,<5.0
+psycopg2-binary>=2.9
+python-dotenv>=1.0
+
+# QoreChain — read paths and native lane
+qorechain-sdk==0.14.0
+qorechain-pqc==0.2.3
+
+# EVM interaction (read + event indexing; signing happens client-side)
+web3>=6.15,<7.0
+
+# AI — Meta Model API is OpenAI-SDK compatible
+openai>=1.40
+
+# HTTP
+requests>=2.31
