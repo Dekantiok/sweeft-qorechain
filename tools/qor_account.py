@@ -76,7 +76,8 @@ def _save_mnemonic(mnemonic: str) -> None:
     if ENV_FILE.exists():
         lines = ENV_FILE.read_text().splitlines()
     lines = [line for line in lines if not line.startswith(f"{ENV_KEY}=")]
-    lines.append(f"{ENV_KEY}={mnemonic}")
+    # Quote the value: the phrase contains spaces and must survive `source`.
+    lines.append(f'{ENV_KEY}="{mnemonic}"')
     ENV_FILE.write_text("\n".join(lines) + "\n")
 
 

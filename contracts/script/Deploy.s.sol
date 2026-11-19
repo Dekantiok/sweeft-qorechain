@@ -23,9 +23,10 @@ import { SweeftDAO } from "../src/SweeftDAO.sol";
 contract DeployScript is Script {
     function run() external {
         uint256 deployerKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
+        address deployer = vm.envAddress("DEPLOYER_ADDRESS");
         vm.startBroadcast(deployerKey);
 
-        SweeftOracleRegistry oracleRegistry = new SweeftOracleRegistry(msg.sender);
+        SweeftOracleRegistry oracleRegistry = new SweeftOracleRegistry(deployer);
 
         SweeftVault vault = new SweeftVault(address(oracleRegistry));
 
