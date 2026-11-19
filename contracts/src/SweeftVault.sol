@@ -95,7 +95,14 @@ contract SweeftVault {
     /// @notice Registry that authorizes oracle verifiers.
     address public immutable oracleRegistry;
 
-    /// @notice Contract deployment time, used to separate refund nonces.
+    /// @notice Deployer, allowed to wire the Marketplace once after deployment.
+    address public immutable deployer;
+
+    /// @notice The Marketplace, allowed to create escrows on behalf of buyers.
+    ///         Set once after both contracts are deployed.
+    address public marketplace;
+
+    /// @notice Contract deployment time.
     uint256 public immutable deployedAt;
 
     uint256 public escrowCount;
@@ -104,32 +111,58 @@ contract SweeftVault {
     /// @notice Per-buyer PQ nonce: prevents replay of a release/refund signature.
     mapping(address => uint256) public pqcNonce;
 
+    error MarketplaceAlreadySet();
+
     constructor(address _oracleRegistry) {
         if (_oracleRegistry == address(0)) revert InvalidParties();
         oracleRegistry = _oracleRegistry;
+        deployer = msg.sender;
         deployedAt = block.timestamp;
+    }
+
+    /// @notice Wire the Marketplace contract. Callable once by the deployer.
+    function setMarketplace(address marketplaceAddress) external {
+        if (msg.sender != deployer) revert NotBuyer();
+        if (marketplace != address(0)) revert MarketplaceAlreadySet();
+        if (marketplaceAddress == address(0)) revert InvalidParties();
+        marketplace = marketplaceAddress;
     }
 
     // ------------------------------------------------------------------
     // Escrow lifecycle
     // ------------------------------------------------------------------
 
-    /// @notice Create an escrow. Anyone may create one on behalf of buyer/seller.
-    function createEscrow(address seller, uint64 deliveryDeadline, uint256 amount) external returns (uint256 escrowId) {
-        if (seller == address(0) || seller == msg.sender) revert InvalidParties();
+    /// @notice Create an escrow for `buyer`.
+    /// @dev Callable by the buyer themselves, or by the trusted Marketplace
+    ///      factory, which forwards the buyer's payment. When `msg.value`
+    ///      equals `amount` (the marketplace flow), the escrow is funded
+    ///      atomically; otherwise it stays unfunded until `fundEscrow`.
+    function createEscrow(address buyer, address seller, uint64 deliveryDeadline, uint256 amount)
+        external
+        payable
+        returns (uint256 escrowId)
+    {
+        if (buyer == address(0) || seller == address(0) || seller == buyer) revert InvalidParties();
         if (amount == 0) revert InvalidAmount();
+        if (msg.sender != buyer && msg.sender != marketplace) revert NotBuyer();
+        if (msg.value != 0 && msg.value != amount) revert WrongDeposit();
 
         escrowId = escrowCount;
         escrowCount = escrowId + 1;
 
         Escrow storage e = escrows[escrowId];
-        e.buyer = msg.sender;
+        e.buyer = buyer;
         e.seller = seller;
         e.amount = amount;
         e.deliveryDeadline = deliveryDeadline;
         e.createdAt = uint64(block.timestamp);
 
-        emit EscrowCreated(escrowId, msg.sender, seller, amount, deliveryDeadline);
+        emit EscrowCreated(escrowId, buyer, seller, amount, deliveryDeadline);
+
+        if (msg.value == amount) {
+            e.status = EscrowStatus.Funded;
+            emit EscrowFunded(escrowId, buyer, msg.value);
+        }
     }
 
     /// @notice Fund the escrow. Only the stored buyer may fund it, and the

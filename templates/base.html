@@ -1,0 +1,69 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Sweeft — Post-Quantum Commerce on QoreChain{% endblock %}</title>
+    <meta name="description" content="Decentralized commerce and trust ecosystem on QoreChain. Escrow protected by ML-DSA-87 post-quantum signatures.">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js"></script>
+    <link rel="stylesheet" href="{% static 'css/sweeft.css' %}">
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="h-full bg-slate-950 text-slate-100 antialiased">
+    <nav class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-40">
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div class="flex h-16 items-center justify-between">
+                <div class="flex items-center gap-8">
+                    <a href="/" class="flex items-center gap-2">
+                        <span class="text-xl font-bold tracking-tight">Sweeft</span>
+                        <span class="rounded bg-teal-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-teal-400">PQ Escrow</span>
+                    </a>
+                    <div class="hidden md:flex items-center gap-6 text-sm text-slate-400">
+                        <a href="/marketplace/" class="hover:text-white transition-colors">Marketplace</a>
+                        <a href="/dashboard/" class="hover:text-white transition-colors">Dashboard</a>
+                        <a href="/oracle/" class="hover:text-white transition-colors">Oracle</a>
+                        <a href="/governance/" class="hover:text-white transition-colors">Governance</a>
+                        <a href="/ai/" class="hover:text-white transition-colors">AI Assistant</a>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-teal-500/30 bg-teal-500/10 px-3 py-1 text-xs text-teal-400">
+                        <span class="h-1.5 w-1.5 rounded-full bg-teal-400 animate-pulse"></span>
+                        Diana Testnet
+                    </span>
+                    {% block nav_actions %}{% endblock %}
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    {% if messages %}
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-4">
+        {% for message in messages %}
+        <div class="rounded-lg border px-4 py-3 text-sm mb-2
+            {% if message.tags == 'error' %}border-red-500/30 bg-red-500/10 text-red-300
+            {% elif message.tags == 'success' %}border-teal-500/30 bg-teal-500/10 text-teal-300
+            {% else %}border-slate-700 bg-slate-800/50 text-slate-300{% endif %}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <main class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="border-t border-slate-800 mt-16">
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+            <p>Sweeft — decentralized commerce with post-quantum escrow, built on QoreChain.</p>
+            <p>Testnet only. Test tokens have no value.</p>
+        </div>
+    </footer>
+
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

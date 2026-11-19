@@ -101,7 +101,7 @@ contract SweeftVaultTest is Test {
 
     function _createAndFund(uint256 amount, uint64 deadlineOffset) internal returns (uint256) {
         vm.prank(buyer);
-        uint256 id = vault.createEscrow(seller, _deadline(deadlineOffset), amount);
+        uint256 id = vault.createEscrow(buyer, seller, _deadline(deadlineOffset), amount);
         vm.deal(buyer, amount);
         vm.prank(buyer);
         vault.fundEscrow{ value: amount }(id);
@@ -114,7 +114,7 @@ contract SweeftVaultTest is Test {
 
     function test_CreateEscrow() public {
         vm.prank(buyer);
-        uint256 id = vault.createEscrow(seller, _deadline(2 days), 1 ether);
+        uint256 id = vault.createEscrow(buyer, seller, _deadline(2 days), 1 ether);
         assertEq(id, 0);
 
         SweeftVault.Escrow memory e = vault.getEscrow(id);
@@ -126,17 +126,17 @@ contract SweeftVaultTest is Test {
 
     function test_CreateEscrow_RevertsOnZeroSeller() public {
         vm.expectRevert(SweeftVault.InvalidParties.selector);
-        vault.createEscrow(address(0), _deadline(1 days), 1 ether);
+        vault.createEscrow(buyer, address(0), _deadline(1 days), 1 ether);
     }
 
     function test_CreateEscrow_RevertsOnZeroAmount() public {
         vm.expectRevert(SweeftVault.InvalidAmount.selector);
-        vault.createEscrow(seller, _deadline(1 days), 0);
+        vault.createEscrow(buyer, seller, _deadline(1 days), 0);
     }
 
     function test_FundEscrow_OnlyBuyer() public {
         vm.prank(buyer);
-        uint256 id = vault.createEscrow(seller, _deadline(1 days), 1 ether);
+        uint256 id = vault.createEscrow(buyer, seller, _deadline(1 days), 1 ether);
         vm.deal(stranger, 1 ether);
 
         vm.prank(stranger);
@@ -146,7 +146,7 @@ contract SweeftVaultTest is Test {
 
     function test_FundEscrow_ExactAmountRequired() public {
         vm.prank(buyer);
-        uint256 id = vault.createEscrow(seller, _deadline(1 days), 1 ether);
+        uint256 id = vault.createEscrow(buyer, seller, _deadline(1 days), 1 ether);
         vm.deal(buyer, 2 ether);
 
         vm.prank(buyer);
@@ -169,7 +169,7 @@ contract SweeftVaultTest is Test {
 
     function test_CancelEscrow_ByBuyer() public {
         vm.prank(buyer);
-        uint256 id = vault.createEscrow(seller, _deadline(1 days), 1 ether);
+        uint256 id = vault.createEscrow(buyer, seller, _deadline(1 days), 1 ether);
         vm.prank(buyer);
         vault.cancelEscrow(id);
         assertEq(uint8(vault.getEscrow(id).status), uint8(SweeftVault.EscrowStatus.Cancelled));
@@ -177,7 +177,7 @@ contract SweeftVaultTest is Test {
 
     function test_CancelEscrow_BySeller() public {
         vm.prank(buyer);
-        uint256 id = vault.createEscrow(seller, _deadline(1 days), 1 ether);
+        uint256 id = vault.createEscrow(buyer, seller, _deadline(1 days), 1 ether);
         vm.prank(seller);
         vault.cancelEscrow(id);
         assertEq(uint8(vault.getEscrow(id).status), uint8(SweeftVault.EscrowStatus.Cancelled));
@@ -185,7 +185,7 @@ contract SweeftVaultTest is Test {
 
     function test_CancelEscrow_StrangerRejected() public {
         vm.prank(buyer);
-        uint256 id = vault.createEscrow(seller, _deadline(1 days), 1 ether);
+        uint256 id = vault.createEscrow(buyer, seller, _deadline(1 days), 1 ether);
         vm.prank(stranger);
         vm.expectRevert(SweeftVault.InvalidParties.selector);
         vault.cancelEscrow(id);
