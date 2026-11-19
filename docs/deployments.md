@@ -10,9 +10,32 @@
 | Contract | Address | Deploy tx |
 |---|---|---|
 | SweeftOracleRegistry | `0xecb16561cfdff10336b278f8107a077fe7a53c6d` | `0x3d2743b89f62ca9aa287b555c097cfae88ce40296b423ffa4fa2935c36ca9a92` |
-| SweeftVault | `0x315f2f19de227bb7d01e4315085c6919e7b654c6` | `0xd2cefb2e0f4e79e6203e6ad15cfd9ba5012ea297ac508a9a7fece5a62e8a3e02` |
-| SweeftMarketplace | `0x86e97fb8653588a2533d55426475cd3a1d04f030` | `0x5324704a6c0671dbda2cc0338a77aba859c39f3d1e0e912268e1e02fcde75a7e` |
 | SweeftDAO | `0x03a0c71c42dcef463f8b472cb39991cedac2dc1b` | `0xeb4a1100b20be48acd41099a2f9cc9ef3b316f5e2c013db244e477a9a9f3e0c3` |
+| **SweeftVault (v2)** | `0xd2ecd7ce5cb600c6730e9873e9e505854ab7e81d` | v2 deploy script |
+| **SweeftMarketplace (v2)** | `0xa51bff719e35647cf6f4d4056cf11c20cdcdc781` | v2 deploy script |
+
+> v2 adds the QoreSign message format (below). v1 Vault was `0x315f2f19de227bb7d01e4315085c6919e7b654c6`,
+> v1 Marketplace `0x86e97fb8653588a2533d55426475cd3a1d04f030` — kept here for the record.
+
+## Release authorization format (QoreSign-compatible)
+
+The buyer's ML-DSA-87 signature covers exactly what QoreX's `signArbitrary` produces
+(message-signing-v1):
+
+```
+ML-DSA-87.Sign(sk, "qorechain-msg-v1|" + chain_id + "|" + data)
+```
+
+where `data` is the human-readable release message the buyer sees in the wallet:
+
+```
+sweeft-release-v1|vault=0x…|escrow=…|buyer=0x…|recipient=0x…|amount=…|nonce=…
+```
+
+The contract rebuilds these exact bytes and verifies them with `pqcVerify`.
+Format compatibility is proven against the official QoreSign test vectors
+(`qoresign-v1.json`): sign-bytes and ML-DSA-87 signatures match bit-for-bit,
+and the full flow passes on-chain (below).
 
 ## Wiring (verified on-chain via `eth_call`)
 

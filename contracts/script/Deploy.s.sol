@@ -28,7 +28,7 @@ contract DeployScript is Script {
 
         SweeftOracleRegistry oracleRegistry = new SweeftOracleRegistry(deployer);
 
-        SweeftVault vault = new SweeftVault(address(oracleRegistry));
+        SweeftVault vault = new SweeftVault(address(oracleRegistry), "qorechain-diana");
 
         SweeftMarketplace marketplace = new SweeftMarketplace(address(vault));
 

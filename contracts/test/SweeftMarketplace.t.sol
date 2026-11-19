@@ -20,7 +20,7 @@ contract SweeftMarketplaceTest is Test {
 
     function setUp() public {
         registry = new SweeftOracleRegistry(address(this));
-        vault = new SweeftVault(address(registry));
+        vault = new SweeftVault(address(registry), "qorechain-diana");
         market = new SweeftMarketplace(address(vault));
         vault.setMarketplace(address(market));
     }

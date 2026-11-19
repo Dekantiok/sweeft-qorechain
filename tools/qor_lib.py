@@ -39,6 +39,31 @@ CHAIN_ID = os.getenv("QORECHAIN_CHAIN_ID", "qorechain-diana")
 EVM_CHAIN_ID = int(os.getenv("QORECHAIN_EVM_CHAIN_ID", "9800"))
 EXPLORER = os.getenv("QORECHAIN_EXPLORER_URL", "https://explore.qore.network")
 
+# QoreSign message-signing-v1 domain prefix — the same bytes QoreX produces.
+QORESIGN_MSG_PREFIX = "qorechain-msg-v1|"
+
+
+def pqc_signing_payload(data: bytes, chain_id: str | None = None) -> bytes:
+    """Build the exact bytes QoreX/QoreSign ML-DSA-87-signs (message-signing-v1)."""
+    cid = chain_id or CHAIN_ID
+    return QORESIGN_MSG_PREFIX.encode() + cid.encode() + b"|" + data
+
+
+def release_message(vault: str, escrow_id: int, buyer: str, recipient: str, amount: int, nonce: int) -> bytes:
+    """The human-readable release data — must match SweeftVault._releaseMessage."""
+    return (
+        f"sweeft-release-v1|vault={vault.lower()}|escrow={escrow_id}|buyer={buyer.lower()}"
+        f"|recipient={recipient.lower()}|amount={amount}|nonce={nonce}"
+    ).encode()
+
+
+def refund_message(vault: str, escrow_id: int, buyer: str, recipient: str, amount: int, nonce: int) -> bytes:
+    """The human-readable refund data — must match SweeftVault._refundMessage."""
+    return (
+        f"sweeft-refund-v1|vault={vault.lower()}|escrow={escrow_id}|buyer={buyer.lower()}"
+        f"|recipient={recipient.lower()}|amount={amount}|nonce={nonce}"
+    ).encode()
+
 CONTRACTS = {
     "SweeftVault": "SWEEFT_VAULT_ADDRESS",
     "SweeftMarketplace": "SWEEFT_MARKETPLACE_ADDRESS",

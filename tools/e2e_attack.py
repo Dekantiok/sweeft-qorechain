@@ -35,6 +35,9 @@ from eth_abi import encode as abi_encode  # noqa: E402
 from qorsdk import derive_unified_account, pqc_sign  # noqa: E402
 from web3 import Web3  # noqa: E402
 
+sys.path.insert(0, str(REPO_ROOT / "tools"))
+import qor_lib as lib  # noqa: E402
+
 EVM_RPC = os.getenv("QORECHAIN_EVM_RPC_URL", "https://evm-testnet.qore.host")
 EXPLORER = os.getenv("QORECHAIN_EXPLORER_URL", "https://explore.qore.network")
 CHAIN_ID = int(os.getenv("QORECHAIN_EVM_CHAIN_ID", "9800"))
@@ -97,19 +100,7 @@ class AttackRunner:
         return escrow_id
 
     def _release_message(self, escrow_id: int, amount: int, nonce: int) -> bytes:
-        return abi_encode(
-            ["string", "uint256", "address", "uint256", "address", "address", "uint256", "uint256"],
-            [
-                "sweeft-release-v1",
-                CHAIN_ID,
-                VAULT_ADDRESS,
-                escrow_id,
-                self.buyer.evm,
-                self.seller.evm,
-                amount,
-                nonce,
-            ],
-        )
+        return lib.release_message(VAULT_ADDRESS, escrow_id, self.buyer.evm, self.seller.evm, amount, nonce)
 
     def run(self) -> None:
         print(f"Buyer: {self.buyer.evm}")
@@ -121,7 +112,7 @@ class AttackRunner:
         escrow_id = self._fresh_escrow()
         nonce = self.vault.functions.pqcNonce(self.w3.to_checksum_address(self.buyer.evm)).call()
         message = self._release_message(escrow_id, AMOUNT, nonce)
-        forged_signature = pqc_sign(self.seller.pqc.secret_key, message)  # seller's key, not buyer's
+        forged_signature = pqc_sign(self.seller.pqc.secret_key, lib.pqc_signing_payload(message))  # seller's key, not buyer's
         result = self._send(self.vault.functions.release(escrow_id, forged_signature), gas=8_000_000)
         print(f"  escrow #{escrow_id}  tx {result['hash']}")
         print(f"  on-chain status: {result['status']} (0 = reverted)")
@@ -138,7 +129,7 @@ class AttackRunner:
         escrow_id = self._fresh_escrow()
         nonce = self.vault.functions.pqcNonce(self.w3.to_checksum_address(self.buyer.evm)).call()
         tampered = self._release_message(escrow_id, AMOUNT + 1_000_000, nonce)  # claims 1 QOR more
-        tampered_signature = pqc_sign(self.buyer.pqc.secret_key, tampered)
+        tampered_signature = pqc_sign(self.buyer.pqc.secret_key, lib.pqc_signing_payload(tampered))
         result = self._send(self.vault.functions.release(escrow_id, tampered_signature), gas=8_000_000)
         print(f"  escrow #{escrow_id}  tx {result['hash']}")
         print(f"  on-chain status: {result['status']} (0 = reverted)")
@@ -151,7 +142,7 @@ class AttackRunner:
         print("Control: correct buyer signature settles the escrow")
         nonce = self.vault.functions.pqcNonce(self.w3.to_checksum_address(self.buyer.evm)).call()
         message = self._release_message(escrow_id, AMOUNT, nonce)
-        signature = pqc_sign(self.buyer.pqc.secret_key, message)
+        signature = pqc_sign(self.buyer.pqc.secret_key, lib.pqc_signing_payload(message))
         result = self._send(self.vault.functions.release(escrow_id, signature), gas=8_000_000)
         print(f"  escrow #{escrow_id}  tx {result['hash']}")
         print(f"  on-chain status: {result['status']} (1 = success)")

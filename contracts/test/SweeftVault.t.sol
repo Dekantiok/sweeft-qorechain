@@ -78,7 +78,7 @@ contract SweeftVaultTest is Test {
 
     function setUp() public {
         oracle = new MockOracleRegistry();
-        vault = new SweeftVault(address(oracle));
+        vault = new SweeftVault(address(oracle), "qorechain-diana");
 
         // Etch precompile mocks at the fixed QoreChain addresses. The etched
         // copies have fresh storage, so initialize them through their ABI.

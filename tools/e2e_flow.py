@@ -37,6 +37,9 @@ from eth_abi import encode as abi_encode  # noqa: E402
 from qorsdk import derive_unified_account, pqc_sign  # noqa: E402
 from web3 import Web3  # noqa: E402
 
+sys.path.insert(0, str(REPO_ROOT / "tools"))
+import qor_lib as lib  # noqa: E402
+
 EVM_RPC = os.getenv("QORECHAIN_EVM_RPC_URL", "https://evm-testnet.qore.host")
 EXPLORER = os.getenv("QORECHAIN_EXPLORER_URL", "https://explore.qore.network")
 CHAIN_ID = int(os.getenv("QORECHAIN_EVM_CHAIN_ID", "9800"))
@@ -134,23 +137,12 @@ class Runner:
         self.results["confirm"] = result
         print(f"      tx {result['hash']}")
 
-        print("[3/4] buyer signs the release message with ML-DSA-87")
+        print("[3/4] buyer signs the release message with ML-DSA-87 (QoreX format)")
         nonce = self.vault.functions.pqcNonce(self.w3.to_checksum_address(self.buyer.evm)).call()
-        message = abi_encode(
-            ["string", "uint256", "address", "uint256", "address", "address", "uint256", "uint256"],
-            [
-                "sweeft-release-v1",
-                CHAIN_ID,
-                VAULT_ADDRESS,
-                escrow_id,
-                self.buyer.evm,
-                self.seller.evm,
-                AMOUNT,
-                nonce,
-            ],
-        )
-        signature = pqc_sign(self.buyer.pqc.secret_key, message)
-        print(f"      nonce={nonce} message={len(message)}B signature={len(signature)}B")
+        message = lib.release_message(VAULT_ADDRESS, escrow_id, self.buyer.evm, self.seller.evm, AMOUNT, nonce)
+        payload = lib.pqc_signing_payload(message)
+        signature = pqc_sign(self.buyer.pqc.secret_key, payload)
+        print(f"      nonce={nonce} message={len(message)}B payload={len(payload)}B signature={len(signature)}B")
 
         print("[4/4] release(escrowId, signature) — precompile verifies on-chain")
         seller_before = self.w3.eth.get_balance(self.w3.to_checksum_address(self.seller.evm))

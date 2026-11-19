@@ -102,6 +102,11 @@ contract SweeftVault {
     ///         Set once after both contracts are deployed.
     address public marketplace;
 
+    /// @notice Cosmos chain id as used in QoreSign message domain separation
+    ///         (e.g. "qorechain-diana"). QoreX signs messages as
+    ///         "qorechain-msg-v1|" + chainId + "|" + data.
+    string public cosmosChainId;
+
     /// @notice Contract deployment time.
     uint256 public immutable deployedAt;
 
@@ -113,9 +118,10 @@ contract SweeftVault {
 
     error MarketplaceAlreadySet();
 
-    constructor(address _oracleRegistry) {
+    constructor(address _oracleRegistry, string memory _cosmosChainId) {
         if (_oracleRegistry == address(0)) revert InvalidParties();
         oracleRegistry = _oracleRegistry;
+        cosmosChainId = _cosmosChainId;
         deployer = msg.sender;
         deployedAt = block.timestamp;
     }
@@ -312,8 +318,21 @@ contract SweeftVault {
         view
         returns (bytes memory)
     {
-        return abi.encode(
-            "sweeft-release-v1", block.chainid, address(this), escrowId, buyer, recipient, amount, nonce
+        return bytes(
+            string.concat(
+                "sweeft-release-v1|vault=",
+                _toHexString(address(this)),
+                "|escrow=",
+                _uintToString(escrowId),
+                "|buyer=",
+                _toHexString(buyer),
+                "|recipient=",
+                _toHexString(recipient),
+                "|amount=",
+                _uintToString(amount),
+                "|nonce=",
+                _uintToString(nonce)
+            )
         );
     }
 
@@ -322,19 +341,68 @@ contract SweeftVault {
         view
         returns (bytes memory)
     {
-        return abi.encode(
-            "sweeft-refund-v1", block.chainid, address(this), escrowId, buyer, recipient, amount, nonce
+        return bytes(
+            string.concat(
+                "sweeft-refund-v1|vault=",
+                _toHexString(address(this)),
+                "|escrow=",
+                _uintToString(escrowId),
+                "|buyer=",
+                _toHexString(buyer),
+                "|recipient=",
+                _toHexString(recipient),
+                "|amount=",
+                _uintToString(amount),
+                "|nonce=",
+                _uintToString(nonce)
+            )
         );
     }
 
     /// @dev Reads the guardian's registered ML-DSA-87 key from the chain and
-    ///      verifies the signature against the exact message. Fails closed.
+    ///      verifies the signature over the QoreSign message payload:
+    ///      "qorechain-msg-v1|" + chainId + "|" + message.
+    ///      This is exactly what QoreX's signArbitrary produces, so the wallet
+    ///      shows the release terms before the buyer approves. Fails closed.
     function _requirePqcSignature(address guardian, bytes memory message, bytes calldata signature) internal view {
         (bool registered,, bytes memory pubkey, bool proven) = PQC_KEYS.pqcKeyStatus(guardian);
         if (!registered || pubkey.length == 0) revert GuardianKeyNotRegistered();
         if (!proven) revert GuardianKeyNotProven();
 
-        if (!PQC_VERIFY.pqcVerify(pubkey, signature, message)) revert BadPqcSignature();
+        bytes memory payload = abi.encodePacked("qorechain-msg-v1|", cosmosChainId, "|", message);
+        if (!PQC_VERIFY.pqcVerify(pubkey, signature, payload)) revert BadPqcSignature();
+    }
+
+    /// @dev "0x" + lowercase hex of an address (deterministic, no checksum).
+    function _toHexString(address account) internal pure returns (string memory) {
+        bytes memory alphabet = "0123456789abcdef";
+        bytes20 data = bytes20(account);
+        bytes memory out = new bytes(42);
+        out[0] = "0";
+        out[1] = "x";
+        for (uint256 i = 0; i < 20; i++) {
+            out[2 + i * 2] = alphabet[uint8(data[i] >> 4)];
+            out[3 + i * 2] = alphabet[uint8(data[i] & 0x0f)];
+        }
+        return string(out);
+    }
+
+    /// @dev Decimal string of a uint256, no leading zeros.
+    function _uintToString(uint256 value) internal pure returns (string memory) {
+        if (value == 0) return "0";
+        uint256 temp = value;
+        uint256 digits;
+        while (temp != 0) {
+            digits++;
+            temp /= 10;
+        }
+        bytes memory buffer = new bytes(digits);
+        while (value != 0) {
+            digits -= 1;
+            buffer[digits] = bytes1(uint8(48 + (value % 10)));
+            value /= 10;
+        }
+        return string(buffer);
     }
 }
 

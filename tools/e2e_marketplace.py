@@ -168,23 +168,12 @@ def main() -> None:
     if not vault.functions.isReleaseEligible(escrow_id).call():
         lib.die("escrow never became release-eligible")
 
-    print("[settle] buyer signs the release message with ML-DSA-87")
+    print("[settle] buyer signs the release message with ML-DSA-87 (QoreX format)")
     nonce = vault.functions.pqcNonce(w3.to_checksum_address(buyer.evm)).call()
-    message = abi_encode(
-        ["string", "uint256", "address", "uint256", "address", "address", "uint256", "uint256"],
-        [
-            "sweeft-release-v1",
-            lib.EVM_CHAIN_ID,
-            lib.contract_address("SweeftVault"),
-            escrow_id,
-            buyer.evm,
-            seller.evm,
-            PRICE,
-            nonce,
-        ],
-    )
-    signature = pqc_sign(buyer.pqc.secret_key, message)
-    print(f"      nonce={nonce} signature={len(signature)}B")
+    message = lib.release_message(lib.contract_address("SweeftVault"), escrow_id, buyer.evm, seller.evm, PRICE, nonce)
+    payload = lib.pqc_signing_payload(message)
+    signature = pqc_sign(buyer.pqc.secret_key, payload)
+    print(f"      nonce={nonce} message={len(message)}B payload={len(payload)}B signature={len(signature)}B")
 
     seller_before = w3.eth.get_balance(w3.to_checksum_address(seller.evm))
     result = lib.send_evm_expect_success(
