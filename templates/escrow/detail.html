@@ -32,6 +32,12 @@
                 <dd class="hash text-slate-300">{{ escrow.seller.evm_address }}</dd>
                 <dt class="text-slate-500">Amount held</dt>
                 <dd class="text-teal-400 font-semibold">{{ escrow.amount_qor }} QOR</dd>
+                <dt class="text-slate-500">Platform fee (2% on release)</dt>
+                <dd class="text-slate-400">
+                    currently {% if escrow.fee_treasury_uqor or escrow.fee_dispute_uqor %}
+                    {{ escrow.fee_treasury_uqor|floatformat:0 }} uqor treasury / {{ escrow.fee_dispute_uqor|floatformat:0 }} uqor dispute pool
+                    {% else %}70% DAO treasury · 30% dispute reward pool{% endif %}
+                </dd>
                 <dt class="text-slate-500">Delivery deadline</dt>
                 <dd class="text-slate-300">{{ escrow.delivery_deadline|date:"Y-m-d H:i" }} UTC</dd>
             </dl>
@@ -133,6 +139,20 @@
                 <li>A used signature can never be replayed</li>
             </ul>
         </div>
+
+        {% if live.status == 1 %}
+        <div class="rounded-xl border border-amber-500/30 bg-amber-500/5 p-5">
+            <div class="text-xs font-semibold uppercase tracking-wider text-amber-400">Something wrong?</div>
+            <p class="mt-2 text-xs leading-relaxed text-slate-300">
+                Buyer or seller can freeze this escrow and open a dispute. A board of three staked
+                resolvers decides release or refund by 2-of-3 majority.
+            </p>
+            <button id="dispute-button" class="mt-3 w-full rounded-lg border border-amber-500/40 px-4 py-2 text-sm text-amber-300 hover:bg-amber-500/10 transition-colors">
+                Raise dispute
+            </button>
+            <p id="dispute-status" class="mt-2 text-xs text-slate-400"></p>
+        </div>
+        {% endif %}
     </div>
 </div>
 
@@ -183,6 +203,35 @@ releaseButton?.addEventListener("click", async () => {
     } catch (err) {
         releaseStatus.textContent = "";
         alert("Release failed: " + (err.message || err));
+    }
+});
+
+// Raise dispute — freezes the escrow via the dispute board.
+const disputeButton = document.getElementById("dispute-button");
+const disputeStatus = document.getElementById("dispute-status");
+const BOARD = "{{ dispute_board_address }}";
+
+disputeButton?.addEventListener("click", async () => {
+    if (!window.ethereum) {
+        alert("No EVM wallet found (MetaMask/QoreX).");
+        return;
+    }
+    try {
+        // openDispute(uint256 escrowId) — selector 0x27d00fb0
+        const data = "0x27d00fb0" + ESCROW_ID.toString(16).padStart(64, "0");
+        disputeStatus.textContent = "Confirm in your wallet…";
+        const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+        const txHash = await window.ethereum.request({
+            method: "eth_sendTransaction",
+            params: [{ from: accounts[0], to: BOARD, data }],
+        });
+        disputeStatus.textContent = "Dispute opened — resolvers can now join.";
+        console.log("dispute tx", txHash);
+        setTimeout(() => location.reload(), 6000);
+    } catch (err) {
+        disputeStatus.textContent = "";
+        alert("Dispute failed: " + (err.message || err) +
+              "\n\nOnly the buyer or seller can raise a dispute, and only while escrowed.");
     }
 });
 </script>

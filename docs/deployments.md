@@ -7,15 +7,42 @@
 
 ## Contracts
 
-| Contract | Address | Deploy tx |
+| Contract | Address | Notes |
 |---|---|---|
-| SweeftOracleRegistry | `0xecb16561cfdff10336b278f8107a077fe7a53c6d` | `0x3d2743b89f62ca9aa287b555c097cfae88ce40296b423ffa4fa2935c36ca9a92` |
-| SweeftDAO | `0x03a0c71c42dcef463f8b472cb39991cedac2dc1b` | `0xeb4a1100b20be48acd41099a2f9cc9ef3b316f5e2c013db244e477a9a9f3e0c3` |
-| **SweeftVault (v2)** | `0xd2ecd7ce5cb600c6730e9873e9e505854ab7e81d` | v2 deploy script |
-| **SweeftMarketplace (v2)** | `0xa51bff719e35647cf6f4d4056cf11c20cdcdc781` | v2 deploy script |
+| SweeftOracleRegistry | `0xecb16561cfdff10336b278f8107a077fe7a53c6d` | kept; ownership migrated to DAO2 by proposal |
+| **SweeftVault (v3)** | `0xa95dfbef4325e6ca06eaeab006c6a31994cc7fcc` | fees + dispute freeze |
+| **SweeftMarketplace (v3)** | `0x809081ac763755239bf6176a01555adacc14d46f` | |
+| **SweeftDisputeBoard** | `0x2c8cc9205c7354a93b27564d653362e0873217fc` | staked resolver panels |
+| **SweeftDAO2** | `0x794b2aa6b5b7884ec71cf0361a41a6d711b0996a` | allowlisted targets: registry, vault, board |
+| SweeftDAO (v1) | `0x03a0c71c42dcef463f8b472cb39991cedac2dc1b` | executed the registry migration |
 
-> v2 adds the QoreSign message format (below). v1 Vault was `0x315f2f19de227bb7d01e4315085c6919e7b654c6`,
-> v1 Marketplace `0x86e97fb8653588a2533d55426475cd3a1d04f030` — kept here for the record.
+### v3 economics
+
+- Platform fee: **2% on release only** — refunds are free.
+- Split: **70% DAO treasury / 30% dispute reward pool**.
+- Resolvers: **20 QOR minimum stake**, up to 3 per dispute, 2-of-3 majority,
+  each voter claims **10% of the escrow fee** from the pool.
+
+## Governance migration evidence
+
+| Step | Result |
+|---|---|
+| DAO v1 proposal "Migrate verifier governance to DAO v2" | executed — tx `0x4e84b6a65ccbbdfd4a85d202c5e6d25f4fb6a5dbd08617c2d0a201526dab14cd` |
+| Registry owner after execution | `0x794b2Aa6b5B7884eC71cF0361A41A6d711B0996a` (DAO2) |
+
+## Dispute resolution evidence (Diana testnet)
+
+Full staked-resolver flow (`tools/e2e_dispute.py`): resolvers stake 20 QOR →
+buyer freezes an escrow with a dispute → three resolvers join → 2-of-3 vote
+release → seller paid minus the 2% fee → voters claim rewards from the pool.
+
+| Step | Observed |
+|---|---|
+| Seller received | 0.098 QOR on a 0.1 QOR escrow (fee 0.002) |
+| Treasury share | 0.0014 QOR (70%) |
+| Dispute pool share | 0.0006 QOR (30%) |
+| Resolver reward each | 0.0002 QOR (10% of fee) |
+| Escrow final state | Completed (release) / Refunded (refund path) |
 
 ## Release authorization format (QoreSign-compatible)
 

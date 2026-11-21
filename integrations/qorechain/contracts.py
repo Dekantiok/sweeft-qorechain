@@ -30,6 +30,8 @@ ADDRESS_ENV = {
     "SweeftMarketplace": "SWEEFT_MARKETPLACE_ADDRESS",
     "SweeftOracleRegistry": "SWEEFT_ORACLE_REGISTRY_ADDRESS",
     "SweeftDAO": "SWEEFT_DAO_ADDRESS",
+    "SweeftDAO2": "SWEEFT_DAO2_ADDRESS",
+    "SweeftDisputeBoard": "SWEEFT_DISPUTE_BOARD_ADDRESS",
 }
 
 

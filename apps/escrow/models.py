@@ -24,6 +24,7 @@ class Escrow(models.Model):
         COMPLETED = "completed", "Completed"
         CANCELLED = "cancelled", "Cancelled"
         REFUNDED = "refunded", "Refunded"
+        DISPUTED = "disputed", "Disputed"
 
     on_chain_id = models.PositiveBigIntegerField(unique=True)
     order = models.OneToOneField(Order, on_delete=models.PROTECT, related_name="escrow")
@@ -34,6 +35,10 @@ class Escrow(models.Model):
     amount_uqor = models.DecimalField(max_digits=30, decimal_places=0)
     delivery_deadline = models.DateTimeField()
     inspection_period_hours = models.PositiveIntegerField(default=48)
+
+    # Platform fee (2% default), split treasury/dispute at release time
+    fee_treasury_uqor = models.DecimalField(max_digits=30, decimal_places=0, default=0)
+    fee_dispute_uqor = models.DecimalField(max_digits=30, decimal_places=0, default=0)
 
     state = models.CharField(max_length=20, choices=State.choices, default=State.CREATED)
 

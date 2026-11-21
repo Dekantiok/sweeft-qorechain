@@ -26,7 +26,7 @@ from integrations.qorechain.events import fetch_events
 
 logger = logging.getLogger(__name__)
 
-CONTRACTS = ["SweeftMarketplace", "SweeftVault", "SweeftOracleRegistry", "SweeftDAO"]
+CONTRACTS = ["SweeftMarketplace", "SweeftVault", "SweeftOracleRegistry", "SweeftDAO", "SweeftDAO2", "SweeftDisputeBoard"]
 
 # Blocks to stay behind the tip when indexing (public RPC replica lag).
 HEAD_LAG_BLOCKS = 8
@@ -41,9 +41,22 @@ EVENTS = {
         "EvidenceAttested",
         "FundsReleased",
         "EscrowRefunded",
+        "DisputeRaised",
+        "DisputeResolved",
+        "FeeCollected",
     ],
     "SweeftOracleRegistry": ["VerifierAdded", "VerifierRemoved"],
     "SweeftDAO": ["ProposalCreated", "VoteCast", "ProposalExecuted", "ProposalRejected"],
+    "SweeftDAO2": ["ProposalCreated", "VoteCast", "ProposalExecuted", "ProposalRejected"],
+    "SweeftDisputeBoard": [
+        "Staked",
+        "StakeWithdrawn",
+        "DisputeOpened",
+        "ResolverJoined",
+        "ResolverVoted",
+        "DisputeSettled",
+        "RewardClaimed",
+    ],
 }
 
 
@@ -280,6 +293,269 @@ def _recompute(participant: Participant) -> None:
     profile.save()
 
 
+# ---------------------------------------------------------------------------
+# Fees and disputes
+# ---------------------------------------------------------------------------
+
+
+def _handle_fee_collected(event) -> dict:
+    args = event.args
+    escrow = Escrow.objects.filter(on_chain_id=int(args["escrowId"])).first()
+    if escrow:
+        escrow.fee_treasury_uqor = _wei_to_uqor(args["treasuryShare"])
+        escrow.fee_dispute_uqor = _wei_to_uqor(args["disputeShare"])
+        escrow.save(update_fields=["fee_treasury_uqor", "fee_dispute_uqor", "updated_at"])
+    return {"escrow_id": args["escrowId"]}
+
+
+def _handle_vault_dispute_raised(event) -> dict:
+    escrow = Escrow.objects.filter(on_chain_id=int(event.args["escrowId"])).first()
+    if escrow:
+        escrow.state = Escrow.State.DISPUTED
+        escrow.save(update_fields=["state", "updated_at"])
+    return {"escrow_id": event.args["escrowId"]}
+
+
+def _handle_dispute_resolved(event) -> dict:
+    """Vault-side resolution (board settlement). Completions count for Cred."""
+    args = event.args
+    escrow = Escrow.objects.filter(on_chain_id=int(args["escrowId"])).first()
+    if escrow is None:
+        return {"escrow_id": args["escrowId"]}
+    release = bool(args["releaseToSeller"])
+
+    escrow.state = Escrow.State.COMPLETED if release else Escrow.State.REFUNDED
+    escrow.save(update_fields=["state", "updated_at"])
+    escrow.order.state = Order.State.COMPLETED if release else Order.State.CANCELLED
+    escrow.order.save(update_fields=["state", "updated_at"])
+
+    if release:
+        for participant in (escrow.buyer, escrow.seller):
+            ReputationEvent.objects.get_or_create(
+                escrow=escrow,
+                participant=participant,
+                kind=ReputationEvent.Kind.ESCROW_COMPLETED,
+                defaults={"on_chain_tx": event.tx_hash, "note": "dispute resolution"},
+            )
+            _recompute(participant)
+    else:
+        ReputationEvent.objects.get_or_create(
+            escrow=escrow,
+            participant=escrow.buyer,
+            kind=ReputationEvent.Kind.ESCROW_REFUNDED,
+            defaults={"on_chain_tx": event.tx_hash, "note": "dispute resolution"},
+        )
+        _recompute(escrow.buyer)
+    return {"escrow_id": args["escrowId"], "release_to_seller": release}
+
+
+def _handle_staked(event) -> dict:
+    from apps.governance.models import ResolverProfile
+
+    participant = _participant_for(event.args["account"])
+    profile, _ = ResolverProfile.objects.get_or_create(participant=participant)
+    profile.staked_uqor = _wei_to_uqor(event.args["total"])
+    profile.save(update_fields=["staked_uqor", "updated_at"])
+    return {"resolver": event.args["account"]}
+
+
+def _handle_stake_withdrawn(event) -> dict:
+    from apps.governance.models import ResolverProfile
+
+    participant = Participant.objects.filter(evm_address__iexact=event.args["account"].lower()).first()
+    if participant:
+        profile, _ = ResolverProfile.objects.get_or_create(participant=participant)
+        profile.staked_uqor = 0
+        profile.save(update_fields=["staked_uqor", "updated_at"])
+    return {"resolver": event.args["account"]}
+
+
+def _handle_dispute_opened(event) -> dict:
+    from datetime import datetime, timezone as dt_timezone
+
+    from apps.governance.models import Dispute
+
+    args = event.args
+    escrow = Escrow.objects.filter(on_chain_id=int(args["escrowId"])).first()
+    if escrow is None:
+        return {"dispute_id": args["disputeId"]}
+
+    dispute, _ = Dispute.objects.update_or_create(
+        on_chain_id=int(args["disputeId"]),
+        defaults={
+            "escrow": escrow,
+            "raiser": _participant_for(args["raiser"]),
+            "voting_ends_at": datetime.fromtimestamp(int(args["votingEndsAt"]), tz=dt_timezone.utc),
+            "opened_tx": event.tx_hash,
+        },
+    )
+    # Escrow state is driven by the Vault's own events (DisputeRaised /
+    # DisputeResolved) — do not touch it here or a replay could revert a
+    # resolved escrow back to Disputed.
+    return {"dispute_id": dispute.on_chain_id}
+
+
+def _handle_resolver_joined(event) -> dict:
+    from apps.governance.models import Dispute, DisputeMember
+
+    args = event.args
+    dispute = Dispute.objects.filter(on_chain_id=int(args["disputeId"])).first()
+    if dispute:
+        DisputeMember.objects.get_or_create(
+            dispute=dispute,
+            participant=_participant_for(args["resolver"]),
+            defaults={"position": int(args["position"])},
+        )
+    return {"dispute_id": args["disputeId"]}
+
+
+def _handle_resolver_voted(event) -> dict:
+    from apps.governance.models import Dispute, DisputeMember
+
+    args = event.args
+    dispute = Dispute.objects.filter(on_chain_id=int(args["disputeId"])).first()
+    if dispute:
+        member = DisputeMember.objects.filter(
+            dispute=dispute, participant__evm_address__iexact=args["resolver"].lower()
+        ).first()
+        if member:
+            member.vote_release = bool(args["releaseToSeller"])
+            member.save(update_fields=["vote_release"])
+        # Recount instead of incrementing — handlers must be replay-safe.
+        dispute.votes_for_release = dispute.members.filter(vote_release=True).count()
+        dispute.votes_for_refund = dispute.members.filter(vote_release=False).count()
+        dispute.save(update_fields=["votes_for_release", "votes_for_refund", "updated_at"])
+    return {"dispute_id": args["disputeId"]}
+
+
+def _handle_dispute_settled(event) -> dict:
+    from apps.governance.models import Dispute
+
+    args = event.args
+    dispute = Dispute.objects.filter(on_chain_id=int(args["disputeId"])).first()
+    if dispute:
+        dispute.state = Dispute.State.RESOLVED
+        dispute.release_to_seller = bool(args["releaseToSeller"])
+        dispute.settled_tx = event.tx_hash
+        dispute.save(update_fields=["state", "release_to_seller", "settled_tx", "updated_at"])
+    return {"dispute_id": args["disputeId"]}
+
+
+def _handle_reward_claimed(event) -> dict:
+    from django.db.models import Sum
+
+    from apps.governance.models import Dispute, DisputeMember, ResolverProfile
+
+    args = event.args
+    dispute = Dispute.objects.filter(on_chain_id=int(args["disputeId"])).first()
+    if dispute:
+        member = DisputeMember.objects.filter(
+            dispute=dispute, participant__evm_address__iexact=args["resolver"].lower()
+        ).first()
+        if member:
+            member.claimed = True
+            member.claimed_uqor = _wei_to_uqor(args["amount"])
+            member.save(update_fields=["claimed", "claimed_uqor"])
+
+        profile, _ = ResolverProfile.objects.get_or_create(participant=_participant_for(args["resolver"]))
+        # Recompute from member claims — replay-safe.
+        total = (
+            DisputeMember.objects.filter(participant=profile.participant, claimed=True).aggregate(
+                total=Sum("claimed_uqor")
+            )["total"]
+            or 0
+        )
+        profile.rewards_claimed_uqor = total
+        profile.save(update_fields=["rewards_claimed_uqor", "updated_at"])
+    return {"dispute_id": args["disputeId"]}
+
+
+# ---------------------------------------------------------------------------
+# Governance proposals
+# ---------------------------------------------------------------------------
+
+_ADD_VERIFIER_SELECTOR = "0x7065cb48"  # addVerifier(address)
+_REMOVE_VERIFIER_SELECTOR = "0xfcec1d9b"  # removeVerifier(address)
+
+
+def _proposal_kind(call_data: str) -> str:
+    from apps.governance.models import Proposal
+
+    if call_data.startswith(_ADD_VERIFIER_SELECTOR):
+        return Proposal.Kind.VERIFIER_APPROVAL
+    if call_data.startswith(_REMOVE_VERIFIER_SELECTOR):
+        return Proposal.Kind.VERIFIER_REMOVAL
+    return Proposal.Kind.OTHER
+
+
+def _handle_proposal_created(event, *, has_target: bool) -> dict:
+    from datetime import datetime, timezone as dt_timezone
+
+    from apps.governance.models import Proposal
+
+    args = event.args
+    proposal_id = int(args["proposalId"])
+
+    call_data = args.get("callData", "") if has_target else ""
+    call_data_hex = "0x" + bytes(call_data).hex() if isinstance(call_data, (bytes, bytearray)) else str(call_data)
+
+    proposal, _ = Proposal.objects.update_or_create(
+        on_chain_id=proposal_id,
+        defaults={
+            "proposer": _participant_for(args["proposer"]),
+            "kind": _proposal_kind(call_data_hex) if call_data_hex.startswith("0x") and len(call_data_hex) > 2 else Proposal.Kind.OTHER,
+            "title": args.get("title", f"Proposal #{proposal_id}"),
+            "description": "",
+            "voting_ends_at": datetime.fromtimestamp(int(args["votingEndsAt"]), tz=dt_timezone.utc),
+            "payload": {
+                "target": args.get("target", ""),
+                "call_data": call_data_hex,
+                "description_hash": "",
+            },
+            "state": Proposal.State.OPEN,
+        },
+    )
+    return {"proposal_id": proposal.on_chain_id}
+
+
+def _handle_proposal_voted(event) -> dict:
+    from apps.governance.models import Proposal, Vote
+
+    args = event.args
+    proposal = Proposal.objects.filter(on_chain_id=int(args["proposalId"])).first()
+    if proposal and "voter" in args:
+        choice = {1: Vote.Choice.FOR, 2: Vote.Choice.AGAINST, 3: Vote.Choice.ABSTAIN}.get(
+            int(args["choice"]), Vote.Choice.ABSTAIN
+        )
+        Vote.objects.get_or_create(
+            proposal=proposal,
+            voter=_participant_for(args["voter"]),
+            defaults={"choice": choice},
+        )
+    return {"proposal_id": args["proposalId"]}
+
+
+def _handle_proposal_executed(event) -> dict:
+    from apps.governance.models import Proposal
+
+    proposal = Proposal.objects.filter(on_chain_id=int(event.args["proposalId"])).first()
+    if proposal:
+        proposal.state = Proposal.State.EXECUTED
+        proposal.execution_tx = event.tx_hash
+        proposal.save(update_fields=["state", "execution_tx"])
+    return {"proposal_id": event.args["proposalId"]}
+
+
+def _handle_proposal_rejected(event) -> dict:
+    from apps.governance.models import Proposal
+
+    proposal = Proposal.objects.filter(on_chain_id=int(event.args["proposalId"])).first()
+    if proposal:
+        proposal.state = Proposal.State.REJECTED
+        proposal.save(update_fields=["state"])
+    return {"proposal_id": event.args["proposalId"]}
+
+
 HANDLERS = {
     ("SweeftMarketplace", "ListingCreated"): _handle_listing_created,
     ("SweeftMarketplace", "ListingPurchased"): _handle_listing_purchased,
@@ -291,6 +567,24 @@ HANDLERS = {
     ("SweeftVault", "EvidenceAttested"): _handle_evidence_attested,
     ("SweeftVault", "FundsReleased"): _handle_funds_released,
     ("SweeftVault", "EscrowRefunded"): _handle_escrow_refunded,
+    ("SweeftVault", "DisputeRaised"): _handle_vault_dispute_raised,
+    ("SweeftVault", "DisputeResolved"): _handle_dispute_resolved,
+    ("SweeftVault", "FeeCollected"): _handle_fee_collected,
+    ("SweeftDisputeBoard", "Staked"): _handle_staked,
+    ("SweeftDisputeBoard", "StakeWithdrawn"): _handle_stake_withdrawn,
+    ("SweeftDisputeBoard", "DisputeOpened"): _handle_dispute_opened,
+    ("SweeftDisputeBoard", "ResolverJoined"): _handle_resolver_joined,
+    ("SweeftDisputeBoard", "ResolverVoted"): _handle_resolver_voted,
+    ("SweeftDisputeBoard", "DisputeSettled"): _handle_dispute_settled,
+    ("SweeftDisputeBoard", "RewardClaimed"): _handle_reward_claimed,
+    ("SweeftDAO", "ProposalCreated"): lambda e: _handle_proposal_created(e, has_target=False),
+    ("SweeftDAO", "VoteCast"): _handle_proposal_voted,
+    ("SweeftDAO", "ProposalExecuted"): _handle_proposal_executed,
+    ("SweeftDAO", "ProposalRejected"): _handle_proposal_rejected,
+    ("SweeftDAO2", "ProposalCreated"): lambda e: _handle_proposal_created(e, has_target=True),
+    ("SweeftDAO2", "VoteCast"): _handle_proposal_voted,
+    ("SweeftDAO2", "ProposalExecuted"): _handle_proposal_executed,
+    ("SweeftDAO2", "ProposalRejected"): _handle_proposal_rejected,
 }
 
 
@@ -367,5 +661,18 @@ def sync_contract(name: str, *, max_blocks: int | None = None) -> int:
     return handled
 
 
-def sync_all(*, max_blocks: int | None = None) -> dict:
-    return {name: sync_contract(name, max_blocks=max_blocks) for name in CONTRACTS}
+def sync_all(*, max_blocks: int | None = None, max_rounds: int = 15) -> dict:
+    """Catch up every contract, looping until no cursor advances further.
+
+    A single pass caps at ``max_blocks`` per contract (the public RPC limits
+    eth_getLogs); the loop lets one call catch up across the full history.
+    """
+    results = {name: 0 for name in CONTRACTS}
+    for _ in range(max_rounds):
+        before = {c.contract_name: c.last_processed_block for c in IndexerCursor.objects.all()}
+        for name in CONTRACTS:
+            results[name] += sync_contract(name, max_blocks=max_blocks)
+        after = {c.contract_name: c.last_processed_block for c in IndexerCursor.objects.all()}
+        if after == before:
+            break
+    return results

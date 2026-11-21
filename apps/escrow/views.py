@@ -36,6 +36,8 @@ def escrow_detail(request, escrow_id: int):
     except Exception:
         logger.exception("could not read on-chain escrow state")
 
+    import os
+
     return render(
         request,
         "escrow/detail.html",
@@ -43,6 +45,7 @@ def escrow_detail(request, escrow_id: int):
             "escrow": escrow,
             "live": live_state,
             "network": get_network(),
+            "dispute_board_address": os.getenv("SWEEFT_DISPUTE_BOARD_ADDRESS", ""),
         },
     )
 

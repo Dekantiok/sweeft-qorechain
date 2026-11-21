@@ -96,7 +96,31 @@ def escrow_state(escrow_id: int) -> dict:
         "confirmed": escrow[7],
         "attested": escrow[8],
         "released": escrow[9],
+        "verifier": escrow[10],
         "release_eligible": vault.functions.isReleaseEligible(escrow_id).call(),
         "refundable": vault.functions.isRefundable(escrow_id).call(),
         "pqc_nonce": vault.functions.pqcNonce(w3.to_checksum_address(escrow[0])).call(),
+    }
+
+
+def board_state() -> dict:
+    """Read the dispute board's parameters and pool directly from the chain."""
+    import json
+    import os
+
+    from integrations.qorechain.contracts_base import load_abi, make_contract
+
+    w3 = get_evm_client()
+    address = os.getenv("SWEEFT_DISPUTE_BOARD_ADDRESS", "")
+    if not address:
+        raise RelayerError("SWEEFT_DISPUTE_BOARD_ADDRESS is not configured")
+    abi = load_abi(artifact_path("SweeftDisputeBoard"))
+    board = make_contract(w3, address, abi)
+    return {
+        "address": w3.to_checksum_address(address),
+        "min_stake_wei": int(board.functions.minStake().call()),
+        "reward_pool_wei": int(board.functions.rewardPool().call()),
+        "voting_period": int(board.functions.votingPeriod().call()),
+        "unstake_cooldown": int(board.functions.unstakeCooldown().call()),
+        "dispute_count": int(board.functions.disputeCount().call()),
     }
