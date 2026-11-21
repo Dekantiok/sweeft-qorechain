@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
 import httpx
@@ -69,6 +70,8 @@ CONTRACTS = {
     "SweeftMarketplace": "SWEEFT_MARKETPLACE_ADDRESS",
     "SweeftOracleRegistry": "SWEEFT_ORACLE_REGISTRY_ADDRESS",
     "SweeftDAO": "SWEEFT_DAO_ADDRESS",
+    "SweeftDAO2": "SWEEFT_DAO2_ADDRESS",
+    "SweeftDisputeBoard": "SWEEFT_DISPUTE_BOARD_ADDRESS",
 }
 
 
@@ -177,6 +180,14 @@ def ensure_pqc_registered(unified) -> None:
     tx_hash = _check_broadcast(response, f"PQ registration for {unified.cosmos}")
     print(f"    PQ key registered: {tx_hash}")
 
+    # Wait for the registration to be included: the next native tx (window
+    # open) must use the advanced sequence or it is rejected at CheckTx.
+    for _ in range(12):
+        time.sleep(3)
+        latest = account_info(unified.cosmos)
+        if latest and latest["sequence"] > info["sequence"]:
+            return
+
 
 def window_status(address: str) -> dict | None:
     response = httpx.get(f"{REST_URL}/qorechain/pqc/v1/evm_window/{address}", timeout=20)
@@ -186,6 +197,29 @@ def window_status(address: str) -> dict | None:
     return payload if payload.get("found") else None
 
 
+def close_evm_window(unified) -> None:
+    """Close the account's EVM window now (hybrid-signed native tx)."""
+    info = account_info(unified.cosmos)
+    if info is None:
+        die(f"{unified.cosmos} has no funds")
+
+    close_msg = msg.pqc.close_evm_window(sender=unified.cosmos)
+
+    def build(version):
+        return sign_hybrid_eth(
+            account=unified,
+            chain_id=CHAIN_ID,
+            account_number=info["account_number"],
+            messages=[close_msg],
+            fee={"amount": [{"denom": "uqor", "amount": "40000"}], "gas": "400000"},
+            sequence=info["sequence"],
+            sign_bytes_version=version,
+        )
+
+    response = hybrid_sign_and_broadcast(build, chain_id=CHAIN_ID, rest_url=REST_URL)
+    print(f"    window closed: {_check_broadcast(response, 'close window')}")
+
+
 def ensure_evm_window(
     unified,
     *,
@@ -193,13 +227,24 @@ def ensure_evm_window(
     max_txs: int = 60,
     max_value: int = 10_000_000,
     min_txs: int = 10,
+    min_value: int = 0,
 ) -> None:
-    """Open a scoped EVM window unless a live one with headroom already exists."""
+    """Open a scoped EVM window, reusing a live one with enough headroom.
+
+    ``min_value`` is the remaining uqor value the caller needs; a live window
+    with less is closed and replaced.
+    """
     status = window_status(unified.cosmos)
-    if status and status.get("live") and int(status.get("remaining_txs", 0)) >= min_txs:
-        print(f"    window live: {status.get('remaining_txs')} txs left, "
-              f"expires at height {status.get('expiry_height')}")
-        return
+    if status and status.get("live"):
+        remaining_txs = int(status.get("remaining_txs", 0))
+        raw_value = status.get("remaining_value_uqor") or status.get("remaining_value") or 0
+        remaining_value = int(raw_value)
+        if remaining_txs >= min_txs and remaining_value >= min_value:
+            print(f"    window live: {remaining_txs} txs, {remaining_value} uqor left")
+            return
+        print(f"    window insufficient ({remaining_txs} txs, {remaining_value} uqor) — replacing")
+        close_evm_window(unified)
+        time.sleep(6)
 
     info = account_info(unified.cosmos)
     if info is None:
@@ -222,6 +267,9 @@ def ensure_evm_window(
     response = hybrid_sign_and_broadcast(build, chain_id=CHAIN_ID, rest_url=REST_URL)
     tx_hash = _check_broadcast(response, f"EVM window open for {unified.cosmos}")
     print(f"    EVM window opened: {tx_hash}")
+    # The chain needs a block or two to activate the window; EVM txs sent in
+    # the same instant can be dropped from the mempool.
+    time.sleep(12)
 
 
 # ---------------------------------------------------------------------------
@@ -230,22 +278,34 @@ def ensure_evm_window(
 
 
 def send_evm(w3: Web3, unified, fn_call, *, value: int = 0, gas: int = 800_000) -> dict:
-    """Sign and send one EVM-lane transaction; wait for the receipt."""
+    """Sign and send one EVM-lane transaction; wait for the receipt.
+
+    Public RPC nodes can drop a freshly broadcast transaction (replica lag,
+    mempool eviction); retry up to three times with a fresh nonce.
+    """
     eth_account = w3.eth.account.from_key(unified.private_key_hex)
-    tx = fn_call.build_transaction(
-        {
-            "from": eth_account.address,
-            "value": value,
-            "gas": gas,
-            "gasPrice": w3.eth.gas_price,
-            "nonce": w3.eth.get_transaction_count(eth_account.address, "pending"),
-            "chainId": EVM_CHAIN_ID,
-        }
-    )
-    signed = eth_account.sign_transaction(tx)
-    tx_hash = w3.eth.send_raw_transaction(signed.rawTransaction)
-    receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=180)
-    return {"hash": tx_hash.hex(), "status": receipt.status, "gas_used": receipt.gasUsed}
+    last_hash = None
+    for attempt in range(3):
+        tx = fn_call.build_transaction(
+            {
+                "from": eth_account.address,
+                "value": value,
+                "gas": gas,
+                "gasPrice": w3.eth.gas_price,
+                "nonce": w3.eth.get_transaction_count(eth_account.address, "pending"),
+                "chainId": EVM_CHAIN_ID,
+            }
+        )
+        signed = eth_account.sign_transaction(tx)
+        tx_hash = w3.eth.send_raw_transaction(signed.rawTransaction)
+        last_hash = tx_hash.hex()
+        try:
+            receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=90)
+            return {"hash": tx_hash.hex(), "status": receipt.status, "gas_used": receipt.gasUsed}
+        except Exception:
+            # Not mined — wait a moment and retry with a fresh nonce.
+            time.sleep(8)
+    die(f"transaction never mined after retries: {last_hash}")
 
 
 def send_evm_expect_success(w3: Web3, unified, fn_call, *, value: int = 0, gas: int = 800_000) -> dict:
@@ -256,20 +316,25 @@ def send_evm_expect_success(w3: Web3, unified, fn_call, *, value: int = 0, gas: 
 
 
 def transfer_qor(w3: Web3, sender_unified, to_address: str, amount_uqor: int, *, gas: int = 100_000) -> dict:
-    """Send a plain QOR value transfer on the EVM lane."""
+    """Send a plain QOR value transfer on the EVM lane (with retry)."""
     eth_account = w3.eth.account.from_key(sender_unified.private_key_hex)
-    tx = {
-        "from": eth_account.address,
-        "to": w3.to_checksum_address(to_address),
-        "value": amount_uqor,
-        "gas": gas,
-        "gasPrice": w3.eth.gas_price,
-        "nonce": w3.eth.get_transaction_count(eth_account.address, "pending"),
-        "chainId": EVM_CHAIN_ID,
-    }
-    signed = eth_account.sign_transaction(tx)
-    tx_hash = w3.eth.send_raw_transaction(signed.rawTransaction)
-    receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=180)
-    if receipt.status != 1:
-        die(f"transfer reverted: {tx_hash.hex()}")
-    return {"hash": tx_hash.hex(), "status": receipt.status}
+    for attempt in range(3):
+        tx = {
+            "from": eth_account.address,
+            "to": w3.to_checksum_address(to_address),
+            "value": amount_uqor,
+            "gas": gas,
+            "gasPrice": w3.eth.gas_price,
+            "nonce": w3.eth.get_transaction_count(eth_account.address, "pending"),
+            "chainId": EVM_CHAIN_ID,
+        }
+        signed = eth_account.sign_transaction(tx)
+        tx_hash = w3.eth.send_raw_transaction(signed.rawTransaction)
+        try:
+            receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=90)
+            if receipt.status != 1:
+                die(f"transfer reverted: {tx_hash.hex()}")
+            return {"hash": tx_hash.hex(), "status": receipt.status}
+        except Exception:
+            time.sleep(8)
+    die(f"transfer never mined: {to_address}")
