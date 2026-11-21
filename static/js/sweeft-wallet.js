@@ -148,10 +148,13 @@
     }
 
     function optionButton(id, badge, title, subtitle, enabled) {
+        // Rows stay clickable even when a wallet is not detected: clicking
+        // re-runs discovery instead of doing nothing.
         return (
-            `<button id="${id}" ${enabled ? "" : "disabled"} style="width:100%;text-align:left;display:flex;` +
+            `<button id="${id}" style="width:100%;text-align:left;display:flex;` +
             "gap:12px;align-items:center;border:1px solid #1e293b;border-radius:12px;padding:12px;margin-bottom:10px;" +
-            (enabled ? "cursor:pointer;background:#0b1220" : "cursor:not-allowed;opacity:0.5;background:#0b1220") +
+            "cursor:pointer;background:#0b1220;" +
+            (enabled ? "" : "opacity:0.55;") +
             '">' +
             `<div style="width:36px;height:36px;border-radius:10px;background:#134e4a;color:#5eead4;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px">${badge}</div>` +
             `<div style="min-width:0"><div style="color:#e2e8f0;font-weight:600;font-size:14px">${title}</div>` +
@@ -160,8 +163,10 @@
         );
     }
 
+    const METAMASK_RDNS = "io.metamask";
+
     async function renderOptions() {
-        await discoverEvmProviders();
+        await discoverEvmProviders(600);
         const body = modal().querySelector("#wallet-modal-body");
         const native = qorexNative();
         const hasNative = !!native;
@@ -169,24 +174,35 @@
         const capabilities = (native && native.capabilities) || [];
         const nativeSigningOk = hasNative && capabilities.includes("signArbitrary");
         const nativeHint = !hasNative
-            ? "not detected in this browser"
+            ? "not detected — install the QoreX extension, then press this row"
             : !nativeSigningOk
               ? "detected — this build does not announce signArbitrary; update QoreX"
               : "ML-DSA-87 post-quantum login and signing";
 
         let html = optionButton("wallet-pick-qorex", "Q", "QoreX", nativeHint, hasNative && nativeSigningOk);
 
-        // QoreX's EVM provider answers account queries only — it cannot sign or
-        // send yet (official QoreX limitation), so it is not offered for login
-        // or transactions. MetaMask-style providers are.
+        // --- EVM wallets (MetaMask-style). QoreX's EVM lane is excluded: per
+        // the official QoreX docs it answers account queries only and cannot
+        // sign or send yet.
         const signable = evmProviders.filter((entry) => entry.info.rdns !== QOREX_RDNS);
-        const qorexEvmSeen = evmProviders.some((entry) => entry.info.rdns === QOREX_RDNS);
+        const evmEntry =
+            signable.find((entry) => entry.info.rdns === METAMASK_RDNS) ||
+            signable.find((entry) => entry.info.uuid === "legacy-window-ethereum") ||
+            signable[0] ||
+            null;
+        const evmHint = evmEntry
+            ? `detected (${evmEntry.info.name}) — classical signing for EVM actions`
+            : "not detected — install MetaMask, then press this row to re-check";
+        html += optionButton("wallet-pick-evm", "E", "MetaMask / EVM wallet", evmHint, !!evmEntry);
 
+        // Any additional announced EVM wallet (beyond the one shown above).
         for (const entry of signable) {
+            if (evmEntry && entry === evmEntry) continue;
             const id = "wallet-pick-evm-" + entry.info.uuid.replace(/[^a-zA-Z0-9-]/g, "");
             html += optionButton(id, "E", entry.info.name, "classical signing — buy, disputes, voting", true);
         }
 
+        const qorexEvmSeen = evmProviders.some((entry) => entry.info.rdns === QOREX_RDNS);
         if (qorexEvmSeen) {
             html +=
                 '<p style="color:#64748b;font-size:11px;line-height:1.6;margin-top:2px">' +
@@ -194,18 +210,33 @@
                 "use MetaMask-style wallets for EVM actions, and QoreX for post-quantum signing.</p>";
         }
 
-        if (!hasNative && !signable.length) {
-            html +=
-                '<p style="color:#94a3b8;font-size:12px;line-height:1.7">No signing wallet detected in this browser. ' +
-                'Install the <a style="color:#5eead4" href="https://qorechain.io/qorex" target="_blank">QoreX wallet</a> ' +
-                "(post-quantum signing) and/or MetaMask (EVM actions), then reload.</p>";
-        }
-
         body.innerHTML = html;
-        if (hasNative && nativeSigningOk) {
-            document.getElementById("wallet-pick-qorex").addEventListener("click", connectQorex);
-        }
+
+        // Wire the QoreX row: connect when possible, otherwise re-check on click.
+        const qorexRow = document.getElementById("wallet-pick-qorex");
+        qorexRow.addEventListener("click", () => {
+            if (hasNative && nativeSigningOk) connectQorex();
+            else {
+                status("Looking for QoreX again…");
+                evmProviders.length = 0;
+                renderOptions().catch(() => {});
+            }
+        });
+
+        // Wire the EVM row: connect when possible, otherwise re-check on click.
+        const evmRow = document.getElementById("wallet-pick-evm");
+        evmRow.addEventListener("click", () => {
+            if (evmEntry) {
+                connectEvm(evmEntry);
+            } else {
+                status("Looking for an EVM wallet again… check the extension is installed and enabled in this browser.");
+                evmProviders.length = 0;
+                renderOptions().catch(() => {});
+            }
+        });
+
         for (const entry of signable) {
+            if (evmEntry && entry === evmEntry) continue;
             const id = "wallet-pick-evm-" + entry.info.uuid.replace(/[^a-zA-Z0-9-]/g, "");
             const button = document.getElementById(id);
             if (button) button.addEventListener("click", () => connectEvm(entry));
