@@ -100,6 +100,28 @@ PQC precompiles (testnet): `pqcVerify` at `0x…0a01`, `pqcKeyStatus` at `0x…0
 - AI output is never treated as authorization; the contract independently
   enforces its rules.
 
+## Wallets — QoreX and EVM wallets, and why both
+
+Sweeft uses each wallet for what it can actually do (matching QoreX's own
+documentation):
+
+| Capability | QoreX (native lane) | MetaMask-style EVM wallets |
+|---|---|---|
+| Post-quantum login (ML-DSA-87 challenge, verified against the key registered on chain) | ✅ | — |
+| **Escrow release signature** (`signArbitrary` → `pqcVerify` on-chain) | ✅ | — |
+| Buy / raise disputes / vote / claim (EVM-lane transactions) | ⛔ (QoreX EVM lane answers account queries only, per its docs) | ✅ |
+| Open scoped EVM windows, register PQ keys | ✅ (also via the QoreChain Dashboard) | — |
+
+The post-quantum-critical steps are deliberately QoreX-only: only the wallet
+holds the ML-DSA-87 key, so the release authorization cannot be produced
+anywhere else. EVM actions use the strongest available EVM signer because
+QoreX's EVM lane cannot sign yet — a QoreX limitation, not an integration
+gap, and the split is visible in the app's connect dialog.
+
+QoreX must be set to **Testnet (Diana)** for signing: mobile app →
+Settings → "Use testnet (developers)". QoreX never switches networks on a
+request's behalf.
+
 ## Documentation
 
 - [`docs/implementation-blueprint.md`](docs/implementation-blueprint.md) — original implementation blueprint
