@@ -31,7 +31,8 @@ contract SweeftVault {
         Funded,
         Completed,
         Cancelled,
-        Refunded
+        Refunded,
+        Disputed
     }
 
     struct Escrow {
@@ -45,6 +46,7 @@ contract SweeftVault {
         bool fulfilledConfirmed; // buyer confirmed receipt (full release path)
         bool evidenceAttested; // oracle verifier attested fulfilment
         bool released;
+        address verifier; // the verifier that attested (if any)
     }
 
     // ------------------------------------------------------------------
@@ -60,6 +62,10 @@ contract SweeftVault {
     event FundsReleased(uint256 indexed escrowId, address indexed seller, uint256 amount, uint256 pqcNonce);
     event EscrowCancelled(uint256 indexed escrowId);
     event EscrowRefunded(uint256 indexed escrowId, address indexed buyer, uint256 amount, uint256 pqcNonce);
+    event DisputeRaised(uint256 indexed escrowId, address indexed raisedBy);
+    event DisputeResolved(uint256 indexed escrowId, bool releaseToSeller, uint256 fee);
+    event FeeCollected(uint256 indexed escrowId, uint256 treasuryShare, uint256 disputeShare);
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
     // ------------------------------------------------------------------
     // Errors
@@ -80,6 +86,10 @@ contract SweeftVault {
     error GuardianKeyNotProven();
     error BadPqcSignature();
     error TransferFailed();
+    error NotOwner();
+    error NotDisputeBoard();
+    error FeeTooHigh();
+    error NotDisputable();
 
     // ------------------------------------------------------------------
     // QoreChain PQC precompiles (testnet-only; addresses must be lowercase)
@@ -107,6 +117,25 @@ contract SweeftVault {
     ///         "qorechain-msg-v1|" + chainId + "|" + data.
     string public cosmosChainId;
 
+    /// @notice Contract owner (deployer, then the DAO). Governs fee parameters.
+    address public owner;
+
+    /// @notice Platform fee on successful release, in basis points (200 = 2%).
+    ///         Charged only on release — refunds are always free.
+    uint256 public feeBps;
+
+    /// @notice Receives the treasury share (70%) of platform fees.
+    address public treasury;
+
+    /// @notice The dispute board; receives the resolver share (30%) of fees and
+    ///         holds the only key to settle a disputed escrow.
+    address public disputeBoard;
+
+    /// @notice Fee split: 70% treasury / 30% dispute reward pool.
+    uint256 public constant TREASURY_SHARE_BPS = 7000;
+    uint256 public constant DISPUTE_SHARE_BPS = 3000;
+    uint256 public constant MAX_FEE_BPS = 1000;
+
     /// @notice Contract deployment time.
     uint256 public immutable deployedAt;
 
@@ -118,12 +147,49 @@ contract SweeftVault {
 
     error MarketplaceAlreadySet();
 
-    constructor(address _oracleRegistry, string memory _cosmosChainId) {
+    constructor(address _oracleRegistry, string memory _cosmosChainId, uint256 _feeBps, address _treasury) {
         if (_oracleRegistry == address(0)) revert InvalidParties();
+        if (_treasury == address(0)) revert InvalidParties();
+        if (_feeBps > MAX_FEE_BPS) revert FeeTooHigh();
         oracleRegistry = _oracleRegistry;
         cosmosChainId = _cosmosChainId;
+        feeBps = _feeBps;
+        treasury = _treasury;
+        owner = msg.sender;
         deployer = msg.sender;
         deployedAt = block.timestamp;
+    }
+
+    modifier onlyOwner() {
+        if (msg.sender != owner) revert NotOwner();
+        _;
+    }
+
+    /// @notice Update the platform fee (DAO-governed once ownership transfers).
+    function setFeeBps(uint256 newFeeBps) external onlyOwner {
+        if (newFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
+        feeBps = newFeeBps;
+    }
+
+    /// @notice Update the treasury address (DAO-governed).
+    function setTreasury(address newTreasury) external onlyOwner {
+        if (newTreasury == address(0)) revert InvalidParties();
+        treasury = newTreasury;
+    }
+
+    /// @notice Transfer ownership (deployer → DAO).
+    function transferOwnership(address newOwner) external onlyOwner {
+        if (newOwner == address(0)) revert InvalidParties();
+        emit OwnershipTransferred(owner, newOwner);
+        owner = newOwner;
+    }
+
+    /// @notice Wire the dispute board. Callable once by the deployer.
+    function setDisputeBoard(address board) external {
+        if (msg.sender != deployer) revert NotBuyer();
+        if (disputeBoard != address(0)) revert MarketplaceAlreadySet();
+        if (board == address(0)) revert InvalidParties();
+        disputeBoard = board;
     }
 
     /// @notice Wire the Marketplace contract. Callable once by the deployer.
@@ -218,14 +284,16 @@ contract SweeftVault {
         if (e.status != EscrowStatus.Funded) revert InvalidStatus();
         if (!_isVerifier(msg.sender)) revert NotVerifier();
         e.evidenceAttested = true;
+        e.verifier = msg.sender;
         emit EvidenceAttested(escrowId, msg.sender, evidenceHash);
     }
 
-    /// @notice Release escrowed funds to the seller.
+    /// @notice Release escrowed funds to the seller, charging the platform fee.
     /// @dev Eligible when the buyer confirmed receipt, or the escrow has been
     ///      delivered/attested and the delivery deadline has passed (inspection
     ///      window satisfied). Authorization is the buyer's registered
     ///      ML-DSA-87 signature over the release message; anyone may submit it.
+    ///      The fee (feeBps) is split treasury/dispute pool; refunds are free.
     function release(uint256 escrowId, bytes calldata signature) external {
         if (!isReleaseEligible(escrowId)) revert NotReleaseEligible();
 
@@ -240,8 +308,7 @@ contract SweeftVault {
 
         emit FundsReleased(escrowId, e.seller, e.amount, nonce);
 
-        (bool ok,) = e.seller.call{ value: e.amount }("");
-        if (!ok) revert TransferFailed();
+        _payRelease(escrowId, e);
     }
 
     /// @notice Refund the buyer when the seller never delivered or was never
@@ -274,6 +341,86 @@ contract SweeftVault {
 
         e.status = EscrowStatus.Cancelled;
         emit EscrowCancelled(escrowId);
+    }
+
+    // ------------------------------------------------------------------
+    // Disputes
+    // ------------------------------------------------------------------
+
+    /// @notice Freeze a funded escrow for dispute resolution. Buyer or seller
+    ///         only — or the dispute board, which validates the raiser before
+    ///         calling. While disputed, the normal release and refund paths
+    ///         are closed; the staked dispute board decides the outcome.
+    function raiseDispute(uint256 escrowId) external {
+        Escrow storage e = escrows[escrowId];
+        if (e.buyer == address(0)) revert InvalidEscrow();
+        if (e.status != EscrowStatus.Funded) revert NotDisputable();
+        if (msg.sender != e.buyer && msg.sender != e.seller && msg.sender != disputeBoard) {
+            revert InvalidParties();
+        }
+
+        e.status = EscrowStatus.Disputed;
+        emit DisputeRaised(escrowId, msg.sender);
+    }
+
+    /// @notice Settle a disputed escrow. Only the dispute board contract may
+    ///         call this; the board reaches a 2-of-3 resolver majority.
+    ///         Release charges the normal fee; refund returns the full amount.
+    function resolveDispute(uint256 escrowId, bool releaseToSeller) external {
+        if (msg.sender != disputeBoard) revert NotDisputeBoard();
+
+        Escrow storage e = escrows[escrowId];
+        if (e.status != EscrowStatus.Disputed) revert InvalidStatus();
+
+        uint256 fee = 0;
+        if (releaseToSeller) {
+            e.released = true;
+            e.status = EscrowStatus.Completed;
+            fee = _feeFor(e.amount);
+            _payRelease(escrowId, e);
+        } else {
+            e.status = EscrowStatus.Refunded;
+            (bool ok,) = e.buyer.call{ value: e.amount }("");
+            if (!ok) revert TransferFailed();
+        }
+
+        emit DisputeResolved(escrowId, releaseToSeller, fee);
+    }
+
+    function _feeFor(uint256 amount) internal view returns (uint256) {
+        return (amount * feeBps) / 10_000;
+    }
+
+    /// @dev Pay the seller minus the platform fee; split the fee between the
+    ///      treasury (70%) and the dispute reward pool (30%).
+    function _payRelease(uint256 escrowId, Escrow storage e) internal {
+        uint256 fee = _feeFor(e.amount);
+        uint256 sellerAmount = e.amount - fee;
+
+        if (fee > 0) {
+            uint256 treasuryShare = (fee * TREASURY_SHARE_BPS) / 10_000;
+            uint256 disputeShare = fee - treasuryShare;
+
+            if (disputeBoard == address(0)) {
+                treasuryShare = fee;
+                disputeShare = 0;
+            }
+
+            (bool tOk,) = treasury.call{ value: treasuryShare }("");
+            if (!tOk) revert TransferFailed();
+
+            if (disputeShare > 0) {
+                (bool dOk,) = disputeBoard.call{ value: disputeShare }(
+                    abi.encodeWithSignature("receiveFeeShare()")
+                );
+                if (!dOk) revert TransferFailed();
+            }
+
+            emit FeeCollected(escrowId, treasuryShare, disputeShare);
+        }
+
+        (bool ok,) = e.seller.call{ value: sellerAmount }("");
+        if (!ok) revert TransferFailed();
     }
 
     // ------------------------------------------------------------------

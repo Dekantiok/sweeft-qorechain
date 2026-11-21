@@ -69,6 +69,9 @@ contract SweeftVaultTest is Test {
     address internal seller = address(0x5E11E);
     address internal stranger = address(0xCAFE);
     address internal oracleVerifier = address(0x0AC1E);
+    address internal treasury = address(0x7EA5);
+
+    uint256 internal constant FEE_BPS = 200; // 2%
 
     bytes internal buyerPqcKey = hex"deadbeef";
     bytes internal dummySig = hex"c0ffee";
@@ -78,7 +81,7 @@ contract SweeftVaultTest is Test {
 
     function setUp() public {
         oracle = new MockOracleRegistry();
-        vault = new SweeftVault(address(oracle), "qorechain-diana");
+        vault = new SweeftVault(address(oracle), "qorechain-diana", FEE_BPS, treasury);
 
         // Etch precompile mocks at the fixed QoreChain addresses. The etched
         // copies have fresh storage, so initialize them through their ABI.
@@ -211,9 +214,13 @@ contract SweeftVaultTest is Test {
         assertTrue(vault.isReleaseEligible(id));
 
         uint256 sellerBefore = seller.balance;
+        uint256 treasuryBefore = treasury.balance;
         vault.release(id, dummySig);
 
-        assertEq(seller.balance, sellerBefore + 1 ether);
+        // 2% fee: seller gets 0.98, treasury the full fee (no dispute board set).
+        uint256 fee = (1 ether * FEE_BPS) / 10_000;
+        assertEq(seller.balance, sellerBefore + 1 ether - fee);
+        assertEq(treasury.balance, treasuryBefore + fee);
         SweeftVault.Escrow memory e = vault.getEscrow(id);
         assertEq(uint8(e.status), uint8(SweeftVault.EscrowStatus.Completed));
         assertTrue(e.released);
@@ -328,7 +335,8 @@ contract SweeftVaultTest is Test {
         vm.prank(stranger);
         vault.release(id, dummySig);
 
-        assertEq(seller.balance, sellerBefore + 1 ether);
+        uint256 fee = (1 ether * FEE_BPS) / 10_000;
+        assertEq(seller.balance, sellerBefore + 1 ether - fee);
     }
 
     // ------------------------------------------------------------------

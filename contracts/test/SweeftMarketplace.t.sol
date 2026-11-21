@@ -20,7 +20,7 @@ contract SweeftMarketplaceTest is Test {
 
     function setUp() public {
         registry = new SweeftOracleRegistry(address(this));
-        vault = new SweeftVault(address(registry), "qorechain-diana");
+        vault = new SweeftVault(address(registry), "qorechain-diana", 200, address(0x7EA5));
         market = new SweeftMarketplace(address(vault));
         vault.setMarketplace(address(market));
     }
@@ -207,12 +207,13 @@ contract SweeftMarketplaceTest is Test {
         vm.prank(buyer);
         vault.confirmReceipt(escrowId);
 
-        // Anyone submits the release; seller receives funds.
+        // Anyone submits the release; seller receives funds minus the 2% fee.
         uint256 sellerBefore = seller.balance;
         vm.prank(stranger);
         vault.release(escrowId, hex"c0ffee");
 
-        assertEq(seller.balance, sellerBefore + 1 ether);
+        uint256 fee = (1 ether * 200) / 10_000;
+        assertEq(seller.balance, sellerBefore + 1 ether - fee);
         assertEq(address(vault).balance, 0);
         assertEq(uint8(vault.getEscrow(escrowId).status), uint8(SweeftVault.EscrowStatus.Completed));
     }

@@ -6,7 +6,9 @@ import { SweeftVault } from "../src/SweeftVault.sol";
 
 /// @notice Harness exposing the internal message builders for format tests.
 contract VaultHarness is SweeftVault {
-    constructor(address registry, string memory chainId) SweeftVault(registry, chainId) {}
+    constructor(address registry, string memory chainId)
+        SweeftVault(registry, chainId, 200, address(0x7EA5))
+    {}
 
     function releaseMessage(uint256 id, address buyer, address recipient, uint256 amount, uint256 nonce)
         external
