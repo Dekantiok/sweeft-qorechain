@@ -212,26 +212,19 @@ const disputeStatus = document.getElementById("dispute-status");
 const BOARD = "{{ dispute_board_address }}";
 
 disputeButton?.addEventListener("click", async () => {
-    if (!window.ethereum) {
-        alert("No EVM wallet found (MetaMask/QoreX).");
-        return;
-    }
     try {
         // openDispute(uint256 escrowId) — selector 0x27d00fb0
         const data = "0x27d00fb0" + ESCROW_ID.toString(16).padStart(64, "0");
         disputeStatus.textContent = "Confirm in your wallet…";
-        const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
-        const txHash = await window.ethereum.request({
-            method: "eth_sendTransaction",
-            params: [{ from: accounts[0], to: BOARD, data }],
-        });
+        const txHash = await window.SweeftWallet.sendTx({ to: BOARD, data });
         disputeStatus.textContent = "Dispute opened — resolvers can now join.";
         console.log("dispute tx", txHash);
         setTimeout(() => location.reload(), 6000);
     } catch (err) {
         disputeStatus.textContent = "";
         alert("Dispute failed: " + (err.message || err) +
-              "\n\nOnly the buyer or seller can raise a dispute, and only while escrowed.");
+              "\n\nOnly the buyer or seller can raise a dispute, and only while the escrow is funded. " +
+              "The account also needs an open EVM window.");
     }
 });
 </script>

@@ -9,6 +9,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
     <script defer src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js"></script>
+    <script src="{% static 'js/sweeft-wallet.js' %}"></script>
     <link rel="stylesheet" href="{% static 'css/sweeft.css' %}">
     {% block extra_head %}{% endblock %}
 </head>
@@ -35,6 +36,7 @@
                         <span class="h-1.5 w-1.5 rounded-full bg-teal-400 animate-pulse"></span>
                         Diana Testnet
                     </span>
+                    <div id="wallet-widget"></div>
                     {% block nav_actions %}{% endblock %}
                 </div>
             </div>

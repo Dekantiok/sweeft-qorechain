@@ -66,7 +66,7 @@
 // purchase(uint256 listingId, uint64 deliveryDeadline) payable — selector 0xb79bd650
 const buyButton = document.getElementById("buy-button");
 const LISTING_ID = {{ listing.on_chain_id }};
-const PRICE_WEI = "{{ listing.price_uqor }}";
+const PRICE_WEI = BigInt("{{ listing.price_uqor }}");
 const MARKETPLACE = "{{ marketplace_address }}";
 const PURCHASE_SELECTOR = "b79bd650";
 
@@ -75,30 +75,13 @@ function pad32(hexValue) {
 }
 
 buyButton?.addEventListener("click", async () => {
-    if (!window.ethereum) {
-        alert("No EVM wallet found. Install MetaMask or QoreX, add QoreChain Diana (chain ID 9800) and import your account.");
-        return;
-    }
     try {
-        const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
-        const from = accounts[0];
-
-        // 7-day delivery window
         const deadline = Math.floor(Date.now() / 1000) + 7 * 86400;
         const data = "0x" + PURCHASE_SELECTOR + pad32(LISTING_ID.toString(16)) + pad32(deadline.toString(16));
 
         buyButton.textContent = "Confirm in your wallet…";
-        const txHash = await window.ethereum.request({
-            method: "eth_sendTransaction",
-            params: [{
-                from,
-                to: MARKETPLACE,
-                value: "0x" + BigInt(PRICE_WEI).toString(16),
-                data,
-            }],
-        });
+        const txHash = await window.SweeftWallet.sendTx({ to: MARKETPLACE, data, value: PRICE_WEI });
         buyButton.textContent = "Purchased — syncing…";
-        // Give the chain a moment, then refresh the projection.
         setTimeout(async () => {
             await fetch("/api/indexer/sync/", { method: "POST" });
             location.href = "/dashboard/";
@@ -106,8 +89,13 @@ buyButton?.addEventListener("click", async () => {
         console.log("purchase tx:", txHash);
     } catch (err) {
         buyButton.textContent = "Buy with escrow";
-        alert("Purchase failed: " + (err.message || err) +
-              "\n\nIf the transaction was refused, open a scoped EVM window in QoreX for this account first.");
+        alert(
+            "Purchase failed: " + (err.message || err) +
+            "\n\nChecklist:\n" +
+            "• Wallet connected to QoreChain Diana (the nav shows your address)\n" +
+            "• The account holds QOR from https://dashboard.qorechain.io/faucet\n" +
+            "• An open EVM window on the account (see docs \u201cTest in the browser\u201d — open one with tools/qor_account.py)"
+        );
     }
 });
 </script>

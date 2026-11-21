@@ -132,11 +132,7 @@ function pad32(hexValue) {
 }
 
 async function walletTx(data, value = 0n) {
-    if (!window.ethereum) throw new Error("No EVM wallet found (MetaMask/QoreX).");
-    const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
-    const tx = { from: accounts[0], to: BOARD, data };
-    if (value > 0n) tx.value = "0x" + value.toString(16);
-    return window.ethereum.request({ method: "eth_sendTransaction", params: [tx] });
+    return window.SweeftWallet.sendTx({ to: BOARD, data, value });
 }
 
 document.getElementById("stake-button")?.addEventListener("click", async () => {

@@ -64,11 +64,11 @@ def _die(message: str, code: int = 1) -> None:
     sys.exit(code)
 
 
-def _load_account():
+def _load_account(index: int = 0):
     mnemonic = os.getenv(ENV_KEY, "").strip()
     if not mnemonic:
         _die(f"{ENV_KEY} is not set in .env — run: python tools/qor_account.py new")
-    return derive_unified_account(mnemonic)
+    return derive_unified_account(mnemonic, index=index)
 
 
 def _save_mnemonic(mnemonic: str) -> None:
@@ -138,19 +138,19 @@ def cmd_new(args) -> None:
 
 
 def cmd_show(args) -> None:
-    unified = _load_account()
+    unified = _load_account(getattr(args, "index", 0))
     print("Stored testnet account:")
     _print_addresses(unified)
 
 
 def cmd_faucet(args) -> None:
-    unified = _load_account()
+    unified = _load_account(getattr(args, "index", 0))
     print(f"Faucet:  {FAUCET_URL}")
     print(f"Address: {unified.cosmos}")
 
 
 def cmd_status(args) -> None:
-    unified = _load_account()
+    unified = _load_account(getattr(args, "index", 0))
     print(f"Account: {unified.cosmos}")
     print()
 
@@ -183,7 +183,7 @@ def cmd_status(args) -> None:
 
 
 def cmd_register(args) -> None:
-    unified = _load_account()
+    unified = _load_account(getattr(args, "index", 0))
 
     status = fetch_pqc_status(REST_URL, unified.cosmos)
     if status.get("registered"):
@@ -220,7 +220,7 @@ def cmd_register(args) -> None:
 
 
 def cmd_window(args) -> None:
-    unified = _load_account()
+    unified = _load_account(getattr(args, "index", 0))
 
     status = fetch_pqc_status(REST_URL, unified.cosmos)
     if not status.get("registered"):
@@ -257,7 +257,7 @@ def cmd_window(args) -> None:
 
 
 def cmd_close(args) -> None:
-    unified = _load_account()
+    unified = _load_account(getattr(args, "index", 0))
     info = _account_info(unified.cosmos)
     if info is None:
         _die("account not found on chain")
@@ -291,20 +291,29 @@ def main() -> None:
     sub = parser.add_subparsers(dest="command", required=True)
 
     sub.add_parser("new", help="generate a fresh mnemonic and store it in .env")
-    sub.add_parser("show", help="show derived addresses for the stored mnemonic")
-    sub.add_parser("faucet", help="print the faucet URL with the account address")
-    sub.add_parser("status", help="read PQC key and EVM window state from chain")
+
+    show = sub.add_parser("show", help="show derived addresses for the stored mnemonic")
+    show.add_argument("--index", type=int, default=0, help="mnemonic account index (0 = deployer)")
+
+    faucet = sub.add_parser("faucet", help="print the faucet URL with the account address")
+    faucet.add_argument("--index", type=int, default=0, help="mnemonic account index (0 = deployer)")
+
+    status = sub.add_parser("status", help="read PQC key and EVM window state from chain")
+    status.add_argument("--index", type=int, default=0, help="mnemonic account index (0 = deployer)")
 
     register = sub.add_parser("register", help="register the ML-DSA-87 key (one-time)")
+    register.add_argument("--index", type=int, default=0, help="mnemonic account index (0 = deployer)")
     register.add_argument("--gas", type=int, default=600_000)
 
     window = sub.add_parser("window", help="open a scoped EVM authorization window")
+    window.add_argument("--index", type=int, default=0, help="mnemonic account index (0 = deployer)")
     window.add_argument("--blocks", type=int, default=10_000, help="window length in blocks (max 17280)")
     window.add_argument("--max-txs", type=int, default=150, help="max EVM txs in the window (max 1000)")
     window.add_argument("--max-value", type=int, default=20_000_000, help="value cap in uqor (default 20 QOR)")
     window.add_argument("--gas", type=int, default=500_000)
 
     close = sub.add_parser("close", help="close the EVM window now")
+    close.add_argument("--index", type=int, default=0, help="mnemonic account index (0 = deployer)")
     close.add_argument("--gas", type=int, default=400_000)
 
     args = parser.parse_args()
