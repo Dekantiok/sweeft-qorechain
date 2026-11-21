@@ -36,26 +36,37 @@ Check which account you need per action:
 - **Raising a dispute** — buyer or seller of that escrow
 - **Joining/voting on the board** — any staked resolver (already staked)
 
-## 3. Connect
+## 3. Connect — what each wallet can and cannot do
 
-Click **Connect wallet** in the nav. A dialog opens with the wallets detected
-in your browser:
+Click **Connect wallet** in the nav. The dialog lists the wallets detected in
+your browser. Per the official QoreX documentation, the split is:
 
-- **QoreX** — signs the login challenge with your **ML-DSA-87 key**; the server
-  verifies it against the key registered on chain. This is the full
-  post-quantum experience and is required for the release step.
-- **MetaMask / EVM wallet** — connects by `personal_sign`; fine for buying,
-  disputes, voting and claiming. Switches to Diana automatically.
+| Wallet | Can | Cannot (yet) |
+|---|---|---|
+| **QoreX (native)** | Post-quantum login and the ML-DSA-87 release signature | — |
+| **QoreX (EVM lane)** | Show your address and network | Sign or send EVM transactions — official QoreX limitation |
+| **MetaMask / any EVM wallet** | Buy, raise disputes, join boards, vote, claim, stake | The PQ release signature |
 
-Sign the login message and the nav switches to your account menu. No
-"install" page — if neither wallet is detected, the dialog says so once and
-links to both.
+So the normal test setup is **both**: QoreX for login/post-quantum steps,
+MetaMask for EVM actions. Login is a real challenge-signature either way.
+
+### QoreX says the network does not match
+
+QoreX only signs for the network it is **set to**, and it never switches
+itself. On the mobile app: **Settings → "Use testnet (developers)"**. The
+Chrome extension follows the network it is set to — if your extension has no
+testnet toggle, use the mobile app (or the Firefox build, which is one release
+ahead: 0.3.9 vs 0.3.8 on Chrome) for testnet signing, and MetaMask for the
+EVM actions.
 
 ## 4. EVM windows (why transactions get refused)
 
 QoreChain admits EVM transactions only while the account has an **open
-authorization window**. Without one, the wallet shows a "refused" error. Open
-one for the account you are testing (the tool manages any index):
+authorization window**. QoreX can open one itself — its **"EVM access
+window"** screen (popup → EVM access window) opens/closes the window for your
+Ethereum-style account, with up to 17,280 blocks and 1,000 transactions.
+
+For the demo accounts (no QoreX needed), the tool manages any index:
 
 ```bash
 # buyer (index 0)

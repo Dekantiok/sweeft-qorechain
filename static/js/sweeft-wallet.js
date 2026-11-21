@@ -108,13 +108,14 @@
 
     function selectedEvmProvider() {
         const wanted = localStorage.getItem(STORAGE_KEY);
+        const signable = evmProviders.filter((entry) => entry.info.rdns !== QOREX_RDNS);
         if (wanted) {
-            const match = evmProviders.find(
+            const match = signable.find(
                 (entry) => entry.info.rdns === wanted || entry.info.uuid === wanted
             );
             if (match) return match.provider;
         }
-        return evmProviders.length ? evmProviders[0].provider : null;
+        return signable.length ? signable[0].provider : null;
     }
 
     // ------------------------------------------------------------------
@@ -175,30 +176,36 @@
 
         let html = optionButton("wallet-pick-qorex", "Q", "QoreX", nativeHint, hasNative && nativeSigningOk);
 
-        for (const entry of evmProviders) {
-            const isQorexEvm = entry.info.rdns === QOREX_RDNS;
+        // QoreX's EVM provider answers account queries only — it cannot sign or
+        // send yet (official QoreX limitation), so it is not offered for login
+        // or transactions. MetaMask-style providers are.
+        const signable = evmProviders.filter((entry) => entry.info.rdns !== QOREX_RDNS);
+        const qorexEvmSeen = evmProviders.some((entry) => entry.info.rdns === QOREX_RDNS);
+
+        for (const entry of signable) {
             const id = "wallet-pick-evm-" + entry.info.uuid.replace(/[^a-zA-Z0-9-]/g, "");
-            html += optionButton(
-                id,
-                isQorexEvm ? "Q" : "E",
-                entry.info.name + (isQorexEvm ? " (EVM lane)" : ""),
-                "classical signing — buy, disputes, voting",
-                true
-            );
+            html += optionButton(id, "E", entry.info.name, "classical signing — buy, disputes, voting", true);
         }
 
-        if (!hasNative && !evmProviders.length) {
+        if (qorexEvmSeen) {
             html +=
-                '<p style="color:#94a3b8;font-size:12px;line-height:1.7">No wallet detected in this browser. ' +
+                '<p style="color:#64748b;font-size:11px;line-height:1.6;margin-top:2px">' +
+                "QoreX's EVM lane is detected but cannot sign transactions yet in this build — " +
+                "use MetaMask-style wallets for EVM actions, and QoreX for post-quantum signing.</p>";
+        }
+
+        if (!hasNative && !signable.length) {
+            html +=
+                '<p style="color:#94a3b8;font-size:12px;line-height:1.7">No signing wallet detected in this browser. ' +
                 'Install the <a style="color:#5eead4" href="https://qorechain.io/qorex" target="_blank">QoreX wallet</a> ' +
-                "(recommended — post-quantum signing) or any EVM wallet, then reload.</p>";
+                "(post-quantum signing) and/or MetaMask (EVM actions), then reload.</p>";
         }
 
         body.innerHTML = html;
         if (hasNative && nativeSigningOk) {
             document.getElementById("wallet-pick-qorex").addEventListener("click", connectQorex);
         }
-        for (const entry of evmProviders) {
+        for (const entry of signable) {
             const id = "wallet-pick-evm-" + entry.info.uuid.replace(/[^a-zA-Z0-9-]/g, "");
             const button = document.getElementById(id);
             if (button) button.addEventListener("click", () => connectEvm(entry));
@@ -361,7 +368,7 @@
         const provider = selectedEvmProvider();
         if (!provider) {
             throw new Error(
-                "No EVM wallet available. Install QoreX (it provides both lanes) or any EVM wallet, then reload."
+                "No signing EVM wallet available. Install MetaMask (QoreX's EVM lane cannot send transactions yet), then reload."
             );
         }
         return provider;
