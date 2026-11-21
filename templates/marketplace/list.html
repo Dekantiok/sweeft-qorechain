@@ -8,11 +8,16 @@
         <h1 class="text-2xl font-bold">Marketplace</h1>
         <p class="mt-1 text-sm text-slate-400">{{ listings|length }} listing{{ listings|length|pluralize }} — every purchase settles through PQ-protected escrow</p>
     </div>
-    <button hx-post="/api/indexer/sync/" hx-swap="none"
-            hx-on::after-request="if(event.detail.successful) location.reload()"
-            class="self-start rounded-lg border border-slate-700 px-4 py-2 text-sm hover:border-teal-500/50 hover:text-teal-300 transition-colors">
-        ⟳ Refresh from chain
-    </button>
+    <div class="flex items-center gap-3">
+        <a href="/marketplace/new/" class="rounded-lg bg-teal-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-teal-400 transition-colors">
+            + Sell an item
+        </a>
+        <button hx-post="/api/indexer/sync/" hx-swap="none"
+                hx-on::after-request="if(event.detail.successful) location.reload()"
+                class="rounded-lg border border-slate-700 px-4 py-2 text-sm hover:border-teal-500/50 hover:text-teal-300 transition-colors">
+            ⟳ Refresh from chain
+        </button>
+    </div>
 </div>
 
 <form method="get" class="mt-6 flex flex-wrap gap-3">

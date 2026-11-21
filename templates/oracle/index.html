@@ -3,18 +3,37 @@
 {% block title %}Oracle — Sweeft{% endblock %}
 
 {% block content %}
-<div>
-    <h1 class="text-2xl font-bold">Oracle — fulfilment verification</h1>
-    <p class="mt-1 text-sm text-slate-400">
-        Evidence submitted by sellers, reviewed by DAO-approved verifiers. A verified
-        attestation is recorded on-chain and feeds the escrow's release conditions.
-    </p>
+<div class="flex items-center justify-between">
+    <div>
+        <h1 class="text-2xl font-bold">Oracle — fulfilment verification</h1>
+        <p class="mt-1 text-sm text-slate-400">
+            Evidence submitted by sellers, reviewed by DAO-approved verifiers. An attestation is
+            recorded on-chain and feeds the escrow's release conditions.
+        </p>
+    </div>
+    <button hx-post="/api/indexer/sync/" hx-swap="none"
+            hx-on::after-request="if(event.detail.successful) location.reload()"
+            class="rounded-lg border border-slate-700 px-4 py-2 text-sm hover:border-teal-500/50 hover:text-teal-300 transition-colors">
+        ⟳ Refresh from chain
+    </button>
 </div>
 
+{% if is_verifier %}
+<div class="mt-6 rounded-xl border border-teal-500/30 bg-teal-500/5 p-4 text-sm text-teal-300">
+    Your wallet is an authorized verifier — review each submission and attest it on-chain.
+</div>
+{% elif wallet_attached %}
+<div class="mt-6 rounded-xl border border-slate-700 bg-slate-900/50 p-4 text-sm text-slate-400">
+    Your wallet is connected but not an authorized verifier. Only DAO-approved verifiers can attest
+    (verifier accounts: <span class="hash">0x9E9745aABd5706291C0D4CA2FD2022B832a875c8</span>).
+</div>
+{% endif %}
+
 <div class="mt-8 space-y-4">
-    {% for item in evidence %}
+    {% for row in rows %}
+    {% with item=row.evidence %}
     <div class="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
-        <div class="flex items-center justify-between">
+        <div class="flex flex-wrap items-center justify-between gap-2">
             <div class="flex items-center gap-3">
                 <span class="text-xs text-slate-500">Escrow #{{ item.escrow.on_chain_id }}</span>
                 <span class="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider
@@ -25,17 +44,71 @@
             </div>
             <span class="text-xs text-slate-500">{{ item.submitted_at|date:"M d, H:i" }}</span>
         </div>
+
         <p class="mt-3 text-sm text-slate-300">{{ item.description|default:"Evidence record" }}</p>
-        <div class="mt-2 text-xs text-slate-500">
-            submitted by <span class="hash">{{ item.submitted_by.evm_address }}</span>
-            {% if item.attestation_tx %}· <span class="hash text-teal-400">on-chain: {{ item.attestation_tx|truncatechars:24 }}</span>{% endif %}
+        {% if item.evidence_reference %}
+        <p class="mt-1 text-xs text-slate-500">reference: <span class="hash text-slate-400">{{ item.evidence_reference }}</span></p>
+        {% endif %}
+        <div class="mt-2 flex flex-wrap items-center gap-4 text-xs text-slate-500">
+            <span>submitted by <span class="hash">{{ item.submitted_by.evm_address }}</span></span>
+            <span>content hash <span class="hash">{{ item.content_hash|truncatechars:24 }}</span></span>
+            {% if item.attestation_tx %}
+            <span class="hash text-teal-400">on-chain: {{ item.attestation_tx|truncatechars:24 }}</span>
+            {% endif %}
         </div>
+
+        {% if is_verifier %}
+            {% if row.state and row.state.status == 1 %}
+            <button class="attest-button mt-4 rounded-lg bg-teal-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-teal-400 transition-colors"
+                    data-escrow="{{ item.escrow.on_chain_id }}"
+                    data-item="{{ item.pk }}"
+                    data-hash="{{ item.content_hash }}">
+                Attest on-chain
+            </button>
+            <p class="mt-2 text-xs text-slate-500" id="attest-status-{{ item.pk }}"></p>
+            {% else %}
+            <p class="mt-3 text-xs text-slate-500">Escrow is no longer awaiting attestation (status {{ row.state.status|default:"?" }}).</p>
+            {% endif %}
+        {% endif %}
     </div>
+    {% endwith %}
     {% empty %}
     <div class="rounded-xl border border-dashed border-slate-700 p-12 text-center text-slate-500">
-        No evidence submitted yet. Sellers submit fulfilment evidence from their escrow pages;
-        authorized verifiers review and attest it on-chain.
+        No evidence submitted yet — sellers submit it from their escrow pages.
     </div>
     {% endfor %}
 </div>
+
+<script>
+const VAULT = "{{ vault_address }}";
+const ATTEST_SELECTOR = "a688ceb3"; // attestEvidence(uint256,bytes32)
+
+function pad32(hexValue) {
+    return hexValue.replace(/^0x/, "").padStart(64, "0");
+}
+
+document.querySelectorAll(".attest-button").forEach((button) => {
+    button.addEventListener("click", async () => {
+        const escrowId = parseInt(button.dataset.escrow, 10);
+        const contentHash = button.dataset.hash.replace(/^0x/, "");
+        const status = document.getElementById("attest-status-" + button.dataset.item);
+        try {
+            // attestEvidence(uint256 escrowId, bytes32 evidenceHash)
+            const data = "0x" + ATTEST_SELECTOR + pad32(escrowId.toString(16)) + pad32(contentHash);
+            status.textContent = "Confirm in your wallet…";
+            const txHash = await window.SweeftWallet.sendTx({ to: VAULT, data });
+            status.textContent = "Attested on-chain: " + txHash;
+            setTimeout(async () => {
+                await fetch("/api/indexer/sync/", { method: "POST" });
+                location.reload();
+            }, 5000);
+        } catch (err) {
+            status.textContent = "";
+            alert("Attestation failed: " + (err.message || err) +
+                  "\n\nOnly an authorized verifier wallet can attest, and the escrow must still be funded. " +
+                  "An EVM window must be open on that account.");
+        }
+    });
+});
+</script>
 {% endblock %}

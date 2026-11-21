@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}New listing — Sweeft{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-2xl">
+    <h1 class="text-2xl font-bold">Sell on Sweeft</h1>
+    <p class="mt-1 text-sm text-slate-400">
+        The listing is published <strong class="text-slate-300">on-chain</strong> from your wallet —
+        price, quantity and a hash of the description below. Buyers pay into PQ-protected escrow.
+    </p>
+
+    {% if not wallet_account %}
+    <div class="mt-6 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-sm text-amber-300">
+        Connect your wallet first — the listing is signed by you.
+    </div>
+    {% endif %}
+
+    <div class="mt-6 space-y-4 rounded-xl border border-slate-800 bg-slate-900/50 p-6">
+        <div>
+            <label class="text-xs uppercase tracking-wider text-slate-500">Title</label>
+            <input id="f-title" type="text" maxlength="120" placeholder="e.g. MacBook Pro 14 — used, excellent"
+                   class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none">
+        </div>
+        <div>
+            <label class="text-xs uppercase tracking-wider text-slate-500">Description</label>
+            <textarea id="f-description" rows="4" placeholder="Condition, delivery expectations, anything a buyer should know…"
+                      class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none"></textarea>
+        </div>
+        <div class="grid gap-4 sm:grid-cols-2">
+            <div>
+                <label class="text-xs uppercase tracking-wider text-slate-500">Price (QOR)</label>
+                <input id="f-price" type="text" inputmode="decimal" placeholder="0.1"
+                       class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none">
+            </div>
+            <div>
+                <label class="text-xs uppercase tracking-wider text-slate-500">Quantity in stock</label>
+                <input id="f-quantity" type="number" min="1" max="1000" value="1"
+                       class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none">
+            </div>
+        </div>
+
+        <button id="publish-button" {% if not wallet_account %}disabled{% endif %}
+                class="w-full rounded-lg bg-teal-500 px-4 py-3 font-semibold text-slate-950 hover:bg-teal-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            Publish on-chain
+        </button>
+        <p id="publish-status" class="text-xs leading-relaxed text-slate-400"></p>
+    </div>
+
+    <div class="mt-4 rounded-xl border border-slate-800 bg-slate-900/50 p-4 text-xs leading-relaxed text-slate-400">
+        <strong class="text-slate-300">How it works:</strong> your description is stored as JSON and its
+        SHA-256 is written into the listing on QoreChain. Buyers can re-hash the file and verify it matches —
+        nobody can silently change your terms. Creating a listing needs an open EVM window and a little QOR for gas
+        (QoreX: “EVM access window”).
+    </div>
+</div>
+
+<script>
+const MARKETPLACE = "{{ marketplace_address }}";
+const WALLET = "{{ wallet_account|escapejs }}";
+const CREATE_LISTING_SELECTOR = "0a4b8e27"; // createListing(uint256,uint64,string,bytes32)
+const publishButton = document.getElementById("publish-button");
+const publishStatus = document.getElementById("publish-status");
+
+function pad32(hexValue) {
+    return hexValue.replace(/^0x/, "").padStart(64, "0");
+}
+
+function utf8Hex(value) {
+    const bytes = new TextEncoder().encode(value);
+    return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/** Parse a decimal QOR string into 18-decimal wei, exactly (no float math). */
+function qorToWei(text) {
+    const clean = String(text).trim();
+    if (!/^\d+(\.\d{0,18})?$/.test(clean)) throw new Error("Enter the price as a decimal number, e.g. 0.1");
+    const [whole, fraction = ""] = clean.split(".");
+    return BigInt(whole) * 10n ** 18n + BigInt((fraction + "0".repeat(18)).slice(0, 18));
+}
+
+/** ABI-encode createListing(uint256 price, uint64 quantity, string uri, bytes32 hash). */
+function encodeCreateListing(priceWei, quantity, uri, hashHex) {
+    const uriHex = utf8Hex(uri);
+    const uriPadded = uriHex.padEnd(Math.ceil(uriHex.length / 64) * 64, "0");
+    const uriLength = (uriHex.length / 2).toString(16);
+    // head: 4 words — price, quantity, string offset (4*32=128), hash
+    // tail: uri length + uri bytes
+    return (
+        "0x" + CREATE_LISTING_SELECTOR +
+        pad32(priceWei.toString(16)) +
+        pad32(BigInt(quantity).toString(16)) +
+        pad32("80") +
+        pad32(hashHex) +
+        pad32(uriLength) +
+        uriPadded
+    );
+}
+
+publishButton?.addEventListener("click", async () => {
+    try {
+        const title = document.getElementById("f-title").value.trim();
+        const description = document.getElementById("f-description").value.trim();
+        const priceText = document.getElementById("f-price").value;
+        const quantity = parseInt(document.getElementById("f-quantity").value || "1", 10);
+
+        if (!title) throw new Error("Give the listing a title.");
+        if (!priceText) throw new Error("Set a price in QOR.");
+        if (!(quantity >= 1)) throw new Error("Quantity must be at least 1.");
+
+        publishStatus.textContent = "Storing the description and hashing it…";
+        const meta = await fetch("/api/marketplace/metadata/", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-CSRFToken": document.querySelector('meta[name="csrf-token"]').content },
+            body: JSON.stringify({
+                title,
+                description,
+                seller_evm: WALLET,
+            }),
+        }).then((r) => r.json());
+        if (meta.error) throw new Error(meta.error);
+
+        const priceWei = qorToWei(priceText);
+        const data = encodeCreateListing(priceWei, quantity, meta.uri, meta.hash);
+
+        publishStatus.textContent = "Confirm the transaction in your wallet…";
+        const txHash = await window.SweeftWallet.sendTx({ to: MARKETPLACE, data });
+        publishStatus.textContent = "Published — syncing from chain…";
+        console.log("createListing tx", txHash);
+
+        setTimeout(async () => {
+            await fetch("/api/indexer/sync/", { method: "POST" });
+            location.href = "/marketplace/?status=all";
+        }, 5000);
+    } catch (err) {
+        publishStatus.textContent = "";
+        alert(
+            "Publishing failed: " + (err.message || err) +
+            "\n\nChecklist:\n" +
+            "• Wallet connected (nav shows your address)\n" +
+            "• Enough QOR for gas\n" +
+            "• An open EVM window (QoreX: “EVM access window”)"
+        );
+    }
+});
+</script>
+{% endblock %}

@@ -8,6 +8,7 @@ state into Django models.
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 from datetime import datetime, timezone as dt_timezone
 
@@ -100,18 +101,56 @@ def _wei_to_uqor(value: int) -> int:
 # ---------------------------------------------------------------------------
 
 
+def _fetch_verified_metadata(uri: str, expected_hash_hex: str, *, timeout: int = 8) -> dict:
+    """Fetch listing metadata and verify it against the on-chain hash.
+
+    Returns {} when the fetch fails or the bytes do not hash to the anchored
+    value — a mismatched listing keeps its placeholder title and is never
+    presented as verified content.
+    """
+    if not uri:
+        return {}
+    try:
+        import requests
+
+        response = requests.get(uri, timeout=timeout)
+        response.raise_for_status()
+        raw = response.content
+        digest = "0x" + hashlib.sha256(raw).hexdigest()
+        if digest.lower() != expected_hash_hex.lower():
+            logger.warning("metadata hash mismatch for %s (expected %s)", uri, expected_hash_hex)
+            return {}
+        return json.loads(raw)
+    except Exception:
+        logger.exception("could not fetch listing metadata from %s", uri)
+        return {}
+
+
 def _handle_listing_created(event) -> dict:
     args = event.args
+    metadata_hash = "0x" + bytes(args["metadataHash"]).hex()
+
+    # The event doesn't carry the URI; read it from the contract, then fetch
+    # and verify the description against the hash the event carries.
+    metadata = {}
+    try:
+        listing_contract = _contract("SweeftMarketplace")
+        if listing_contract is not None:
+            on_chain = listing_contract.functions.getListing(int(args["listingId"])).call()
+            metadata = _fetch_verified_metadata(on_chain[4], metadata_hash)
+    except Exception:
+        logger.exception("could not load listing metadata")
+
     listing, created = Listing.objects.update_or_create(
         on_chain_id=int(args["listingId"]),
         defaults={
             "seller": _participant_for(args["seller"]),
-            "title": f"Listing #{args['listingId']}",
-            "description": "",
+            "title": str(metadata.get("title") or f"Listing #{args['listingId']}")[:200],
+            "description": str(metadata.get("description") or ""),
             "price_uqor": _wei_to_uqor(args["price"]),
             "quantity": int(args["quantity"]),
             "status": Listing.Status.ACTIVE,
-            "metadata_hash": "0x" + bytes(args["metadataHash"]).hex(),
+            "metadata_hash": metadata_hash,
             "created_tx": event.tx_hash,
             "created_block": event.block_number,
         },

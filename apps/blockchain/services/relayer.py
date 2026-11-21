@@ -124,3 +124,23 @@ def board_state() -> dict:
         "unstake_cooldown": int(board.functions.unstakeCooldown().call()),
         "dispute_count": int(board.functions.disputeCount().call()),
     }
+
+
+def is_verifier(address: str) -> bool:
+    """True when the address is an authorized oracle verifier on the registry."""
+    import os
+
+    from integrations.qorechain.contracts_base import load_abi, make_contract
+
+    if not address:
+        return False
+    w3 = get_evm_client()
+    registry_address = os.getenv("SWEEFT_ORACLE_REGISTRY_ADDRESS", "")
+    if not registry_address:
+        return False
+    abi = load_abi(artifact_path("SweeftOracleRegistry"))
+    registry = make_contract(w3, registry_address, abi)
+    try:
+        return bool(registry.functions.isVerifier(w3.to_checksum_address(address)).call())
+    except Exception:
+        return False
