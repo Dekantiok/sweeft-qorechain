@@ -36,12 +36,20 @@ Check which account you need per action:
 - **Raising a dispute** — buyer or seller of that escrow
 - **Joining/voting on the board** — any staked resolver (already staked)
 
-## 3. Network
+## 3. Connect
 
-Click **Connect wallet** — if Diana is not in the wallet yet, the app offers
-to add it automatically (`QoreChain Diana Testnet`, chain ID `9800`, RPC
-`https://evm-testnet.qore.host`). If your wallet shows *Wrong network*, click
-the badge in the nav to switch.
+Click **Connect wallet** in the nav. A dialog opens with the wallets detected
+in your browser:
+
+- **QoreX** — signs the login challenge with your **ML-DSA-87 key**; the server
+  verifies it against the key registered on chain. This is the full
+  post-quantum experience and is required for the release step.
+- **MetaMask / EVM wallet** — connects by `personal_sign`; fine for buying,
+  disputes, voting and claiming. Switches to Diana automatically.
+
+Sign the login message and the nav switches to your account menu. No
+"install" page — if neither wallet is detected, the dialog says so once and
+links to both.
 
 ## 4. EVM windows (why transactions get refused)
 
