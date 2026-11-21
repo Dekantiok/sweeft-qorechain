@@ -309,6 +309,35 @@
         }
     }
 
+    function isUnauthorizedError(err) {
+        const code = err && (err.code || (err.data && err.data.originalError && err.data.originalError.code));
+        return code === 4100 || /not been authorized/i.test(String((err && err.message) || ""));
+    }
+
+    /** personal_sign with a 4100 recovery path: re-request account permission
+     *  explicitly (MetaMask shows the Connect prompt) and retry once. */
+    async function requestEvmSignature(provider, address, message) {
+        try {
+            return await provider.request({ method: "personal_sign", params: [message, address] });
+        } catch (err) {
+            if (!isUnauthorizedError(err)) throw err;
+            status("MetaMask says this site is not authorized — approve the connection prompt, then sign…");
+            await provider.request({ method: "wallet_requestPermissions", params: [{ eth_accounts: {} }] });
+            const accounts = await provider.request({ method: "eth_accounts" });
+            const authorized = accounts[0];
+            if (!authorized) {
+                throw new Error("MetaMask returned no authorized account — open MetaMask, unlock it, and press Connect again.");
+            }
+            if (authorized.toLowerCase() !== address.toLowerCase()) {
+                throw new Error(
+                    `MetaMask authorized ${authorized}, but the challenge was for ${address}. ` +
+                        "Press Connect again to retry with the authorized account."
+                );
+            }
+            return await provider.request({ method: "personal_sign", params: [message, authorized] });
+        }
+    }
+
     async function connectEvm(entry) {
         const provider = entry.provider;
         localStorage.setItem(STORAGE_KEY, entry.info.rdns || entry.info.uuid);
@@ -334,10 +363,7 @@
                 { headers: { Accept: "application/json" } }
             ).then((r) => r.json());
 
-            const signature = await provider.request({
-                method: "personal_sign",
-                params: [challenge.message, address],
-            });
+            const signature = await requestEvmSignature(provider, address, challenge.message);
 
             status("Verifying…");
             const result = await jsonPost("/api/wallet/verify/", {
@@ -351,7 +377,12 @@
             status("Connected — reloading…");
             window.location.reload();
         } catch (err) {
-            status(`<span style="color:#fda4af">${entry.info.name}: ${(err && err.message) || err}</span>`);
+            const message = String((err && err.message) || err);
+            const hint = isUnauthorizedError(err)
+                ? "<br><br>Open MetaMask and make sure it is <b>unlocked</b>, then use its " +
+                  "<i>Connected sites</i> screen to disconnect this site and press Connect again."
+                : "";
+            status(`<span style="color:#fda4af">${entry.info.name}: ${message}</span>${hint}`);
         }
     }
 
@@ -415,7 +446,19 @@
         }
         const tx = { from, to, data };
         if (value > 0n) tx.value = "0x" + value.toString(16);
-        return provider.request({ method: "eth_sendTransaction", params: [tx] });
+        try {
+            return await provider.request({ method: "eth_sendTransaction", params: [tx] });
+        } catch (err) {
+            if (isUnauthorizedError(err)) {
+                // Re-request permission explicitly, then retry once.
+                await provider.request({ method: "wallet_requestPermissions", params: [{ eth_accounts: {} }] });
+                const authorized = (await provider.request({ method: "eth_accounts" }))[0];
+                if (!authorized) throw new Error("Wallet reported no authorized account — unlock it and try again.");
+                tx.from = authorized;
+                return provider.request({ method: "eth_sendTransaction", params: [tx] });
+            }
+            throw err;
+        }
     }
 
     async function copyAddress() {
