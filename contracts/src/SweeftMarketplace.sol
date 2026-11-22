@@ -23,13 +23,16 @@ contract SweeftMarketplace {
 
     struct Listing {
         address seller;
-        uint256 price; // uqor
+        uint256 price; // total total (goods + logistics) for a purchase
         uint64 quantity;
         ListingStatus status;
         string metadataUri;
         bytes32 metadataHash; // sha256 of the metadata JSON
         uint64 createdAt;
         uint64 updatedAt;
+        // v4 appended fields for ABI/upgrade sanity (struct append at end)
+        address logisticsPartner;
+        uint256 logisticsFee; // portion of price that is the carrier payout
     }
 
     // ------------------------------------------------------------------
@@ -86,6 +89,36 @@ contract SweeftMarketplace {
         external
         returns (uint256 listingId)
     {
+        return _createListing(price, quantity, metadataUri, metadataHash, address(0), 0);
+    }
+
+    /// @notice Create a physical listing with a logistics allocation.
+    /// @dev price = total (goods + logistics fee); logisticsFee is paid to
+    ///      logisticsPartner at escrow release. Zero partner = digital goods.
+    function createListingWithLogistics(
+        uint256 price,
+        uint64 quantity,
+        string calldata metadataUri,
+        bytes32 metadataHash,
+        address logisticsPartner,
+        uint256 logisticsFee
+    ) external returns (uint256 listingId) {
+        if (logisticsFee > price) revert InvalidPrice();
+        if (logisticsPartner == address(0) && logisticsFee != 0) revert InvalidPrice();
+        return _createListing(price, quantity, metadataUri, metadataHash, logisticsPartner, logisticsFee);
+    }
+
+    function _createListing(
+        uint256 price,
+        uint64 quantity,
+        string calldata metadataUri,
+        bytes32 metadataHash,
+        address logisticsPartner,
+        uint256 logisticsFee
+    )
+        internal
+        returns (uint256 listingId)
+    {
         if (price == 0) revert InvalidPrice();
         if (quantity == 0) revert InvalidQuantity();
         if (metadataHash == bytes32(0)) revert InvalidMetadata();
@@ -102,6 +135,8 @@ contract SweeftMarketplace {
         listing.metadataHash = metadataHash;
         listing.createdAt = uint64(block.timestamp);
         listing.updatedAt = listing.createdAt;
+        listing.logisticsPartner = logisticsPartner;
+        listing.logisticsFee = logisticsFee;
 
         emit ListingCreated(listingId, msg.sender, price, quantity, metadataHash);
     }
@@ -159,7 +194,9 @@ contract SweeftMarketplace {
         }
         listing.updatedAt = uint64(block.timestamp);
 
-        escrowId = vault.createEscrow{ value: msg.value }(msg.sender, listing.seller, deliveryDeadline, msg.value);
+        escrowId = vault.createEscrowWithLogistics{ value: msg.value }(
+            msg.sender, listing.seller, listing.logisticsPartner, deliveryDeadline, msg.value, listing.logisticsFee
+        );
         if (escrowId == 0 && vault.escrowCount() == 0) revert EscrowCreationFailed();
 
         emit ListingPurchased(listingId, escrowId, msg.sender, listing.seller, listing.price);

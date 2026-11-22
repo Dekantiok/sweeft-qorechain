@@ -28,6 +28,7 @@ SWEEFT_APPS = [
     "apps.ai",
     "apps.notifications",
     "apps.blockchain",
+    "apps.logistics",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + SWEEFT_APPS

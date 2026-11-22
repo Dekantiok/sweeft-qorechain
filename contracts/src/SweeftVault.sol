@@ -38,7 +38,7 @@ contract SweeftVault {
     struct Escrow {
         address buyer;
         address seller;
-        uint256 amount;
+        uint256 amount; // total escrowed (goods + logistics)
         uint64 deliveryDeadline; // unix seconds
         uint64 createdAt; // unix seconds
         EscrowStatus status;
@@ -47,6 +47,13 @@ contract SweeftVault {
         bool evidenceAttested; // oracle verifier attested fulfilment
         bool released;
         address verifier; // the verifier that attested (if any)
+        // --- logistics (v4, appended for ABI compatibility) ---
+        address logisticsPartner; // zero = physical-less / digital default
+        uint256 logisticsAmount; // paid to partner, separate from seller goods
+        bool carrierAttested; // signed carrier payload verified on-chain
+        uint64 carrierAttestedAt;
+        bytes32 carrierPayloadHash; // keccak256(canonical tracking payload)
+        address carrierSigner;
     }
 
     // ------------------------------------------------------------------
@@ -66,6 +73,10 @@ contract SweeftVault {
     event DisputeResolved(uint256 indexed escrowId, bool releaseToSeller, uint256 fee);
     event FeeCollected(uint256 indexed escrowId, uint256 treasuryShare, uint256 disputeShare);
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+    event CarrierRegistered(address indexed carrier, string providerId);
+    event CarrierRemoved(address indexed carrier);
+    event CarrierAttested(uint256 indexed escrowId, address indexed carrier, bytes32 payloadHash, string status, string trackingNumber);
+    event LogisticsPaid(uint256 indexed escrowId, address indexed partner, uint256 amount);
 
     // ------------------------------------------------------------------
     // Errors
@@ -90,6 +101,11 @@ contract SweeftVault {
     error NotDisputeBoard();
     error FeeTooHigh();
     error NotDisputable();
+    error NotCarrier();
+    error BadCarrierSignature();
+    error CarrierKeyNotRegistered();
+    error CarrierKeyNotProven();
+    error BadPayloadHash();
 
     // ------------------------------------------------------------------
     // QoreChain PQC precompiles (testnet-only; addresses must be lowercase)
@@ -144,6 +160,13 @@ contract SweeftVault {
 
     /// @notice Per-buyer PQ nonce: prevents replay of a release/refund signature.
     mapping(address => uint256) public pqcNonce;
+
+    /// @notice Authorized logistics carriers, by QoreChain account address.
+    ///         Their registered ML-DSA-87 key signs carrier tracking payloads
+    ///         verified on-chain via pqcVerify — no TEE needed.
+    mapping(address => bool) public isCarrier;
+    /// @notice Provider id per carrier, e.g. "LOG-DEMO-001".
+    mapping(address => string) public carrierProviderId;
 
     error MarketplaceAlreadySet();
 
@@ -200,6 +223,22 @@ contract SweeftVault {
         marketplace = marketplaceAddress;
     }
 
+    /// @notice Register a logistics carrier (owner/DAO only). The carrier's
+    ///         QoreChain account must have a registered ML-DSA-87 key.
+    function registerCarrier(address carrier, string calldata providerId) external onlyOwner {
+        if (carrier == address(0)) revert InvalidParties();
+        isCarrier[carrier] = true;
+        carrierProviderId[carrier] = providerId;
+        emit CarrierRegistered(carrier, providerId);
+    }
+
+    /// @notice Remove a logistics carrier.
+    function removeCarrier(address carrier) external onlyOwner {
+        if (!isCarrier[carrier]) revert NotCarrier();
+        isCarrier[carrier] = false;
+        emit CarrierRemoved(carrier);
+    }
+
     // ------------------------------------------------------------------
     // Escrow lifecycle
     // ------------------------------------------------------------------
@@ -228,6 +267,45 @@ contract SweeftVault {
         e.amount = amount;
         e.deliveryDeadline = deliveryDeadline;
         e.createdAt = uint64(block.timestamp);
+
+        emit EscrowCreated(escrowId, buyer, seller, amount, deliveryDeadline);
+
+        if (msg.value == amount) {
+            e.status = EscrowStatus.Funded;
+            emit EscrowFunded(escrowId, buyer, msg.value);
+        }
+    }
+
+    /// @notice Create an escrow with a logistics allocation.
+    /// @dev amount = TOTAL escrowed (goods + logistics). logisticsPartner
+    ///      may be zero (digital goods / self-delivery). When funded, the
+    ///      logistics share is paid to the partner at release.
+    function createEscrowWithLogistics(
+        address buyer,
+        address seller,
+        address logisticsPartner,
+        uint64 deliveryDeadline,
+        uint256 amount,
+        uint256 logisticsAmount
+    ) external payable returns (uint256 escrowId) {
+        if (buyer == address(0) || seller == address(0) || seller == buyer) revert InvalidParties();
+        if (amount == 0) revert InvalidAmount();
+        if (logisticsAmount > amount) revert InvalidAmount();
+        if (msg.sender != buyer && msg.sender != marketplace) revert NotBuyer();
+        if (msg.value != 0 && msg.value != amount) revert WrongDeposit();
+        if (logisticsPartner != address(0) && logisticsAmount > 0 && !isCarrier[logisticsPartner]) revert NotCarrier();
+
+        escrowId = escrowCount;
+        escrowCount = escrowId + 1;
+
+        Escrow storage e = escrows[escrowId];
+        e.buyer = buyer;
+        e.seller = seller;
+        e.amount = amount;
+        e.deliveryDeadline = deliveryDeadline;
+        e.createdAt = uint64(block.timestamp);
+        e.logisticsPartner = logisticsPartner;
+        e.logisticsAmount = logisticsAmount;
 
         emit EscrowCreated(escrowId, buyer, seller, amount, deliveryDeadline);
 
@@ -286,6 +364,41 @@ contract SweeftVault {
         e.evidenceAttested = true;
         e.verifier = msg.sender;
         emit EvidenceAttested(escrowId, msg.sender, evidenceHash);
+    }
+
+    /// @notice Verify the carrier's ML-DSA-87 signature over the canonical
+    ///         tracking payload on-chain and record it as fulfilment evidence.
+    function attestCarrierEvidence(
+        uint256 escrowId,
+        bytes32 payloadHash,
+        bytes calldata signature,
+        bytes calldata payload
+    ) external {
+        Escrow storage e = escrows[escrowId];
+        if (e.status != EscrowStatus.Funded) revert InvalidStatus();
+        if (!isCarrier[msg.sender]) revert NotCarrier();
+        if (keccak256(payload) != payloadHash) revert BadPayloadHash();
+
+        _requireCarrierSignature(msg.sender, payload, signature);
+
+        e.carrierAttested = true;
+        e.carrierAttestedAt = uint64(block.timestamp);
+        e.carrierPayloadHash = payloadHash;
+        e.carrierSigner = msg.sender;
+
+        e.evidenceAttested = true;
+        e.verifier = msg.sender; // excluded from dispute board like a verifier
+        e.delivered = true;
+
+        emit EvidenceAttested(escrowId, msg.sender, payloadHash);
+        emit CarrierAttested(escrowId, msg.sender, payloadHash, "", "");
+    }
+
+    function _requireCarrierSignature(address carrier, bytes memory payload, bytes calldata signature) internal view {
+        (bool registered,, bytes memory pubkey, bool proven) = PQC_KEYS.pqcKeyStatus(carrier);
+        if (!registered || pubkey.length == 0) revert CarrierKeyNotRegistered();
+        if (!proven) revert CarrierKeyNotProven();
+        if (!PQC_VERIFY.pqcVerify(pubkey, signature, payload)) revert BadCarrierSignature();
     }
 
     /// @notice Release escrowed funds to the seller, charging the platform fee.
@@ -392,10 +505,20 @@ contract SweeftVault {
     }
 
     /// @dev Pay the seller minus the platform fee; split the fee between the
-    ///      treasury (70%) and the dispute reward pool (30%).
+    ///      treasury (70%) and the dispute reward pool (30%). When a logistics
+    ///      share is set, the partner is paid first and the fee is charged on
+    ///      the goods portion only.
     function _payRelease(uint256 escrowId, Escrow storage e) internal {
-        uint256 fee = _feeFor(e.amount);
-        uint256 sellerAmount = e.amount - fee;
+        uint256 goodsAmount = e.amount - e.logisticsAmount;
+
+        if (e.logisticsAmount > 0 && e.logisticsPartner != address(0)) {
+            (bool logOk,) = e.logisticsPartner.call{ value: e.logisticsAmount }("");
+            if (!logOk) revert TransferFailed();
+            emit LogisticsPaid(escrowId, e.logisticsPartner, e.logisticsAmount);
+        }
+
+        uint256 fee = _feeFor(goodsAmount);
+        uint256 sellerAmount = goodsAmount - fee;
 
         if (fee > 0) {
             uint256 treasuryShare = (fee * TREASURY_SHARE_BPS) / 10_000;

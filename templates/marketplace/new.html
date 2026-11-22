@@ -29,7 +29,7 @@
         </div>
         <div class="grid gap-4 sm:grid-cols-2">
             <div>
-                <label class="text-xs uppercase tracking-wider text-slate-500">Price (QOR)</label>
+                <label class="text-xs uppercase tracking-wider text-slate-500">Price (QOR, total)</label>
                 <input id="f-price" type="text" inputmode="decimal" placeholder="0.1"
                        class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none">
             </div>
@@ -38,6 +38,20 @@
                 <input id="f-quantity" type="number" min="1" max="1000" value="1"
                        class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none">
             </div>
+        </div>
+
+        <div>
+            <label class="text-xs uppercase tracking-wider text-slate-500">Delivery</label>
+            <select id="f-delivery" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm">
+                <option value="digital">Digital (buyer confirmation, no carrier)</option>
+                <option value="physical">Physical (carrier — Demo Carrier)</option>
+            </select>
+        </div>
+        <div id="logistics-fields" class="hidden">
+            <label class="text-xs uppercase tracking-wider text-slate-500">Logistics fee (QOR, reserved from the price)</label>
+            <input id="f-logistics-fee" type="text" inputmode="decimal" value="0"
+                   class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none">
+            <p class="mt-1 text-[11px] text-slate-500">Paid to the carrier on release. Goods = price − fee. Leave 0 for self-delivery.</p>
         </div>
 
         <button id="publish-button" {% if not wallet_account %}disabled{% endif %}
@@ -59,8 +73,14 @@
 const MARKETPLACE = "{{ marketplace_address }}";
 const WALLET = "{{ wallet_account|escapejs }}";
 const CREATE_LISTING_SELECTOR = "0a4b8e27"; // createListing(uint256,uint64,string,bytes32)
+const CREATE_LOGISTICS_SELECTOR = "7237a326"; // createListingWithLogistics(uint256,uint64,string,bytes32,address,uint256)
 const publishButton = document.getElementById("publish-button");
 const publishStatus = document.getElementById("publish-status");
+
+// Toggle logistics fields
+document.getElementById("f-delivery")?.addEventListener("change", (e) => {
+    document.getElementById("logistics-fields").classList.toggle("hidden", e.target.value !== "physical");
+});
 
 function pad32(hexValue) {
     return hexValue.replace(/^0x/, "").padStart(64, "0");
@@ -79,19 +99,20 @@ function qorToWei(text) {
     return BigInt(whole) * 10n ** 18n + BigInt((fraction + "0".repeat(18)).slice(0, 18));
 }
 
-/** ABI-encode createListing(uint256 price, uint64 quantity, string uri, bytes32 hash). */
-function encodeCreateListing(priceWei, quantity, uri, hashHex) {
+/** ABI-encode createListingWithLogistics(uint256,uint64,string,bytes32,address,uint256). */
+function encodeCreateListingWithLogistics(priceWei, quantity, uri, hashHex, partner, feeWei) {
     const uriHex = utf8Hex(uri);
     const uriPadded = uriHex.padEnd(Math.ceil(uriHex.length / 64) * 64, "0");
     const uriLength = (uriHex.length / 2).toString(16);
-    // head: 4 words — price, quantity, string offset (4*32=128), hash
-    // tail: uri length + uri bytes
+    const partnerHex = (partner || "0x0000000000000000000000000000000000000000").replace("0x", "").padStart(64, "0");
     return (
-        "0x" + CREATE_LISTING_SELECTOR +
+        "0x" + CREATE_LOGISTICS_SELECTOR +
         pad32(priceWei.toString(16)) +
         pad32(BigInt(quantity).toString(16)) +
-        pad32("80") +
+        pad32("c0") + // head: 6 words before tail? offset = 6*32 = 192 = 0xc0
         pad32(hashHex) +
+        pad32(partnerHex) +
+        pad32(feeWei.toString(16)) +
         pad32(uriLength) +
         uriPadded
     );
@@ -103,6 +124,8 @@ publishButton?.addEventListener("click", async () => {
         const description = document.getElementById("f-description").value.trim();
         const priceText = document.getElementById("f-price").value;
         const quantity = parseInt(document.getElementById("f-quantity").value || "1", 10);
+        const delivery = document.getElementById("f-delivery").value;
+        const logisticsFeeText = document.getElementById("f-logistics-fee").value || "0";
 
         if (!title) throw new Error("Give the listing a title.");
         if (!priceText) throw new Error("Set a price in QOR.");
@@ -121,7 +144,16 @@ publishButton?.addEventListener("click", async () => {
         if (meta.error) throw new Error(meta.error);
 
         const priceWei = qorToWei(priceText);
-        const data = encodeCreateListing(priceWei, quantity, meta.uri, meta.hash);
+        let data;
+        if (delivery === "physical") {
+            const feeWei = qorToWei(logisticsFeeText);
+            if (feeWei > priceWei) throw new Error("Logistics fee cannot exceed the price.");
+            // Demo Carrier settlement wallet (index 6 of the testnet mnemonic)
+            const partner = "{{ demo_carrier_address }}";
+            data = encodeCreateListingWithLogistics(priceWei, quantity, meta.uri, meta.hash, partner, feeWei);
+        } else {
+            data = encodeCreateListing(priceWei, quantity, meta.uri, meta.hash);
+        }
 
         publishStatus.textContent = "Confirm the transaction in your wallet…";
         const txHash = await window.SweeftWallet.sendTx({ to: MARKETPLACE, data });

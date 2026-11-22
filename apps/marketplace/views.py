@@ -71,10 +71,21 @@ def listing_new(request):
     """Seller form: metadata is stored hash-anchored, then published on-chain."""
     import os
 
+    demo_carrier_address = ""
+    try:
+        from apps.logistics.carriers import demo_carrier_keypair
+
+        _, _, demo_carrier_address = demo_carrier_keypair()
+    except Exception:
+        pass
+
     return render(
         request,
         "marketplace/new.html",
-        {"marketplace_address": os.getenv("SWEEFT_MARKETPLACE_ADDRESS", "")},
+        {
+            "marketplace_address": os.getenv("SWEEFT_MARKETPLACE_ADDRESS", ""),
+            "demo_carrier_address": demo_carrier_address,
+        },
     )
 
 

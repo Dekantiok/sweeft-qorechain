@@ -14,6 +14,7 @@ urlpatterns = [
     path("", include("apps.oracle.urls")),
     path("", include("apps.ai.urls")),
     path("", include("apps.blockchain.urls")),
+    path("", include("apps.logistics.urls")),
 ]
 
 if settings.DEBUG:

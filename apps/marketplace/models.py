@@ -51,6 +51,15 @@ class Listing(models.Model):
     metadata_uri = models.URLField(max_length=500, blank=True)
     metadata_hash = models.CharField(max_length=66, blank=True, help_text="SHA-256 hex of the metadata JSON")
 
+    # Logistics (v4) — physical listings carry a carrier allocation
+    class DeliveryType(models.TextChoices):
+        PHYSICAL = "physical", "Physical (carrier)"
+        DIGITAL = "digital", "Digital"
+
+    delivery_type = models.CharField(max_length=16, choices=DeliveryType.choices, default=DeliveryType.PHYSICAL)
+    logistics_partner_address = models.CharField(max_length=42, blank=True)
+    logistics_fee_uqor = models.DecimalField(max_digits=30, decimal_places=0, default=0)
+
     created_tx = models.CharField(max_length=80, blank=True)
     created_block = models.PositiveBigIntegerField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

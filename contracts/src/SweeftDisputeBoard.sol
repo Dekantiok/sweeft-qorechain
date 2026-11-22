@@ -278,12 +278,13 @@ contract SweeftDisputeBoard {
 
     /// @notice The reward a voting resolver earns for a dispute: 10% of the
     ///         escrow's platform fee (the 30% resolver share split three ways),
-    ///         paid from the accumulated reward pool.
+    ///         paid from the accumulated reward pool. Fee is on goods only.
     function resolverReward(uint256 disputeId) public view returns (uint256) {
         Dispute storage d = disputes[disputeId];
         if (d.state != DisputeState.Resolved) return 0;
         SweeftVault.Escrow memory escrow = vault.getEscrow(d.escrowId);
-        uint256 fee = (escrow.amount * vault.feeBps()) / 10_000;
+        uint256 goods = escrow.amount - escrow.logisticsAmount;
+        uint256 fee = (goods * vault.feeBps()) / 10_000;
         return (fee * 3_000) / 10_000 / 3;
     }
 

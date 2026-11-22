@@ -41,13 +41,14 @@ AI assistant     ────────▶ apps/ai       (draft/execute w/ man
 
 | Component | Purpose | Status |
 |---|---|---|
-| **Sweeft Market** | On-chain listings + Django discovery/search | contracts deployed + purchase flow proven on testnet |
-| **Sweeft Vault** | Escrow with PQ-gated release, 2% fee on release | deployed + release, attack and fee-split tests passing on testnet |
-| **Sweeft Oracle** | Fulfilment evidence + verifier attestations | registry deployed, DAO-governed verifiers proven on-chain |
+| **Sweeft Market** | On-chain listings + Django discovery/search | v4: physical/digital listings with logistics allocation |
+| **Sweeft Vault** | Escrow with PQ-gated release, 2% fee on release, carrier attestation | v4 deployed + logistics E2E passing on testnet |
+| **Sweeft Oracle** | Fulfilment evidence + verifier attestations | DAO-governed verifiers proven on-chain |
 | **Sweeft Cred** | Reputation from verified outcomes only | scoring live from indexed completions |
 | **Sweeft AI** | Natural-language commerce, mandate-capped autonomous buying (Meta Model API) | adapter in place, chat wiring in progress |
-| **Sweeft DAO** | Proposal registry; governs verifiers, fees and dispute parameters | DAO2 deployed and owns registry, vault and board |
-| **Dispute Board** | Staked resolver panels (20 QOR min, 3 members, 2-of-3) | deployed + full staked flow proven on testnet |
+| **Sweeft DAO** | Proposal registry; governs verifiers, fees and dispute parameters | DAO2 owns registry, vault and board |
+| **Dispute Board** | Staked resolver panels (20 QOR min, 3 members, 2-of-3) | v4 deployed + dispute E2E proven |
+| **Logistics** | Verified physical delivery (carrier ML-DSA signatures on-chain) + digital goods | partner registry, Partner API, Demo Carrier, carrier attestation (v4) proven on testnet |
 
 ## Quick start (development)
 

@@ -9,12 +9,23 @@
 
 | Contract | Address | Notes |
 |---|---|---|
-| SweeftOracleRegistry | `0xecb16561cfdff10336b278f8107a077fe7a53c6d` | kept; ownership migrated to DAO2 by proposal |
-| **SweeftVault (v3)** | `0xa95dfbef4325e6ca06eaeab006c6a31994cc7fcc` | fees + dispute freeze |
-| **SweeftMarketplace (v3)** | `0x809081ac763755239bf6176a01555adacc14d46f` | |
-| **SweeftDisputeBoard** | `0x2c8cc9205c7354a93b27564d653362e0873217fc` | staked resolver panels |
-| **SweeftDAO2** | `0x794b2aa6b5b7884ec71cf0361a41a6d711b0996a` | allowlisted targets: registry, vault, board |
+| SweeftOracleRegistry | `0xecb16561cfdff10336b278f8107a077fe7a53c6d` | kept across v3/v4; ownership in DAO2 |
+| **SweeftVault (v4)** | `0x7c170ec8ab48dfa5c86ce96c9bd4d21af6d84fc9` | adds carrier attestation + logistics split |
+| **SweeftMarketplace (v4)** | `0xa2075dbca3a80192e1158cba4a822bfe835c3ea6` | physical listings carry logistics allocation |
+| **SweeftDisputeBoard** | `0x3fe1c7e2c014b4ec9c847cc35718449245eaacb1` | staked resolver panels (20 QOR min) |
+| **SweeftDAO2** | `0x1af66554af38e16458c0b72352517483723379db` | owns vault + board; allowlisted targets |
 | SweeftDAO (v1) | `0x03a0c71c42dcef463f8b472cb39991cedac2dc1b` | executed the registry migration |
+
+### v4 additions (logistics — Phase 2)
+
+- Vault `attestCarrierEvidence`: verifies the carrier's ML-DSA-87 signature over
+  `sweeft-carrier-v1|provider|tracking|escrow|status|events` **on-chain** via
+  `pqcVerify` — the TEE is replaced by post-quantum verification on QoreChain.
+- Vault `createEscrowWithLogistics`: three-way split at release — goods to
+  seller (minus 2% fee to treasury/dispute), logistics share to the carrier.
+- Marketplace `createListingWithLogistics` for physical goods; digital = no carrier.
+- Demo Carrier: `LOG-DEMO-001`, `0xd2908Fd85fc5D5141AD2Bdd3913394245236Ec41`
+  (mnemonic index 6), registered via a DAO2 proposal.
 
 ### v3 economics
 

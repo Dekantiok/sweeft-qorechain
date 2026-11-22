@@ -162,6 +162,55 @@
         </div>
 
         <div class="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
+            <div class="text-xs font-semibold uppercase tracking-wider text-slate-400">Carrier delivery</div>
+            {% if shipment %}
+            <div class="mt-3 space-y-2 text-xs">
+                <div class="flex items-center justify-between">
+                    <span class="font-mono text-slate-300">{{ shipment.tracking_number }}</span>
+                    <span class="rounded-full bg-teal-500/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-teal-400">{{ shipment.status }}</span>
+                </div>
+                <div class="text-slate-500">provider: {{ shipment.provider.provider_id|default:"LOG-DEMO-001" }} · simulated: {{ shipment.simulated|yesno:"yes,no" }}</div>
+                <ul class="mt-2 space-y-1">
+                    {% for ev in shipment.events.all %}
+                    <li class="flex justify-between rounded bg-slate-800/50 px-2 py-1">
+                        <span class="text-slate-400">{{ ev.status }}</span>
+                        <span class="text-slate-500">{{ ev.created_at|date:"M d H:i" }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% if escrow.carrier_attested %}
+                <div class="rounded-lg bg-teal-500/10 px-2 py-1 text-teal-300">✓ carrier-attested on-chain <span class="hash">{{ escrow.carrier_payload_hash|truncatechars:18 }}</span></div>
+                {% endif %}
+            </div>
+            {% if is_seller or is_buyer %}
+            <div class="mt-3 flex gap-2">
+                <button id="ship-advance" class="flex-1 rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700 transition-colors" data-shipment="{{ shipment.id }}">
+                    Advance scan (Demo Carrier)
+                </button>
+                <button id="carrier-attest" class="flex-1 rounded bg-teal-500/90 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-teal-400 transition-colors" data-shipment="{{ shipment.id }}">
+                    Verify with carrier signature
+                </button>
+            </div>
+            <p id="carrier-status" class="mt-2 text-[11px] text-slate-500"></p>
+            {% endif %}
+            {% else %}
+            <div class="mt-3 text-xs text-slate-500">
+                {% if escrow.delivery_type == "digital" %}
+                Digital delivery — no carrier. The seller sends the files and the buyer confirms receipt.
+                {% else %}
+                No shipment registered yet. The seller or buyer can register the carrier shipment for this escrow.
+                {% endif %}
+            </div>
+            {% if is_seller or is_buyer %}
+            <button id="ship-create" class="mt-3 w-full rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700 transition-colors">
+                Register Demo Carrier shipment
+            </button>
+            <p id="carrier-status" class="mt-2 text-[11px] text-slate-500"></p>
+            {% endif %}
+            {% endif %}
+        </div>
+
+        <div class="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
             <div class="text-xs font-semibold uppercase tracking-wider text-slate-400">Fulfilment evidence</div>
             {% if is_seller or is_buyer %}
             <div class="mt-3 space-y-2">
@@ -330,6 +379,73 @@ evidenceButton?.addEventListener("click", async () => {
     } catch (err) {
         status.textContent = "";
         alert("Evidence submission failed: " + (err.message || err));
+    }
+});
+
+// --- Carrier / shipment (Demo Carrier) ---
+const csrfToken = () => document.querySelector('meta[name="csrf-token"]').content;
+
+document.getElementById("ship-create")?.addEventListener("click", async () => {
+    const status = document.getElementById("carrier-status");
+    try {
+        status.textContent = "Registering shipment…";
+        const result = await fetch("/api/logistics/shipments/", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken() },
+            body: JSON.stringify({ escrow_id: String(ESCROW_ID), scenario: "delivered" }),
+        }).then((r) => r.json());
+        if (result.error) throw new Error(result.error);
+        status.textContent = `Shipment ${result.tracking_number} registered — advancing demo scans…`;
+        // Novice path: advance through the demo states automatically
+        for (const next of ["ACCEPTED", "PICKED_UP", "IN_TRANSIT", "OUT_FOR_DELIVERY", "DELIVERED"]) {
+            await fetch(`/api/logistics/shipments/${result.shipment_id}/events/`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken() },
+                body: JSON.stringify({ status: next }),
+            });
+        }
+        location.reload();
+    } catch (err) {
+        status.textContent = "";
+        alert("Shipment failed: " + (err.message || err));
+    }
+});
+
+document.getElementById("ship-advance")?.addEventListener("click", async (e) => {
+    const status = document.getElementById("carrier-status");
+    try {
+        status.textContent = "Advancing scan…";
+        await fetch(`/api/logistics/shipments/${e.currentTarget.dataset.shipment}/events/`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken() },
+            body: JSON.stringify({}),
+        });
+        location.reload();
+    } catch (err) {
+        status.textContent = "";
+        alert("Advance failed: " + (err.message || err));
+    }
+});
+
+document.getElementById("carrier-attest")?.addEventListener("click", async () => {
+    const status = document.getElementById("carrier-status");
+    try {
+        status.textContent = "Carrier is signing and verifying on-chain…";
+        const result = await fetch(`/api/logistics/escrow/${ESCROW_ID}/attest/`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken() },
+            body: JSON.stringify({}),
+        }).then((r) => r.json());
+        if (result.error || !result.ok) throw new Error(result.error || "failed");
+        status.textContent = "Carrier-attested on-chain: " + result.tx_hash;
+        setTimeout(async () => {
+            await fetch("/api/indexer/sync/", { method: "POST" });
+            location.reload();
+        }, 5000);
+    } catch (err) {
+        status.textContent = "";
+        alert("Carrier attestation failed: " + (err.message || err) +
+              "\n\nShipment must be DELIVERED, and the carrier account needs a registered PQ key + window.");
     }
 });
 

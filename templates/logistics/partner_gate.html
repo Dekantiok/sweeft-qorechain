@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block title %}Carrier portal — Sweeft{% endblock %}
+
+{% block content %}
+<div class="rounded-xl border border-dashed border-slate-700 p-12 text-center">
+    <h1 class="text-lg font-semibold">No carrier profile yet</h1>
+    <p class="mt-2 text-sm text-slate-400">Register your logistics company and it will appear here after review.</p>
+    <a href="{% url 'logistics:partner_register' %}" class="mt-4 inline-block rounded-lg bg-teal-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-teal-400 transition-colors">Register as a carrier</a>
+</div>
+{% endblock %}

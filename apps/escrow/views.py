@@ -43,6 +43,11 @@ def escrow_detail(request, escrow_id: int):
     wallet = (request.session.get("wallet_account") or {}).get("evm", "").lower()
     evidence = FulfilmentEvidence.objects.filter(escrow=escrow).order_by("-submitted_at")
 
+    from apps.logistics.models import Shipment, VerificationRequest
+
+    shipment = Shipment.objects.filter(escrow=escrow).order_by("-created_at").first()
+    verification = VerificationRequest.objects.filter(escrow=escrow).order_by("-created_at").first()
+
     return render(
         request,
         "escrow/detail.html",
@@ -53,6 +58,8 @@ def escrow_detail(request, escrow_id: int):
             "dispute_board_address": os.getenv("SWEEFT_DISPUTE_BOARD_ADDRESS", ""),
             "vault_address": os.getenv("SWEEFT_VAULT_ADDRESS", ""),
             "evidence": evidence,
+            "shipment": shipment,
+            "verification": verification,
             "is_buyer": bool(wallet) and wallet == escrow.buyer.evm_address.lower(),
             "is_seller": bool(wallet) and wallet == escrow.seller.evm_address.lower(),
             "wallet_attached": bool(wallet),

@@ -36,6 +36,17 @@ class Escrow(models.Model):
     delivery_deadline = models.DateTimeField()
     inspection_period_hours = models.PositiveIntegerField(default=48)
 
+    # Logistics / carrier (v4) — physical vs digital delivery
+    class DeliveryType(models.TextChoices):
+        PHYSICAL = "physical", "Physical (carrier)"
+        DIGITAL = "digital", "Digital (buyer confirmation)"
+
+    delivery_type = models.CharField(max_length=16, choices=DeliveryType.choices, default=DeliveryType.PHYSICAL)
+    logistics_partner_address = models.CharField(max_length=42, blank=True)
+    logistics_amount_uqor = models.DecimalField(max_digits=30, decimal_places=0, default=0)
+    carrier_attested = models.BooleanField(default=False)
+    carrier_payload_hash = models.CharField(max_length=66, blank=True)
+
     # Platform fee (2% default), split treasury/dispute at release time
     fee_treasury_uqor = models.DecimalField(max_digits=30, decimal_places=0, default=0)
     fee_dispute_uqor = models.DecimalField(max_digits=30, decimal_places=0, default=0)

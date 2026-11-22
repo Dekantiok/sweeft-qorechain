@@ -45,6 +45,10 @@ EVENTS = {
         "DisputeRaised",
         "DisputeResolved",
         "FeeCollected",
+        "CarrierAttested",
+        "CarrierRegistered",
+        "CarrierRemoved",
+        "LogisticsPaid",
     ],
     "SweeftOracleRegistry": ["VerifierAdded", "VerifierRemoved"],
     "SweeftDAO": ["ProposalCreated", "VoteCast", "ProposalExecuted", "ProposalRejected"],
@@ -133,11 +137,17 @@ def _handle_listing_created(event) -> dict:
     # The event doesn't carry the URI; read it from the contract, then fetch
     # and verify the description against the hash the event carries.
     metadata = {}
+    logistics_partner = ""
+    logistics_fee = 0
     try:
         listing_contract = _contract("SweeftMarketplace")
         if listing_contract is not None:
             on_chain = listing_contract.functions.getListing(int(args["listingId"])).call()
             metadata = _fetch_verified_metadata(on_chain[4], metadata_hash)
+            # v4 struct: [seller, price, qty, status, uri, hash, createdAt, updatedAt, partner, fee]
+            if len(on_chain) > 9:
+                logistics_partner = on_chain[8] or ""
+                logistics_fee = _wei_to_uqor(on_chain[9])
     except Exception:
         logger.exception("could not load listing metadata")
 
@@ -153,6 +163,9 @@ def _handle_listing_created(event) -> dict:
             "metadata_hash": metadata_hash,
             "created_tx": event.tx_hash,
             "created_block": event.block_number,
+            "logistics_partner_address": logistics_partner,
+            "logistics_fee_uqor": logistics_fee,
+            "delivery_type": "physical" if logistics_partner else "digital",
         },
     )
     return {"listing_id": listing.on_chain_id, "created": created}
@@ -226,6 +239,18 @@ def _handle_escrow_created(event) -> dict:
             "create_tx": event.tx_hash,
         },
     )
+    # Hydrate logistics fields from the Vault struct (v4 appends them at the end)
+    try:
+        vault_c = _contract("SweeftVault")
+        if vault_c is not None:
+            on_chain = vault_c.functions.getEscrow(escrow_id).call()
+            if len(on_chain) > 11:
+                escrow.logistics_partner_address = on_chain[11] or ""
+                escrow.logistics_amount_uqor = _wei_to_uqor(on_chain[12])
+                escrow.delivery_type = "physical" if on_chain[11] else "digital"
+                escrow.save(update_fields=["logistics_partner_address", "logistics_amount_uqor", "delivery_type"])
+    except Exception:
+        logger.exception("could not load logistics allocation for escrow %s", escrow_id)
     return {"escrow_id": escrow_id, "created": created}
 
 
@@ -595,11 +620,41 @@ def _handle_proposal_rejected(event) -> dict:
     return {"proposal_id": event.args["proposalId"]}
 
 
+def _handle_carrier_attested(event) -> dict:
+    args = event.args
+    escrow = Escrow.objects.filter(on_chain_id=int(args["escrowId"])).first()
+    if escrow:
+        escrow.carrier_attested = True
+        escrow.carrier_payload_hash = "0x" + bytes(args["payloadHash"]).hex()
+        escrow.save(update_fields=["carrier_attested", "carrier_payload_hash", "updated_at"])
+        # Also count as fulfilment evidence (same reputation hook as oracle)
+        ReputationEvent.objects.get_or_create(
+            escrow=escrow,
+            participant=escrow.seller,
+            kind=ReputationEvent.Kind.FULFILMENT_VERIFIED,
+            defaults={"on_chain_tx": event.tx_hash, "note": "carrier attestation"},
+        )
+        _recompute(escrow.seller)
+    return {"escrow_id": args["escrowId"]}
+
+def _handle_carrier_registered(event) -> dict:
+    return {"carrier": event.args.get("carrier")}
+
+def _handle_carrier_removed(event) -> dict:
+    return {"carrier": event.args.get("carrier")}
+
+def _handle_logistics_paid(event) -> dict:
+    return {"escrow_id": event.args.get("escrowId")}
+
 HANDLERS = {
     ("SweeftMarketplace", "ListingCreated"): _handle_listing_created,
     ("SweeftMarketplace", "ListingPurchased"): _handle_listing_purchased,
     ("SweeftMarketplace", "ListingCancelled"): _handle_listing_cancelled,
     ("SweeftVault", "EscrowCreated"): _handle_escrow_created,
+    ("SweeftVault", "CarrierAttested"): _handle_carrier_attested,
+    ("SweeftVault", "CarrierRegistered"): _handle_carrier_registered,
+    ("SweeftVault", "CarrierRemoved"): _handle_carrier_removed,
+    ("SweeftVault", "LogisticsPaid"): _handle_logistics_paid,
     ("SweeftVault", "EscrowFunded"): _handle_escrow_funded,
     ("SweeftVault", "MarkedDelivered"): _handle_marked_delivered,
     ("SweeftVault", "ReceiptConfirmed"): _handle_receipt_confirmed,

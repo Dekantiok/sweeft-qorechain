@@ -144,3 +144,38 @@ def is_verifier(address: str) -> bool:
         return bool(registry.functions.isVerifier(w3.to_checksum_address(address)).call())
     except Exception:
         return False
+
+
+def attest_carrier_evidence(escrow_id: int, payload_hash: bytes, signature: bytes, payload: bytes) -> dict:
+    """Submit the carrier's signed tracking payload to the Vault (as the carrier)."""
+    from apps.logistics.carriers import demo_carrier_keypair
+
+    _, _, carrier_evm = demo_carrier_keypair()
+    w3 = get_evm_client()
+    from qorsdk import derive_unified_account
+
+    import os
+
+    mnemonic = os.getenv("SWEEFT_DEPLOYER_MNEMONIC", "")
+    account = derive_unified_account(mnemonic, index=6)
+    eth_account = w3.eth.account.from_key(account.private_key_hex)
+    vault = _vault_contract(w3)
+    ensure_relayer_window()  # opener for carrier too (best-effort)
+
+    fn = vault.functions.attestCarrierEvidence(escrow_id, payload_hash, signature, payload)
+    tx = fn.build_transaction(
+        {
+            "from": eth_account.address,
+            "value": 0,
+            "gas": 1_000_000,
+            "gasPrice": w3.eth.gas_price,
+            "nonce": w3.eth.get_transaction_count(eth_account.address, "pending"),
+            "chainId": get_network().evm_chain_id,
+        }
+    )
+    signed = eth_account.sign_transaction(tx)
+    tx_hash = w3.eth.send_raw_transaction(signed.rawTransaction)
+    receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=180)
+    if receipt.status != 1:
+        raise RelayerError(f"carrier attestation reverted: {tx_hash.hex()}")
+    return {"tx_hash": tx_hash.hex(), "block": receipt.blockNumber, "carrier": carrier_evm}
