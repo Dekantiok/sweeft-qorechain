@@ -249,6 +249,8 @@
                             {{ item.verification_status }}
                         </span>
                     </div>
+                    {% if item.description %}<div class="mt-1 text-slate-400">{{ item.description }}</div>{% endif %}
+                    {% if item.evidence_reference %}<div class="hash mt-1 text-[10px] text-slate-500">{{ item.evidence_reference }}</div>{% endif %}
                     {% if item.attestation_tx %}<div class="hash mt-1 text-[10px] text-teal-400">{{ item.attestation_tx|truncatechars:30 }}</div>{% endif %}
                 </li>
                 {% endfor %}
