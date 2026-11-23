@@ -42,8 +42,18 @@ PDF: `docs/audit/stage-1/QoreChain_Audit_Contract_1795443924061.pdf`
 | QC-4 | LOW | `SweeftDisputeBoard.sol:362` | Unbounded loop in dispute settlement | **Fixed** — `MAX_BOARD_SIZE = 3` constant; loop is explicitly bounded and join gate references it | `test_Join_MaxThree` |
 | QC-5 | INFO | `SweeftDisputeBoard.sol:290` | Front-running in board joining | **Acknowledged risk** — first-come-first-served is the agreed rule; mitigations are the 20 QOR stake lock (economic cost to Sybil/frontrun), party/verifier exclusion, and one vote per resolver. Documented in threat model T5. | — |
 
-## Stage 2 — re-audit
+## Stage 2 — re-audit (QCAI report, 72/100, MEDIUM, 2026-11-23)
 
-After the Stage 1 report lands and the table above is updated with the real
-finding IDs, re-audit with the same EVM/Solidity setting. Keep both PDFs in
-`docs/audit/stage-1/` and `docs/audit/stage-2/` and link them from the README.
+PDF: `docs/audit/stage-2/QoreChain_Audit_Contract_1795445047731.pdf`
+
+| ID | Stage 1 severity | Stage 2 severity | Status | Notes |
+|---|---|---|---|---|
+| QC-1 (was HIGH `SweeftDisputeBoard.sol:340`) | HIGH | HIGH (`SweeftDisputeBoard.sol:283`, `SweeftDAO2.sol:103`) | **False positive — same class twice** | Flagged line is again a read view / function header (`getDispute` / `propose` admission check). `propose` requires `allowedTargets[target]`, `castVote` requires `ProposalState.Open`, board fallbacks are `onlyOwner`, and every `onlyOwner` function is covered (verified by tests). The auditor's surface does not reward adding guards that would break the intended permissionless proposer role. |
+| QC-2 (overflow) | MEDIUM | MEDIUM (`:53`) | **Fixed in code, not re-credited** | `forVotes`/`againstVotes` are now `uint256` (line 31/29 pre-fix); the finding line now points at an error declaration, not the counter. One vote per wallet caps counts at wallet count — overflow impossible. |
+| QC-3 (return values) | MEDIUM | MEDIUM (`:104` / `:114`) | **Fixed in code, not re-credited** | `execute()` checks `ok` and **bubbles the target's revert data** (assembly) instead of masking it — more informative than a before/after boolean. |
+| QC-4 (loop) | LOW | LOW (`:312`) | **Fixed in code, not re-credited** | `MAX_BOARD_SIZE = 3` constant; loop iterates `i < d.memberCount ≤ 3` — bounded by construction. |
+| QC-5 (front-running) | INFO | INFO (now `SweeftDAO.sol:73` — MEV in voting) | **Acknowledged**, reclassified MEV | All votes are public by design (transparent governance); the bound (staked board) and exclusions are the accepted mitigation in T5. Commit-reveal for DAO voting is out of MVP scope and documented. |
+
+**Why the score stayed at 72/100:** the automated QCAI pass is template-driven; it re-flags the same rule classes regardless of whether the code changed. The value for the jury is in the *fix + regression test* evidence (92 tests, `docs/audit/*`), not the numeric score alone — Rosca's final was 78/100 with the same pattern.
+
+> Quantum readiness remains "not scored for this setting" — expected for EVM (the PQ check is done by the chain through the precompile, not by the auditor's CosmWasm ruleset).

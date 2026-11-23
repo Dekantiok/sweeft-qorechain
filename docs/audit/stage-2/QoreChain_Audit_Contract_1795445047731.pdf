@@ -1,0 +1,672 @@
+%PDF-1.3
+%ºß¬à
+3 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 595.2799999999999727 841.8899999999999864]
+/Contents 4 0 R
+>>
+endobj
+4 0 obj
+<<
+/Length 8072
+>>
+stream
+0.5670000000000001 w
+0 G
+BT
+/F1 22 Tf
+25.2999999999999972 TL
+0.063 0.725 0.506 rg
+39.6850393700787407 785.1970866141732586 Td
+(QoreChain AI) Tj
+ET
+BT
+/F1 16 Tf
+18.3999999999999986 TL
+0.157 g
+39.6850393700787407 756.8506299212598378 Td
+(Security Audit Report) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.392 g
+39.6850393700787407 728.5041732283464171 Td
+(Generated: 11/23/2026, 3:44:07 PM) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.392 g
+39.6850393700787407 700.15771653543311 Td
+(Blockchain: ethereum) Tj
+ET
+0.78 G
+39.6850393700787407 685.9844881889763428 m
+555.5905511811024553 685.9844881889763428 l
+S
+BT
+/F1 12 Tf
+13.7999999999999989 TL
+0. g
+39.6850393700787407 657.6380314960629221 Td
+(Audit Overview) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0. g
+39.6850393700787407 629.291574803149615 Td
+(Overall Security Score: 72/100) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0. g
+39.6850393700787407 615.1183464566928478 Td
+(Risk Level: MEDIUM) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0. g
+39.6850393700787407 600.9451181102361943 Td
+(Quantum Readiness: not scored for this setting) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0. g
+39.6850393700787407 586.7718897637794271 Td
+(Total Vulnerabilities: 5) Tj
+ET
+BT
+/F1 12 Tf
+13.7999999999999989 TL
+0. g
+39.6850393700787407 544.2522047244094665 Td
+(Executive Summary) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.235 g
+39.6850393700787407 515.9057480314959321 Td
+(The SweeftDAO system consists of multiple interconnected contracts managing governance, dispute resolution,) Tj
+T* (and escrow functionality. Key findings include potential access control issues, unchecked external calls, and integer) Tj
+T* (safety concerns. While the system implements several security measures such as PQC verification and) Tj
+T* (multi-signature requirements, there are areas for improvement in terms of access control, error handling, and MEV) Tj
+T* (protection.) Tj
+ET
+0.78 G
+0.5670000000000001 w
+0.78 G
+0.5670000000000001 w
+0.06 0.73 0.51 rg
+0.78 G
+0. w
+0.06 0.73 0.51 rg
+40. 416.69314960629913 85.2367702802211227 -21.4999999999999964 re
+f
+BT
+/F2 10 Tf
+11.5 TL
+1. g
+45. 403.1931496062991869 Td
+(Vulnerability) Tj
+ET
+0.06 0.73 0.51 rg
+0.78 G
+0. w
+0.06 0.73 0.51 rg
+125.2367702802211369 416.69314960629913 48.6000000000000014 -21.4999999999999964 re
+f
+BT
+/F2 10 Tf
+11.5 TL
+1. g
+130.2367702802211227 403.1931496062991869 Td
+(Severity) Tj
+ET
+0.06 0.73 0.51 rg
+0.78 G
+0. w
+0.06 0.73 0.51 rg
+173.836770280221117 416.69314960629913 125.2900000000000205 -21.4999999999999964 re
+f
+BT
+/F2 10 Tf
+11.5 TL
+1. g
+178.836770280221117 403.1931496062991869 Td
+(Location) Tj
+ET
+0.06 0.73 0.51 rg
+0.78 G
+0. w
+0.06 0.73 0.51 rg
+299.1267702802211943 416.69314960629913 256.153229719817773 -21.4999999999999964 re
+f
+BT
+/F2 10 Tf
+11.5 TL
+1. g
+304.1267702802211375 403.1931496062991869 Td
+(Recommendation) Tj
+ET
+0.78 G
+0.5670000000000001 w
+0.96 g
+0.78 G
+0. w
+0.96 g
+40. 395.1931496062991869 85.2367702802211227 -41.0499999999999972 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+45. 382.5431496062992096 Td
+(Missing Access) Tj
+T* (Control on Critical) Tj
+T* (Functions) Tj
+ET
+0.96 g
+0.78 G
+0. w
+0.96 g
+125.2367702802211369 395.1931496062991869 48.6000000000000014 -41.0499999999999972 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+130.2367702802211227 382.5431496062992096 Td
+(HIGH) Tj
+ET
+0.96 g
+0.78 G
+0. w
+0.96 g
+173.836770280221117 395.1931496062991869 125.2900000000000205 -41.0499999999999972 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+178.836770280221117 382.5431496062992096 Td
+(SweeftDisputeBoard.sol:283,) Tj
+T* (SweeftDAO2.sol:103) Tj
+ET
+0.96 g
+0.78 G
+0. w
+0.96 g
+299.1267702802211943 395.1931496062991869 256.153229719817773 -41.0499999999999972 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+304.1267702802211375 382.5431496062992096 Td
+(Ensure all critical functions have proper access control) Tj
+T* (modifiers and validate that only authorized entities can) Tj
+T* (perform sensitive operations.) Tj
+ET
+1. g
+0.78 G
+0. w
+1. g
+40. 354.1431496062991187 85.2367702802211227 -41.0499999999999972 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+45. 341.4931496062991982 Td
+(Potential Integer) Tj
+T* (Overflow in Voting) Tj
+T* (System) Tj
+ET
+1. g
+0.78 G
+0. w
+1. g
+125.2367702802211369 354.1431496062991187 48.6000000000000014 -41.0499999999999972 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+130.2367702802211227 341.4931496062991982 Td
+(MEDIUM) Tj
+ET
+1. g
+0.78 G
+0. w
+1. g
+173.836770280221117 354.1431496062991187 125.2900000000000205 -41.0499999999999972 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+178.836770280221117 341.4931496062991982 Td
+(SweeftDAO.sol:53,) Tj
+T* (SweeftDAO2.sol:53) Tj
+ET
+1. g
+0.78 G
+0. w
+1. g
+299.1267702802211943 354.1431496062991187 256.153229719817773 -41.0499999999999972 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+304.1267702802211375 341.4931496062991982 Td
+(Add explicit bounds checking for vote counts to prevent) Tj
+T* (unexpected behavior.) Tj
+ET
+0.96 g
+0.78 G
+0. w
+0.96 g
+40. 313.0931496062991073 85.2367702802211227 -41.0499999999999972 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+45. 300.44314960629913 Td
+(Unchecked Return) Tj
+T* (Values in External) Tj
+T* (Calls) Tj
+ET
+0.96 g
+0.78 G
+0. w
+0.96 g
+125.2367702802211369 313.0931496062991073 48.6000000000000014 -41.0499999999999972 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+130.2367702802211227 300.44314960629913 Td
+(MEDIUM) Tj
+ET
+0.96 g
+0.78 G
+0. w
+0.96 g
+173.836770280221117 313.0931496062991073 125.2900000000000205 -41.0499999999999972 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+178.836770280221117 300.44314960629913 Td
+(SweeftDAO.sol:104,) Tj
+T* (SweeftDAO2.sol:114) Tj
+ET
+0.96 g
+0.78 G
+0. w
+0.96 g
+299.1267702802211943 313.0931496062991073 256.153229719817773 -41.0499999999999972 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+304.1267702802211375 300.44314960629913 Td
+(Implement proper error handling for external calls using) Tj
+T* (try/catch blocks or ensure that failure conditions are checked) Tj
+T* (explicitly.) Tj
+ET
+1. g
+0.78 G
+0. w
+1. g
+40. 272.0431496062990959 85.2367702802211227 -41.0499999999999972 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+45. 259.3931496062991755 Td
+(Potential) Tj
+T* (Unbounded Loop) Tj
+T* (in Dispute Board) Tj
+ET
+1. g
+0.78 G
+0. w
+1. g
+125.2367702802211369 272.0431496062990959 48.6000000000000014 -41.0499999999999972 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+130.2367702802211227 259.3931496062991755 Td
+(LOW) Tj
+ET
+1. g
+0.78 G
+0. w
+1. g
+173.836770280221117 272.0431496062990959 125.2900000000000205 -41.0499999999999972 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+178.836770280221117 259.3931496062991755 Td
+(SweeftDisputeBoard.sol:312) Tj
+ET
+1. g
+0.78 G
+0. w
+1. g
+299.1267702802211943 272.0431496062990959 256.153229719817773 -41.0499999999999972 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+304.1267702802211375 259.3931496062991755 Td
+(Consider using a more efficient data structure or limiting the) Tj
+T* (number of iterations.) Tj
+ET
+0.96 g
+0.78 G
+0. w
+0.96 g
+40. 230.9931496062990846 85.2367702802211227 -41.0499999999999972 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+45. 218.3431496062991073 Td
+(No MEV Protection) Tj
+T* (in Voting) Tj
+T* (Mechanism) Tj
+ET
+0.96 g
+0.78 G
+0. w
+0.96 g
+125.2367702802211369 230.9931496062990846 48.6000000000000014 -41.0499999999999972 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+130.2367702802211227 218.3431496062991073 Td
+(INFO) Tj
+ET
+0.96 g
+0.78 G
+0. w
+0.96 g
+173.836770280221117 230.9931496062990846 125.2900000000000205 -41.0499999999999972 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+178.836770280221117 218.3431496062991073 Td
+(SweeftDAO.sol:73,) Tj
+T* (SweeftDAO2.sol:73) Tj
+ET
+0.96 g
+0.78 G
+0. w
+0.96 g
+299.1267702802211943 230.9931496062990846 256.153229719817773 -41.0499999999999972 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+304.1267702802211375 218.3431496062991073 Td
+(Consider implementing a commit-reveal scheme or similar) Tj
+T* (mechanism to protect against MEV.) Tj
+ET
+0.78 G
+0.5670000000000001 w
+0.78 G
+0. w
+0.78 G
+0.5670000000000001 w
+0.78 G
+0.5670000000000001 w
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.588 g
+227.5977952755905562 19.8427559055116944 Td
+(Page 1 of 1 - Powered by QoreChain AI) Tj
+ET
+endstream
+endobj
+1 0 obj
+<</Type /Pages
+/Kids [3 0 R ]
+/Count 1
+>>
+endobj
+5 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+6 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+7 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-Oblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+8 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-BoldOblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+9 0 obj
+<<
+/Type /Font
+/BaseFont /Courier
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+10 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+11 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-Oblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+12 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-BoldOblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+13 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Roman
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+14 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+15 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Italic
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+16 0 obj
+<<
+/Type /Font
+/BaseFont /Times-BoldItalic
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+17 0 obj
+<<
+/Type /Font
+/BaseFont /ZapfDingbats
+/Subtype /Type1
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+18 0 obj
+<<
+/Type /Font
+/BaseFont /Symbol
+/Subtype /Type1
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+2 0 obj
+<<
+/ProcSet [/PDF /Text /ImageB /ImageC /ImageI]
+/Font <<
+/F1 5 0 R
+/F2 6 0 R
+/F3 7 0 R
+/F4 8 0 R
+/F5 9 0 R
+/F6 10 0 R
+/F7 11 0 R
+/F8 12 0 R
+/F9 13 0 R
+/F10 14 0 R
+/F11 15 0 R
+/F12 16 0 R
+/F13 17 0 R
+/F14 18 0 R
+>>
+/XObject <<
+>>
+>>
+endobj
+19 0 obj
+<<
+/Producer (jsPDF 4.0.0)
+/CreationDate (D:20261123154407+01'00')
+>>
+endobj
+20 0 obj
+<<
+/Type /Catalog
+/Pages 1 0 R
+/OpenAction [3 0 R /FitH null]
+/PageLayout /OneColumn
+>>
+endobj
+xref
+0 21
+0000000000 65535 f 
+0000008276 00000 n 
+0000010093 00000 n 
+0000000015 00000 n 
+0000000152 00000 n 
+0000008333 00000 n 
+0000008458 00000 n 
+0000008588 00000 n 
+0000008721 00000 n 
+0000008858 00000 n 
+0000008981 00000 n 
+0000009110 00000 n 
+0000009242 00000 n 
+0000009378 00000 n 
+0000009506 00000 n 
+0000009633 00000 n 
+0000009762 00000 n 
+0000009895 00000 n 
+0000009997 00000 n 
+0000010341 00000 n 
+0000010427 00000 n 
+trailer
+<<
+/Size 21
+/Root 20 0 R
+/Info 19 0 R
+/ID [ <F7CEBADA65BCCC8BFB6DB3A8289F0C43> <F7CEBADA65BCCC8BFB6DB3A8289F0C43> ]
+>>
+startxref
+10531
+%%EOF

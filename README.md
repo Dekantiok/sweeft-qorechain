@@ -126,7 +126,7 @@ request's behalf.
 ## Documentation
 
 - [`docs/implementation-blueprint.md`](docs/implementation-blueprint.md) — original implementation blueprint
-- [`docs/AUDIT.md`](docs/AUDIT.md) — QCAI audit findings and resolutions (in progress)
+- [`docs/AUDIT.md`](docs/AUDIT.md) — QCAI audit: Stage 1 72/100 + Stage 2 72/100 (PDFs in `docs/audit/`, finding-by-finding resolutions)
 - [`AI_USAGE.md`](AI_USAGE.md) — how AI was used during development
 
 ## Licence
