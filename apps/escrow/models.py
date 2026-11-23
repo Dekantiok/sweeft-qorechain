@@ -64,6 +64,16 @@ class Escrow(models.Model):
     release_tx = models.CharField(max_length=80, blank=True)
     refund_tx = models.CharField(max_length=80, blank=True)
 
+    # Autopilot (pre-authorized release) — the buyer signs once in QoreX and the AI
+    # submits that exact signature when the escrow becomes release-eligible.
+    # The signed message already binds escrowId/recipient/amount/nonce, so the
+    # scope of the pre-authorization cannot exceed the funded terms.
+    autopilot_enabled = models.BooleanField(default=False)
+    autopilot_release_signature_b64 = models.TextField(blank=True)
+    autopilot_signer = models.CharField(max_length=42, blank=True)
+    autopilot_authorized_at = models.DateTimeField(null=True, blank=True)
+    autopilot_execute_tx = models.CharField(max_length=80, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

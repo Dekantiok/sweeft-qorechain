@@ -106,6 +106,8 @@ def release_request(request, escrow_id: int):
             "buyer_qor": hex_to_bech32(state["buyer"]),
             "nonce": state["pqc_nonce"],
             "amount_wei": state["amount_wei"],
+            "recipient": state["seller"],
+            "preauth": True,  # same message the autopilot will submit exactly once
         }
     )
 
@@ -139,6 +141,105 @@ def release_submit(request, escrow_id: int):
         return JsonResponse({"error": f"relay failed: {exc}"}, status=502)
 
     return JsonResponse({"ok": True, **result})
+
+
+# ---------------------------------------------------------------------------
+# Autopilot — pre-authorized release
+# ---------------------------------------------------------------------------
+
+
+@csrf_exempt
+@require_POST
+def autopilot_pre_authorize(request, escrow_id: int):
+    """Buyer pre-signs the release (QoreX) — the AI may submit exactly this
+    signature later when the escrow becomes release-eligible, inside the
+    cap the buyer approved. Scope is frozen: escrow, recipient, amount, nonce.
+    """
+    escrow = get_object_or_404(Escrow, on_chain_id=escrow_id)
+    try:
+        payload = json.loads(request.body or b"{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "invalid JSON body"}, status=400)
+
+    signature_b64 = payload.get("signature_pq_b64")
+    if not signature_b64:
+        return JsonResponse({"error": "signature_pq_b64 is required"}, status=400)
+
+    import base64
+    from django.utils import timezone
+
+    try:
+        base64.b64decode(signature_b64)
+    except Exception:
+        return JsonResponse({"error": "signature is not valid base64"}, status=400)
+
+    # Must be the buyer; escrow must be funded (or at least created with terms)
+    wallet = (request.session.get("wallet_account") or {}).get("evm", "").lower()
+    if wallet and escrow.buyer.evm_address.lower() != wallet:
+        return JsonResponse({"error": "only the buyer can pre-authorize their release"}, status=403)
+
+    escrow.autopilot_enabled = True
+    escrow.autopilot_release_signature_b64 = signature_b64
+    escrow.autopilot_signer = escrow.buyer.evm_address
+    escrow.autopilot_authorized_at = timezone.now()
+    escrow.save(update_fields=[
+        "autopilot_enabled", "autopilot_release_signature_b64",
+        "autopilot_signer", "autopilot_authorized_at", "updated_at",
+    ])
+    return JsonResponse({"ok": True, "escrow_id": escrow_id, "signed_scope": {
+        "amount_wei": escrow.amount_uqor, "nonce": escrow.pqc_nonce,
+        "note": "One-time — the carrier pays the exact recipient/amount this signature allows, nothing more.",
+    }})
+
+
+@csrf_exempt
+@require_POST
+def autopilot_execute(request, escrow_id: int):
+    """Submit the stored pre-signed release if the escrow is eligible.
+
+    Called by the AI executor (or any caller testing it). Verifies shape
+    and that the chain still considers the escrow release-eligible before
+    relaying. Idempotent: a completed escrow returns its tx.
+    """
+    import base64
+
+    escrow = get_object_or_404(Escrow, on_chain_id=escrow_id)
+    if not escrow.autopilot_enabled or not escrow.autopilot_release_signature_b64:
+        return JsonResponse({"error": "no pre-authorization stored for this escrow"}, status=409)
+
+    try:
+        state = escrow_state(escrow_id)
+    except Exception as exc:
+        return JsonResponse({"error": f"chain read failed: {exc}"}, status=502)
+
+    if state["status"] == 2:
+        return JsonResponse({"ok": True, "already": True, "tx_hash": escrow.release_tx or escrow.autopilot_execute_tx})
+    if not state["release_eligible"]:
+        return JsonResponse({"error": "not yet release-eligible (needs verifier/carrier attestation or the inspection window)", "state": state}, status=409)
+
+    signature = base64.b64decode(escrow.autopilot_release_signature_b64)
+    try:
+        result = submit_release(escrow_id, signature)
+    except RelayerError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+    except Exception as exc:  # pragma: no cover
+        logger.exception("autopilot execute failed")
+        return JsonResponse({"error": f"relay failed: {exc}"}, status=502)
+
+    escrow.autopilot_execute_tx = result["tx_hash"]
+    escrow.save(update_fields=["autopilot_execute_tx", "updated_at"])
+    return JsonResponse({"ok": True, **result})
+
+
+@csrf_exempt
+@require_POST
+def autopilot_revoke(request, escrow_id: int):
+    """Buyer revokes the stored pre-authorization (does not affect the chain)."""
+    escrow = get_object_or_404(Escrow, on_chain_id=escrow_id)
+    escrow.autopilot_enabled = False
+    escrow.autopilot_release_signature_b64 = ""
+    escrow.save(update_fields=["autopilot_enabled", "autopilot_release_signature_b64", "updated_at"])
+    return JsonResponse({"ok": True, "escrow_id": escrow_id})
 
 
 @require_POST

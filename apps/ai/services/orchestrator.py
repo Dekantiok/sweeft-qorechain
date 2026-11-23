@@ -108,6 +108,18 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "execute_autopilot",
+            "description": "Submit a stored pre-signed release for an escrow (Autopilot). Only succeeds if the buyer pre-signed and the escrow is release-eligible. Cannot change terms.",
+            "parameters": {
+                "type": "object",
+                "properties": {"escrow_id": {"type": "integer"}},
+                "required": ["escrow_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "check_mandate",
             "description": "Check whether an action fits the user's current mandate caps (per-tx and daily).",
             "parameters": {

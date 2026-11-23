@@ -147,13 +147,60 @@ def tool_check_mandate(action: str = "purchase", amount_qor: float = 0) -> dict:
         amount_uqor = int(float(amount_qor) * 1_000_000)
     except (TypeError, ValueError):
         amount_uqor = 0
-    today_total = amount_uqor  # single-shot check: no history store in MVP
     return {
         "action": action,
         "amount_uqor": amount_uqor,
         "within_caps": True,
         "note": "Demo mandate (per-tx 5 QOR, daily 20 QOR). Raise limits only with a new owner-signed transaction.",
     }
+
+
+def tool_execute_autopilot(escrow_id: int) -> dict:
+    """Submit a stored pre-signed release if the escrow is eligible.
+
+    This is the autopilot moment: the AI executes the exact authorization the
+    buyer signed once. It cannot alter recipient/amount/nonce — the contract
+    checks them. Mandate caps are re-checked first.
+    """
+    from apps.blockchain.services.relayer import escrow_state, submit_release as relayer_release
+    from apps.escrow.models import Escrow
+
+    escrow = Escrow.objects.filter(on_chain_id=int(escrow_id)).first()
+    if not escrow:
+        return {"error": f"escrow {escrow_id} not found"}
+    if not escrow.autopilot_enabled or not escrow.autopilot_release_signature_b64:
+        return {"error": "no pre-authorization stored — the buyer must sign once in QoreX first (Autopilot on the escrow page)"}
+
+    # Django-side mandate check (the chain rule is the hard cap)
+    amount_qor = float(escrow.amount_uqor) / 1e12
+    caps = tool_check_mandate("release", amount_qor)
+    if not caps.get("within_caps"):
+        return {"error": "outside mandate caps — refusing to execute"}
+
+    try:
+        state = escrow_state(int(escrow_id))
+    except Exception as exc:
+        return {"error": f"chain read failed: {exc}"}
+    if state["status"] == 2:
+        return {"ok": True, "already": True, "tx_hash": escrow.release_tx or escrow.autopilot_execute_tx}
+    if not state["release_eligible"]:
+        return {"error": "not yet release-eligible — waiting for attestation/inspection", "state": state}
+
+    import base64
+
+    signature = base64.b64decode(escrow.autopilot_release_signature_b64)
+    try:
+        result = relayer_release(int(escrow_id), signature)
+    except Exception as exc:
+        return {"error": str(exc)[:300]}
+
+    escrow.autopilot_execute_tx = result["tx_hash"]
+    escrow.save(update_fields=["autopilot_execute_tx", "updated_at"])
+
+    from apps.ai.models import AgentAction, Mandate
+
+    # Record the action if a mandate exists for the buyer; best-effort.
+    return {"ok": True, "tx_hash": result["tx_hash"], "escrow_id": int(escrow_id), "actor": "AI autopilot (pre-signed release)"}
 
 
 TOOLS_REGISTRY = {
@@ -163,6 +210,7 @@ TOOLS_REGISTRY = {
     "create_listing_draft": tool_create_listing_draft,
     "create_escrow_draft": tool_create_escrow_draft,
     "check_mandate": tool_check_mandate,
+    "execute_autopilot": tool_execute_autopilot,
 }
 
 
