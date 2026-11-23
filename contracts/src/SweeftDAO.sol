@@ -59,6 +59,7 @@ contract SweeftDAO {
     // Constants / immutables
     // ------------------------------------------------------------------
 
+    uint256 internal constant MAX_VOTES = 10_000;
     uint8 internal constant CHOICE_FOR = 1;
     uint8 internal constant CHOICE_AGAINST = 2;
     uint8 internal constant CHOICE_ABSTAIN = 3;
@@ -115,8 +116,10 @@ contract SweeftDAO {
         hasVoted[proposalId][msg.sender] = true;
 
         if (choice == CHOICE_FOR) {
+            if (p.forVotes >= MAX_VOTES) revert ProposalFailed();
             p.forVotes += 1;
         } else if (choice == CHOICE_AGAINST) {
+            if (p.againstVotes >= MAX_VOTES) revert ProposalFailed();
             p.againstVotes += 1;
         }
 
@@ -139,6 +142,9 @@ contract SweeftDAO {
 
         p.state = ProposalState.Executed;
 
+        // Low-level call with explicit status check and revert bubbling.
+        // `ok == false` is reverted immediately; target revert data is
+        // forwarded so callers see the real reason.
         bool ok;
         (ok, result) = p.target.call(p.callData);
         if (!ok) {
@@ -162,4 +168,8 @@ contract SweeftDAO {
         Proposal storage p = proposals[proposalId];
         return p.state == ProposalState.Open && block.timestamp >= p.votingEndsAt;
     }
+}
+
+interface ITargetLike {
+    function executeCall(bytes calldata data) external returns (bytes memory);
 }
