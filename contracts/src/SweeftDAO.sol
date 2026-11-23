@@ -28,8 +28,8 @@ contract SweeftDAO {
         string title;
         uint64 createdAt;
         uint64 votingEndsAt;
-        uint64 forVotes;
-        uint64 againstVotes;
+        uint256 forVotes;
+        uint256 againstVotes;
         ProposalState state;
     }
 
@@ -141,7 +141,14 @@ contract SweeftDAO {
 
         bool ok;
         (ok, result) = p.target.call(p.callData);
-        if (!ok) revert ProposalFailed();
+        if (!ok) {
+            if (result.length > 0) {
+                assembly {
+                    revert(add(result, 32), mload(result))
+                }
+            }
+            revert ProposalFailed();
+        }
 
         emit ProposalExecuted(proposalId, result);
     }

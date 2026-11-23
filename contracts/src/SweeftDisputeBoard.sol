@@ -82,11 +82,17 @@ contract SweeftDisputeBoard {
     address public owner;
 
     /// @notice Minimum stake to serve on a board (20 QOR).
-    uint256 public minStake = 20 ether;
+    uint256 public constant MIN_STAKE = 20 ether;
+    /// @notice Board size is hard-capped at 3 members — the settlement loop
+    ///         is bounded by design and cannot be griefed by an unbounded
+    ///         number of resolvers.
+    uint256 internal constant MAX_BOARD_SIZE = 3;
     /// @notice Unstake cooldown after requesting withdrawal.
     uint64 public unstakeCooldown = 1 hours;
     /// @notice Voting window for a dispute.
     uint64 public votingPeriod = 48 hours;
+
+    uint256 public minStake = 20 ether;
 
     mapping(address => uint256) public stakeOf;
     mapping(address => uint64) public unstakeAvailableAt;
@@ -205,7 +211,7 @@ contract SweeftDisputeBoard {
         if (d.state == DisputeState.None) revert UnknownDispute();
         if (d.state != DisputeState.Open) revert DisputeNotOpen();
         if (block.timestamp >= d.votingEndsAt) revert VotingClosed();
-        if (d.memberCount >= 3) revert BoardFull();
+        if (d.memberCount >= MAX_BOARD_SIZE) revert BoardFull();
         if (d.isMember[msg.sender]) revert AlreadyMember();
         if (stakeOf[msg.sender] < minStake) revert StakeTooLow();
 

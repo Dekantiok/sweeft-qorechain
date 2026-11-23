@@ -30,16 +30,17 @@
 - **T7 Window expiry / fund lock.** Release eligibility is derived (buyer confirm OR delivery/attestation + deadline); dispute path is the escape hatch; refund works after the deadline unless attested.
 - **T8 Amount integrity.** `createEscrow` requires exact deposit; marketplace forwards the listing price; logistics share is a sub-allocation of the total, fee is on goods only.
 
-## Stage 1 — findings
+## Stage 1 — findings (QCAI report, 72/100, MEDIUM, 2026-11-23)
 
-(Self-audit pre-pass; replace/extend with the auditor PDF in `stage-1/`.)
+PDF: `docs/audit/stage-1/QoreChain_Audit_Contract_1795443924061.pdf`
 
-| ID | Severity | Location | Finding | Fix | Regression test |
-|---|---|---|---|---|---|
-| S1-01 | Medium | `SweeftVault._payRelease` | Logistics share is paid before fee/seller — a failing partner call would block release | Order: checklist first, then split payouts; `_payRelease` checks are before any state-dependent payout; dispute path remains | _existing facts_ `test_release_withLogistics_paysCarrier` |
-| S1-02 | Low | `SweeftVault.createEscrowWithLogistics` | Amount is the *total*; mis-reading it as goods would double-pay | Proved on testnet: seller = total − logistics − fee | `test_release_withLogistics_paysCarrier` |
-| S1-03 | Low | `SweeftDisputeBoard.resolverReward` | Reward computed off `escrow.amount`; after v4 split it must exclude the logistics share | Goods-only fee base in the reward math | `test_ClaimReward_VotersGetTenthOfFeeEach` |
-| S1-04 | Info | Precompiles | Static calls to `0x…0a01/0a02`; no fallback on networks without them | Revert surfaces as the custom error (fail-closed); testnet supports both | `test_Release_RejectsUnregisteredGuardianKey` |
+| ID | Severity | Location | Finding | Status | Fix / justification | Regression test |
+|---|---|---|---|---|---|---|
+| QC-1 | HIGH | `SweeftDisputeBoard.sol:340` | Missing Access Control on Critical Functions | **False positive** — flagged line is the `votesForRefund` field inside the `getDispute()` *view* (line ~340). Every state-changing board function is `onlyOwner`, party-checked, or members-only: `setMinStake`/`setUnstakeCooldown`/`setVotingPeriod`/`transferOwnership` (`onlyOwner`), `resolveExpired` (`onlyOwner`), `openDispute` (buyer/seller), `joinDispute` (staker, not a party), `castVote` (member-only), `claimReward` (voter-only). No owner path is missing. | — |
+| QC-2 | MEDIUM | `SweeftDAO.sol:44`, `SweeftDAO2.sol:44` | Potential overflow in vote counting (uint64) | **Fixed** — vote counters widened to `uint256` in both DAOs; one vote per wallet makes overflow impossible regardless | `test_OneVotePerWallet`, `test_VoteCast` suites |
+| QC-3 | MEDIUM | `SweeftDAO2.sol:127` | Unchecked return values in external calls | **Fixed** — `execute()` now bubbles the target's revert reason instead of masking it (was checked, now also informative) | `test_FullFlow_ApproveVerifier`, `test_ExecuteBubblesReason` (new) |
+| QC-4 | LOW | `SweeftDisputeBoard.sol:362` | Unbounded loop in dispute settlement | **Fixed** — `MAX_BOARD_SIZE = 3` constant; loop is explicitly bounded and join gate references it | `test_Join_MaxThree` |
+| QC-5 | INFO | `SweeftDisputeBoard.sol:290` | Front-running in board joining | **Acknowledged risk** — first-come-first-served is the agreed rule; mitigations are the 20 QOR stake lock (economic cost to Sybil/frontrun), party/verifier exclusion, and one vote per resolver. Documented in threat model T5. | — |
 
 ## Stage 2 — re-audit
 

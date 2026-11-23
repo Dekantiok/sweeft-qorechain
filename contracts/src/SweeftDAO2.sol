@@ -26,8 +26,8 @@ contract SweeftDAO2 {
         string title;
         uint64 createdAt;
         uint64 votingEndsAt;
-        uint64 forVotes;
-        uint64 againstVotes;
+        uint256 forVotes;
+        uint256 againstVotes;
         ProposalState state;
     }
 
@@ -158,7 +158,15 @@ contract SweeftDAO2 {
 
         bool ok;
         (ok, result) = p.target.call(p.callData);
-        if (!ok) revert ProposalFailed();
+        if (!ok) {
+            // Bubble the target's revert reason instead of masking it.
+            if (result.length > 0) {
+                assembly {
+                    revert(add(result, 32), mload(result))
+                }
+            }
+            revert ProposalFailed();
+        }
 
         emit ProposalExecuted(proposalId, result);
     }
