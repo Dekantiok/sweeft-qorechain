@@ -21,14 +21,22 @@
 
 ## Threat model (selected)
 
-- **T1 Leaked classical key.** Steal an EVM key → still cannot release/refund (needs buyer ML-DSA-87) or attest (needs registry membership). Proven by `e2e_attack.py` on testnet (wrong-key + tampered-amount both revert).
-- **T2 Forged carrier scans.** Carrier payload signature checked on-chain against the key registered for that carrier; unregistered carriers cannot attest (`NotCarrier`, `CarrierKeyNotRegistered`).
-- **T3 Replay.** Release/refund signatures are bound to a per-buyer nonce; carrier payloads bind escrowId + payload hash.
-- **T4 Stolen seller key.** Seller cannot self-release: release pays the stored `seller` address with a buyer PQ signature.
-- **T5 Dispute abuse.** Board = first 3 stakers ≥ 20 QOR, parties and the attesting verifier excluded, 2-of-3 majority; stakes lock while serving; rewards come from the fee pool, never from stakes.
-- **T6 DAO takeover.** DAO2 calls are allowlisted to registry/vault/board; a passed proposal cannot reach arbitrary contracts.
-- **T7 Window expiry / fund lock.** Release eligibility is derived (buyer confirm OR delivery/attestation + deadline); dispute path is the escape hatch; refund works after the deadline unless attested.
-- **T8 Amount integrity.** `createEscrow` requires exact deposit; marketplace forwards the listing price; logistics share is a sub-allocation of the total, fee is on goods only.
+| ID | Threat | Mitigation (contract) | Test | Live proof |
+|---|---|---|---|---|
+| T1 | Leaked classical key releases escrow | Buyer ML-DSA-87 signature required (pqcVerify) | `e2e_attack.py` + Foundry suite | wrong-key release **reverts** on Diana |
+| T2 | Tampered release message | Message binds vault/escrow/buyer/recipient/amount/nonce | `e2e_attack.py` tampered case | tampered release **reverts** |
+| T3 | Replay of a used signature | Per-buyer PQ nonce | `test_Release_ReplayRejected` | keeper log in `docs/proofs/` |
+| T4 | Stolen seller key self-pays | Seller is paid at the stored address, not `msg.sender` | `test_Release_RejectsBadSignature` | — |
+| T5 | Dispute abuse / Sybil boards | ≥20 QOR stake lock, 2-of-3 majority, party/verifier exclusion | dispute suite (22 tests) | dispute E2E settled on Diana |
+| T6 | DAO takeover of fees | DAO2 allowlisted targets (registry/vault/board) | governance suite | registry migration by executed proposal |
+| T7 | Fund lock (window expiry) | Buyer confirm OR delivery/attestation + deadline; dispute escape hatch; deadline refund | release eligibility tests | — |
+| T8 | Amount double-count (logistics) | Exact deposit; logistics sub-allocation of the total; fee on goods only | `test_release_withLogistics_paysCarrier` | logistics E2E (three-way split exact) |
+| T9 | Forged carrier scans | Carrier must be allowlisted + registered proven ML-DSA key; payload hash + signature verified on-chain | `test_attestCarrierEvidence_*` | carrier attested on Diana |
+| T10 | Carrier not in registry | `NotCarrier` on attest | logistics suite | keeper log |
+| T11 | Dispute resolver double-claim | `rewardClaimed` mapping, single claim per vote | `test_ClaimReward_VotersGetTenthOfFeeEach` | dispute E2E claims |
+| T12 | Stale window refuses everybody | `ensure_evm_window` replaces insufficient windows; QoreX has its own "EVM access window" screen | — | — |
+| T13 | AI agent overspend | Agent tools call Django services only; on-chain spending rule caps (authenticator lane) — AI never appears in the release path | — | mandate design in `apps/ai/` |
+| T14 | Metadata tampering | Indexer re-hashes the file and only displays when it matches the on-chain hash | hash-match test in the listing flow | — |
 
 ## Stage 1 — findings (QCAI report, 72/100, MEDIUM, 2026-11-23)
 

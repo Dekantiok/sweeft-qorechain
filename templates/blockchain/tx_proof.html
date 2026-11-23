@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Proof — {{ tx_hash|truncatechars:22 }} — Sweeft{% endblock %}
+
+{% block content %}
+<div>
+    <h1 class="text-2xl font-bold">Transaction proof</h1>
+    <p class="hash mt-2 break-all text-xs text-slate-400">{{ tx_hash }}</p>
+</div>
+
+{% if escrow %}
+<div class="mt-6 rounded-xl border border-teal-500/30 bg-teal-500/5 p-4 text-sm">
+    <span class="text-teal-300">This transaction touches Sweeft escrow </span>
+    <a href="{% url 'escrow:detail' escrow.on_chain_id %}" class="font-semibold text-teal-400 hover:text-teal-300">#{{ escrow.on_chain_id }} →</a>
+</div>
+{% endif %}
+
+{% if evm %}
+<div class="mt-6 rounded-xl border border-slate-800 bg-slate-900/50 p-6">
+    <h2 class="text-sm font-semibold text-teal-300">EVM transaction (the honest label)</h2>
+    <dl class="mt-4 grid gap-x-8 gap-y-2 text-xs sm:grid-cols-2">
+        <dt class="text-slate-500">Status</dt><dd class="{% if evm.status == 1 %}text-teal-400{% else %}text-red-400{% endif %}">{% if evm.status == 1 %}success (1){% else %}reverted (0){% endif %}</dd>
+        <dt class="text-slate-500">From</dt><dd class="hash text-slate-400 break-all">{{ evm.from }}</dd>
+        <dt class="text-slate-500">To</dt><dd class="hash text-slate-400 break-all">{{ evm.to }}</dd>
+        <dt class="text-slate-500">Value</dt><dd class="text-slate-300">{{ evm.value }} wei</dd>
+        <dt class="text-slate-500">Block</dt><dd class="text-slate-300">{{ evm.block }}</dd>
+        <dt class="text-slate-500">Signature tier</dt>
+        <dd class="text-slate-300">classical (EVM lane)</dd>
+    </dl>
+    <p class="mt-4 text-xs leading-relaxed text-slate-400">
+        EVM transactions carry no ML-DSA-87 layer — that's the chain's honest label, not a gap.
+        Sweeft's safety comes from <strong class="text-slate-300">in-contract verification</strong>: the vault
+        checks the buyer's registered ML-DSA-87 signature via the <span class="hash">pqcVerify</span> precompile
+        before any funds move. The precompile call is visible in the transaction trace on the explorer.
+    </p>
+</div>
+{% endif %}
+
+{% if cosmos %}
+<div class="mt-6 rounded-xl border border-slate-800 bg-slate-900/50 p-6">
+    <h2 class="text-sm font-semibold text-teal-300">Native-lane record</h2>
+    <dl class="mt-4 grid gap-x-8 gap-y-2 text-xs sm:grid-cols-2">
+        <dt class="text-slate-500">Signature tier</dt><dd class="text-slate-300">{{ tier.tier }}</dd>
+        <dt class="text-slate-500">Hybrid verified</dt><dd class="{% if tier.verified %}text-teal-400{% else %}text-slate-400{% endif %}">{{ tier.verified|yesno:"yes,no" }}</dd>
+        <dt class="text-slate-500">Meaning</dt><dd class="text-slate-400 leading-relaxed">{{ tier.label }}</dd>
+    </dl>
+</div>
+{% endif %}
+
+<div class="mt-6 rounded-xl border border-slate-800 bg-slate-900/50 p-6">
+    <h2 class="text-sm font-semibold text-slate-300">Try to replay it</h2>
+    <p class="mt-2 text-xs leading-relaxed text-slate-400">
+        Release and refund signatures bind the vault, escrow id, both parties, amount and the per-buyer
+        nonce. Submitting the same signature again fails <span class="hash">NotReleaseEligible</span>, and
+        changing any field fails <span class="hash">BadPqcSignature</span> — both recorded as reverting
+        transactions in the attack simulation (<span class="hash">tools/e2e_attack.py</span>).
+    </p>
+</div>
+{% endblock %}

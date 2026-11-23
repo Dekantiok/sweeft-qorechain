@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}Escrow proof #{{ escrow.on_chain_id }} — Sweeft{% endblock %}
+
+{% block content %}
+<div class="flex flex-wrap items-center gap-3">
+    <h1 class="text-2xl font-bold">Escrow #{{ escrow.on_chain_id }} — proof</h1>
+    <span class="rounded-full px-3 py-1 text-xs uppercase tracking-wider bg-slate-700/50 text-slate-300">{{ escrow.get_state_display }}</span>
+</div>
+<p class="mt-2 text-sm text-slate-400">Everything below is read live from QoreChain; nothing here is stored or cached.</p>
+
+{% if live_error %}
+<div class="mt-6 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">Chain read failed: {{ live_error }}</div>
+{% endif %}
+
+{% if pqc_status %}
+<div class="mt-6 rounded-xl border border-teal-500/30 bg-teal-500/5 p-5">
+    <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-teal-400">
+        <span class="h-2 w-2 rounded-full bg-teal-400"></span> Buyer ML-DSA-87 key (registered on chain)
+    </div>
+    <dl class="mt-3 grid gap-x-8 gap-y-2 text-xs sm:grid-cols-3">
+        <dt class="text-slate-500">registered</dt><dd class="text-slate-300">{{ pqc_status.registered|yesno:"yes,no" }}</dd>
+        <dt class="text-slate-500">algorithm</dt><dd class="text-slate-300">{{ pqc_status.algorithm_name|default:"ML-DSA-87" }}</dd>
+        <dt class="text-slate-500">possession proven</dt><dd class="text-teal-400">{{ pqc_status.possession_proven|yesno:"yes,no" }}</dd>
+        <dt class="text-slate-500">key type</dt><dd class="text-slate-300">{{ pqc_status.key_type|default:"hybrid" }}</dd>
+        <dt class="text-slate-500">created at height</dt><dd class="text-slate-300">{{ pqc_status.created_at_height|default:"—" }}</dd>
+    </dl>
+    <p class="mt-3 text-[11px] leading-relaxed text-slate-400">
+        The vault reads this exact key on-chain (pqcKeyStatus → pqcVerify) before releasing. The buyer proves
+        possession of the secret key on every release — a leaked EVM key has nothing to do with it.
+    </p>
+</div>
+{% endif %}
+
+{% if live %}
+<div class="mt-6 rounded-xl border border-slate-800 bg-slate-900/50 p-5">
+    <h2 class="text-sm font-semibold text-teal-300">Live contract state</h2>
+    <dl class="mt-3 grid gap-x-8 gap-y-2 text-xs sm:grid-cols-3">
+        <dt class="text-slate-500">buyer</dt><dd class="hash text-slate-400 break-all">{{ live.buyer }}</dd>
+        <dt class="text-slate-500">seller</dt><dd class="hash text-slate-400 break-all">{{ live.seller }}</dd>
+        <dt class="text-slate-500">amount (wei)</dt><dd class="text-slate-300">{{ live.amount_wei }}</dd>
+        <dt class="text-slate-500">delivered</dt><dd>{{ live.delivered|yesno:"yes,no" }}</dd>
+        <dt class="text-slate-500">receipt confirmed</dt><dd>{{ live.confirmed|yesno:"yes,no" }}</dd>
+        <dt class="text-slate-500">attested</dt><dd>{{ live.attested|yesno:"yes,no" }}</dd>
+        <dt class="text-slate-500">carrier-attested</dt><dd>{{ live.carrier_attested|yesno:"yes,no" }}</dd>
+        <dt class="text-slate-500">release eligible</dt><dd class="{% if live.release_eligible %}text-teal-400{% else %}text-slate-400{% endif %}">{{ live.release_eligible|yesno:"yes,no" }}</dd>
+        <dt class="text-slate-500">refundable</dt><dd>{{ live.refundable|yesno:"yes,no" }}</dd>
+        <dt class="text-slate-500">PQ nonce</dt><dd class="text-slate-300">{{ live.pqc_nonce }}</dd>
+    </dl>
+</div>
+{% endif %}
+
+<div class="mt-6 grid gap-4 sm:grid-cols-2">
+    <div class="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
+        <h2 class="text-sm font-semibold text-teal-300">The release signature binds</h2>
+        <p class="mt-2 text-xs leading-relaxed text-slate-400">
+            <span class="hash">sweeft-release-v1|vault=…|escrow=…|buyer=…|recipient=…|amount=…|nonce=…</span>,
+            signed as <span class="hash">qorechain-msg-v1|qorechain-diana|…</span>. Claim a different
+            recipient, a different amount or a previous nonce and the contract rejects it with
+            <span class="hash">BadPqcSignature</span> — proven on testnet with the attack simulator.
+        </p>
+    </div>
+    <div class="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
+        <h2 class="text-sm font-semibold text-teal-300">Transactions</h2>
+        <dl class="mt-2 space-y-1 text-xs">
+            {% if escrow.create_tx %}<dt class="text-slate-500">created</dt><dd><a class="hash text-teal-400 hover:text-teal-300" href="{% url 'blockchain:tx_proof' escrow.create_tx %}">{{ escrow.create_tx|truncatechars:26 }}</a></dd>{% endif %}
+            {% if escrow.release_tx %}<dt class="text-slate-500">released</dt><dd><a class="hash text-teal-400 hover:text-teal-300" href="{% url 'blockchain:tx_proof' escrow.release_tx %}">{{ escrow.release_tx|truncatechars:26 }}</a></dd>{% endif %}
+            {% if escrow.refund_tx %}<dt class="text-slate-500">refunded</dt><dd><a class="hash text-blue-400 hover:text-blue-300" href="{% url 'blockchain:tx_proof' escrow.refund_tx %}">{{ escrow.refund_tx|truncatechars:26 }}</a></dd>{% endif %}
+        </dl>
+    </div>
+</div>
+
+<div class="mt-6"><a href="{% url 'escrow:detail' escrow.on_chain_id %}" class="text-xs text-teal-400 hover:text-teal-300">← Back to escrow</a></div>
+{% endblock %}

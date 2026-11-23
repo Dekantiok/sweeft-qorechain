@@ -138,6 +138,10 @@
                 <li>The signature is verified on-chain by the pqcVerify precompile</li>
                 <li>A used signature can never be replayed</li>
             </ul>
+            <a href="{% url 'blockchain:escrow_proof' escrow.on_chain_id %}" class="mt-3 inline-block text-teal-400 hover:text-teal-300">
+                Verify this escrow in your browser →
+            </a>
+            <p id="browser-proof" class="mt-2 text-slate-500">PDF: the proof page reads the buyer's registered key and this escrow's live state from chain — no trust in this page needed.</p>
         </div>
 
         {% if live.status == 1 %}
