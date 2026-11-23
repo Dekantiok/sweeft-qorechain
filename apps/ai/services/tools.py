@@ -10,6 +10,7 @@ import hashlib
 import json
 import logging
 import time
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from django.conf import settings
@@ -141,17 +142,94 @@ def tool_create_escrow_draft(item: str, seller_hint: str = "", amount_qor: float
     }
 
 
-def tool_check_mandate(action: str = "purchase", amount_qor: float = 0) -> dict:
-    """Django-side policy check. The chain rule (authenticator) is the hard cap."""
+def _decimal(value) -> Decimal:
     try:
-        amount_uqor = int(float(amount_qor) * 1_000_000)
-    except (TypeError, ValueError):
-        amount_uqor = 0
+        return Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        return Decimal(0)
+
+
+def _active_mandate(wallet: str | None):
+    from apps.ai.models import Mandate
+
+    qs = Mandate.objects.filter(state=Mandate.State.ACTIVE)
+    if wallet:
+        qs = qs.filter(owner__evm_address__iexact=wallet)
+    return qs.order_by("-created_at").first()
+
+
+def _daily_spend_uqor(mandate) -> int:
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.ai.models import AgentAction
+
+    since = timezone.now() - timedelta(hours=24)
+    total = 0
+    actions = AgentAction.objects.filter(
+        mandate=mandate,
+        created_at__gte=since,
+        outcome__in=[AgentAction.Outcome.EXECUTED, AgentAction.Outcome.PLANNED],
+    )
+    for action in actions:
+        try:
+            total += int(action.payload.get("amount_uqor", 0) or 0)
+        except (TypeError, ValueError):
+            continue
+    return total
+
+
+def tool_check_mandate(action: str = "purchase", amount_qor: float = 0, wallet: str | None = None) -> dict:
+    """Enforce the owner's mandate in code (per-tx and rolling 24h caps).
+
+    The mandate is the off-chain policy; the on-chain spending rule registered
+    by the owner remains the hard cap. With no active mandate, the agent
+    refuses autonomous spend rather than acting unbounded.
+    """
+    amount = _decimal(amount_qor)
+    amount_uqor = int((amount * Decimal(1_000_000)).to_integral_value())
+    mandate = _active_mandate(wallet)
+    if not mandate:
+        return {
+            "action": action,
+            "amount_uqor": amount_uqor,
+            "within_caps": False,
+            "reason": "no active mandate — the agent will not spend autonomously until you create one",
+        }
+
+    from django.utils import timezone
+
+    if mandate.expires_at and mandate.expires_at < timezone.now():
+        return {"action": action, "amount_uqor": amount_uqor, "within_caps": False, "reason": "mandate expired"}
+
+    per_tx = int(mandate.per_tx_limit_uqor)
+    daily = int(mandate.daily_limit_uqor)
+    if amount_uqor > per_tx:
+        return {
+            "action": action,
+            "amount_uqor": amount_uqor,
+            "within_caps": False,
+            "reason": f"amount {amount_uqor} uqor exceeds the per-tx cap {per_tx} uqor",
+        }
+
+    spent = _daily_spend_uqor(mandate)
+    if spent + amount_uqor > daily:
+        return {
+            "action": action,
+            "amount_uqor": amount_uqor,
+            "within_caps": False,
+            "reason": f"daily cap reached ({spent}+{amount_uqor} > {daily} uqor)",
+        }
+
     return {
         "action": action,
         "amount_uqor": amount_uqor,
         "within_caps": True,
-        "note": "Demo mandate (per-tx 5 QOR, daily 20 QOR). Raise limits only with a new owner-signed transaction.",
+        "mandate_id": mandate.pk,
+        "per_tx_limit_uqor": per_tx,
+        "daily_limit_uqor": daily,
+        "daily_spent_uqor": spent,
     }
 
 
@@ -173,9 +251,21 @@ def tool_execute_autopilot(escrow_id: int) -> dict:
 
     # Django-side mandate check (the chain rule is the hard cap)
     amount_qor = float(escrow.amount_uqor) / 1e12
-    caps = tool_check_mandate("release", amount_qor)
+    wallet = escrow.buyer.evm_address if escrow.buyer else None
+    caps = tool_check_mandate("release", amount_qor, wallet=wallet)
     if not caps.get("within_caps"):
-        return {"error": "outside mandate caps — refusing to execute"}
+        from apps.ai.models import AgentAction, Mandate
+
+        mandate = _active_mandate(wallet)
+        if mandate:
+            AgentAction.objects.create(
+                mandate=mandate,
+                action="execute_autopilot",
+                payload={"escrow_id": int(escrow_id), "amount_uqor": int(escrow.amount_uqor)},
+                outcome=AgentAction.Outcome.REFUSED_POLICY,
+                detail=str(caps.get("reason", ""))[:500],
+            )
+        return {"error": f"outside mandate caps — refusing to execute: {caps.get('reason', '')}"}
 
     try:
         state = escrow_state(int(escrow_id))
@@ -195,11 +285,24 @@ def tool_execute_autopilot(escrow_id: int) -> dict:
         return {"error": str(exc)[:300]}
 
     escrow.autopilot_execute_tx = result["tx_hash"]
-    escrow.save(update_fields=["autopilot_execute_tx", "updated_at"])
+    # A pre-signed release is single-use; clear it after a successful execution.
+    escrow.autopilot_enabled = False
+    escrow.autopilot_release_signature_b64 = ""
+    escrow.save(update_fields=["autopilot_execute_tx", "autopilot_enabled", "autopilot_release_signature_b64", "updated_at"])
 
-    from apps.ai.models import AgentAction, Mandate
+    from apps.ai.models import AgentAction
 
-    # Record the action if a mandate exists for the buyer; best-effort.
+    mandate = _active_mandate(wallet)
+    if mandate:
+        AgentAction.objects.create(
+            mandate=mandate,
+            action="execute_autopilot",
+            payload={"escrow_id": int(escrow_id), "amount_uqor": int(escrow.amount_uqor)},
+            outcome=AgentAction.Outcome.EXECUTED,
+            tx_hash=result["tx_hash"],
+            detail="pre-signed release submitted within mandate",
+        )
+
     return {"ok": True, "tx_hash": result["tx_hash"], "escrow_id": int(escrow_id), "actor": "AI autopilot (pre-signed release)"}
 
 

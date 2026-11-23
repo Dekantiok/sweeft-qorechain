@@ -70,6 +70,63 @@ def canonical_carrier_message(payload: dict) -> str:
     )
 
 
+def canonical_carrier_attestation(
+    provider_id: str,
+    tracking_number: str,
+    escrow_id: int,
+    status: str,
+    issued_at: int,
+    nonce: int,
+) -> str:
+    """v5 on-chain attestation message — MUST match SweeftVault._carrierMessage.
+
+    The vault rebuilds this from (carrier, escrowId, tracking, status,
+    issuedAt, nonce) and verifies the carrier's ML-DSA-87 signature over it,
+    binding the attestation to one escrow, carrier, status and nonce.
+    """
+    return (
+        f"sweeft-carrier-v1|provider={provider_id}|tracking={tracking_number}"
+        f"|escrow={escrow_id}|status={status}|issued={issued_at}|nonce={nonce}"
+    )
+
+
+def hash_attestation(message: str) -> str:
+    """keccak256 hex of an attestation message (matches the vault's hash)."""
+    from eth_utils import keccak
+
+    return keccak(message.encode()).hex()
+
+
+def sign_carrier_attestation(
+    escrow_id: int,
+    tracking_number: str,
+    status: str,
+    nonce: int,
+    issued_at: int | None = None,
+) -> dict:
+    """Sign the v5 on-chain attestation message with the Demo Carrier key.
+
+    `issued_at` is in **seconds** (the vault bounds it to the last 7 days).
+    """
+    if issued_at is None:
+        issued_at = int(time.time())
+    keypair, _, _ = demo_carrier_keypair()
+    message = canonical_carrier_attestation(
+        DemoCarrier.provider_id, tracking_number, escrow_id, status, issued_at, nonce
+    )
+    from qorsdk import pqc_sign
+
+    signature = pqc_sign(keypair.secret_key, message.encode()).hex()
+    return {
+        "message": message,
+        "signature": signature,
+        "issued_at": issued_at,
+        "nonce": nonce,
+        "provider_id": DemoCarrier.provider_id,
+        "simulated": True,
+    }
+
+
 def demo_carrier_keypair():
     """Demo carrier's ML-DSA-87 keypair, derived from the testnet mnemonic (index 6)."""
     import os

@@ -23,10 +23,19 @@ contract SweeftMarketplaceTest is Test {
         vault = new SweeftVault(address(registry), "qorechain-diana", 200, address(0x7EA5));
         market = new SweeftMarketplace(address(vault));
         vault.setMarketplace(address(market));
+
+        // The vault requires the buyer to hold a registered, proven PQ key.
+        _installPqcMocks(buyer);
     }
 
     function _deadline(uint64 offset) internal view returns (uint64) {
         return uint64(block.timestamp + offset);
+    }
+
+    function _buy(uint256 listingId, uint256 price) internal returns (uint256) {
+        vm.deal(buyer, price);
+        vm.prank(buyer);
+        return market.purchase{ value: price }(listingId, _deadline(7 days), price, META_HASH);
     }
 
     // ------------------------------------------------------------------
@@ -106,11 +115,8 @@ contract SweeftMarketplaceTest is Test {
         vm.prank(seller);
         uint256 listingId = market.createListing(1 ether, 1, META_URI, META_HASH);
 
-        vm.deal(buyer, 1 ether);
-        vm.prank(buyer);
-        uint256 escrowId = market.purchase{ value: 1 ether }(listingId, _deadline(7 days));
+        uint256 escrowId = _buy(listingId, 1 ether);
 
-        // Escrow created and holds the payment.
         assertEq(vault.escrowCount(), 1);
         SweeftVault.Escrow memory e = vault.getEscrow(escrowId);
         assertEq(e.buyer, buyer);
@@ -118,7 +124,6 @@ contract SweeftMarketplaceTest is Test {
         assertEq(e.amount, 1 ether);
         assertEq(address(vault).balance, 1 ether);
 
-        // Listing marked sold (quantity reached 0).
         assertEq(uint8(market.getListing(listingId).status), uint8(SweeftMarketplace.ListingStatus.Sold));
     }
 
@@ -126,17 +131,11 @@ contract SweeftMarketplaceTest is Test {
         vm.prank(seller);
         uint256 listingId = market.createListing(1 ether, 2, META_URI, META_HASH);
 
-        vm.deal(buyer, 2 ether);
-
-        vm.prank(buyer);
-        market.purchase{ value: 1 ether }(listingId, _deadline(7 days));
-
+        _buy(listingId, 1 ether);
         assertEq(market.getListing(listingId).quantity, 1);
         assertEq(uint8(market.getListing(listingId).status), uint8(SweeftMarketplace.ListingStatus.Active));
 
-        vm.prank(buyer);
-        market.purchase{ value: 1 ether }(listingId, _deadline(7 days));
-
+        _buy(listingId, 1 ether);
         assertEq(market.getListing(listingId).quantity, 0);
         assertEq(uint8(market.getListing(listingId).status), uint8(SweeftMarketplace.ListingStatus.Sold));
     }
@@ -148,7 +147,27 @@ contract SweeftMarketplaceTest is Test {
         vm.deal(buyer, 1 ether);
         vm.prank(buyer);
         vm.expectRevert(SweeftMarketplace.WrongPayment.selector);
-        market.purchase{ value: 0.5 ether }(listingId, _deadline(7 days));
+        market.purchase{ value: 0.5 ether }(listingId, _deadline(7 days), 1 ether, META_HASH);
+    }
+
+    function test_Purchase_RejectsPriceAboveMax() public {
+        vm.prank(seller);
+        uint256 listingId = market.createListing(2 ether, 1, META_URI, META_HASH);
+
+        vm.deal(buyer, 2 ether);
+        vm.prank(buyer);
+        vm.expectRevert(SweeftMarketplace.PriceAboveMax.selector);
+        market.purchase{ value: 2 ether }(listingId, _deadline(7 days), 1 ether, META_HASH);
+    }
+
+    function test_Purchase_RejectsMetadataMismatch() public {
+        vm.prank(seller);
+        uint256 listingId = market.createListing(1 ether, 1, META_URI, META_HASH);
+
+        vm.deal(buyer, 1 ether);
+        vm.prank(buyer);
+        vm.expectRevert(SweeftMarketplace.MetadataMismatch.selector);
+        market.purchase{ value: 1 ether }(listingId, _deadline(7 days), 1 ether, keccak256("swapped"));
     }
 
     function test_Purchase_RejectsSeller() public {
@@ -158,7 +177,7 @@ contract SweeftMarketplaceTest is Test {
         vm.deal(seller, 1 ether);
         vm.prank(seller);
         vm.expectRevert(SweeftMarketplace.InvalidBuyer.selector);
-        market.purchase{ value: 1 ether }(listingId, _deadline(7 days));
+        market.purchase{ value: 1 ether }(listingId, _deadline(7 days), 1 ether, META_HASH);
     }
 
     function test_Purchase_RejectsCancelled() public {
@@ -170,20 +189,18 @@ contract SweeftMarketplaceTest is Test {
         vm.deal(buyer, 1 ether);
         vm.prank(buyer);
         vm.expectRevert(SweeftMarketplace.ListingNotActive.selector);
-        market.purchase{ value: 1 ether }(listingId, _deadline(7 days));
+        market.purchase{ value: 1 ether }(listingId, _deadline(7 days), 1 ether, META_HASH);
     }
 
     function test_Purchase_RejectsSoldOut() public {
         vm.prank(seller);
         uint256 listingId = market.createListing(1 ether, 1, META_URI, META_HASH);
 
-        vm.deal(buyer, 2 ether);
-        vm.prank(buyer);
-        market.purchase{ value: 1 ether }(listingId, _deadline(7 days));
-
+        _buy(listingId, 1 ether);
+        vm.deal(buyer, 1 ether);
         vm.prank(buyer);
         vm.expectRevert(SweeftMarketplace.ListingNotActive.selector);
-        market.purchase{ value: 1 ether }(listingId, _deadline(7 days));
+        market.purchase{ value: 1 ether }(listingId, _deadline(7 days), 1 ether, META_HASH);
     }
 
     // ------------------------------------------------------------------
@@ -191,23 +208,15 @@ contract SweeftMarketplaceTest is Test {
     // ------------------------------------------------------------------
 
     function test_FullLoop_ListBuyConfirmRelease() public {
-        // Griefing-resistant precompile mocks, as in the vault tests.
-        _installPqcMocks(buyer);
-
         vm.prank(seller);
         uint256 listingId = market.createListing(1 ether, 1, META_URI, META_HASH);
 
-        // Buyer purchases -> escrow created and funded in one step.
-        vm.deal(buyer, 2 ether);
-        vm.prank(buyer);
-        uint256 escrowId = market.purchase{ value: 1 ether }(listingId, _deadline(1 days));
+        uint256 escrowId = _buy(listingId, 1 ether);
 
-        // Escrow holds the money; buyer confirms receipt.
         assertEq(address(vault).balance, 1 ether);
         vm.prank(buyer);
         vault.confirmReceipt(escrowId);
 
-        // Anyone submits the release; seller receives funds minus the 2% fee.
         uint256 sellerBefore = seller.balance;
         vm.prank(stranger);
         vault.release(escrowId, hex"c0ffee");
@@ -219,17 +228,12 @@ contract SweeftMarketplaceTest is Test {
     }
 
     function test_FullLoop_RefundPath() public {
-        _installPqcMocks(buyer);
-
         vm.prank(seller);
         uint256 listingId = market.createListing(1 ether, 1, META_URI, META_HASH);
 
-        vm.deal(buyer, 1 ether);
-        vm.prank(buyer);
-        uint256 escrowId = market.purchase{ value: 1 ether }(listingId, _deadline(1 days));
+        uint256 escrowId = _buy(listingId, 1 ether);
 
-        // Seller never delivers; after the deadline the buyer refunds.
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(block.timestamp + 7 days + 1);
         uint256 buyerBefore = buyer.balance;
         vault.refundAfterDeadline(escrowId, hex"c0ffee");
 

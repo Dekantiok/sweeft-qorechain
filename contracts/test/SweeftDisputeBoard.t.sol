@@ -18,10 +18,13 @@ contract SweeftDisputeBoardTest is Test {
     address internal resolver3 = address(0xA3);
     address internal resolver4 = address(0xA4);
     address internal verifier = address(0x0AC1E);
+    address internal carrier = address(0xCA99);
     address internal treasury = address(0x7EA5);
 
     uint256 internal constant AMOUNT = 1 ether;
     uint256 internal constant FEE_BPS = 200;
+    uint256 internal constant BOND = 0.1 ether;
+    uint256 internal constant STAKE = 21 ether; // >= 20 + 1% of AMOUNT
 
     function setUp() public {
         registry = new SweeftOracleRegistry(address(this));
@@ -31,12 +34,20 @@ contract SweeftDisputeBoardTest is Test {
         board.setVotingPeriod(1 hours);
         board.setUnstakeCooldown(1 hours);
 
-        // Four funded, staked resolvers (20 QOR each).
+        // Etch PQ precompile mocks; the vault now requires a registered key
+        // for the buyer at escrow creation.
+        MockKS ks = new MockKS();
+        MockPV pv = new MockPV();
+        vm.etch(0x0000000000000000000000000000000000000a02, address(ks).code);
+        vm.etch(0x0000000000000000000000000000000000000a01, address(pv).code);
+        MockKS(0x0000000000000000000000000000000000000a02).setRegistered(buyer, true, true);
+        MockPV(0x0000000000000000000000000000000000000a01).setResult(true);
+
         address[4] memory resolvers = [resolver1, resolver2, resolver3, resolver4];
         for (uint256 i = 0; i < resolvers.length; i++) {
             vm.deal(resolvers[i], 30 ether);
             vm.prank(resolvers[i]);
-            board.stake{ value: 20 ether }();
+            board.stake{ value: STAKE }();
         }
     }
 
@@ -45,9 +56,9 @@ contract SweeftDisputeBoardTest is Test {
     // ------------------------------------------------------------------
 
     function _fundedEscrow() internal returns (uint256) {
+        vm.deal(buyer, AMOUNT);
         vm.prank(buyer);
         uint256 id = vault.createEscrow(buyer, seller, uint64(block.timestamp + 7 days), AMOUNT);
-        vm.deal(buyer, AMOUNT);
         vm.prank(buyer);
         vault.fundEscrow{ value: AMOUNT }(id);
         return id;
@@ -55,8 +66,9 @@ contract SweeftDisputeBoardTest is Test {
 
     function _openDispute() internal returns (uint256 escrowId, uint256 disputeId) {
         escrowId = _fundedEscrow();
+        vm.deal(buyer, BOND);
         vm.prank(buyer);
-        disputeId = board.openDispute(escrowId);
+        disputeId = board.openDispute{ value: BOND }(escrowId);
     }
 
     function _openAndJoin() internal returns (uint256 escrowId, uint256 disputeId) {
@@ -104,6 +116,11 @@ contract SweeftDisputeBoardTest is Test {
         board.requestUnstake();
     }
 
+    function test_MinStakeFor_ScalesWithEscrow() public {
+        assertEq(board.minStakeFor(1 ether), 20 ether + 0.01 ether);
+        assertEq(board.minStakeFor(100 ether), 20 ether + 1 ether);
+    }
+
     // ------------------------------------------------------------------
     // Dispute lifecycle
     // ------------------------------------------------------------------
@@ -111,43 +128,52 @@ contract SweeftDisputeBoardTest is Test {
     function test_OpenDispute_ByBuyer_FreezesEscrow() public {
         uint256 escrowId = _fundedEscrow();
 
+        vm.deal(buyer, BOND);
         vm.prank(buyer);
-        uint256 disputeId = board.openDispute(escrowId);
+        uint256 disputeId = board.openDispute{ value: BOND }(escrowId);
 
         SweeftVault.Escrow memory e = vault.getEscrow(escrowId);
         assertEq(uint8(e.status), uint8(SweeftVault.EscrowStatus.Disputed));
         assertFalse(vault.isReleaseEligible(escrowId));
         assertFalse(vault.isRefundable(escrowId));
 
-        uint256 storedEscrow;
-        (storedEscrow,,,,,,,,,) = board.getDispute(disputeId);
+        (uint256 storedEscrow,,,,,,,,,,,) = board.getDispute(disputeId);
         assertEq(storedEscrow, escrowId);
     }
 
     function test_OpenDispute_BySeller() public {
         uint256 escrowId = _fundedEscrow();
+        vm.deal(seller, BOND);
         vm.prank(seller);
-        board.openDispute(escrowId);
+        board.openDispute{ value: BOND }(escrowId);
         assertEq(uint8(vault.getEscrow(escrowId).status), uint8(SweeftVault.EscrowStatus.Disputed));
+    }
+
+    function test_OpenDispute_RequiresBond() public {
+        uint256 escrowId = _fundedEscrow();
+        vm.deal(buyer, 0.05 ether);
+        vm.prank(buyer);
+        vm.expectRevert(SweeftDisputeBoard.BondTooLow.selector);
+        board.openDispute{ value: 0.05 ether }(escrowId);
     }
 
     function test_OpenDispute_StrangerRejected() public {
         uint256 escrowId = _fundedEscrow();
+        vm.deal(address(0xCAFE), BOND);
         vm.prank(address(0xCAFE));
         vm.expectRevert(SweeftDisputeBoard.ExcludedParty.selector);
-        board.openDispute(escrowId);
+        board.openDispute{ value: BOND }(escrowId);
     }
 
     function test_OpenDispute_OutsideVaultPath() public {
-        // Buyer may also freeze via the vault directly; the board rejects a
-        // second freeze (already Disputed).
         uint256 escrowId = _fundedEscrow();
         vm.prank(buyer);
         vault.raiseDispute(escrowId);
 
+        vm.deal(seller, BOND);
         vm.prank(seller);
         vm.expectRevert(SweeftVault.NotDisputable.selector);
-        board.openDispute(escrowId);
+        board.openDispute{ value: BOND }(escrowId);
     }
 
     // ------------------------------------------------------------------
@@ -168,13 +194,12 @@ contract SweeftDisputeBoardTest is Test {
     function test_Join_ExcludesParties() public {
         (, uint256 disputeId) = _openDispute();
 
-        // Parties are excluded even when staked.
         vm.deal(buyer, 25 ether);
         vm.prank(buyer);
-        board.stake{ value: 20 ether }();
+        board.stake{ value: 21 ether }();
         vm.deal(seller, 25 ether);
         vm.prank(seller);
-        board.stake{ value: 20 ether }();
+        board.stake{ value: 21 ether }();
 
         vm.prank(buyer);
         vm.expectRevert(SweeftDisputeBoard.ExcludedParty.selector);
@@ -191,13 +216,13 @@ contract SweeftDisputeBoardTest is Test {
         vm.prank(verifier);
         vault.attestEvidence(escrowId, keccak256("proof"));
 
+        vm.deal(buyer, BOND);
         vm.prank(buyer);
-        uint256 disputeId = board.openDispute(escrowId);
+        uint256 disputeId = board.openDispute{ value: BOND }(escrowId);
 
-        // Verifier has no stake — fund and stake them, still excluded.
         vm.deal(verifier, 25 ether);
         vm.prank(verifier);
-        board.stake{ value: 20 ether }();
+        board.stake{ value: 21 ether }();
 
         vm.prank(verifier);
         vm.expectRevert(SweeftDisputeBoard.ExcludedParty.selector);
@@ -246,7 +271,8 @@ contract SweeftDisputeBoardTest is Test {
         uint256 fee = (AMOUNT * FEE_BPS) / 10_000; // 0.02 ether
         assertEq(seller.balance, sellerBefore + AMOUNT - fee);
         assertEq(treasury.balance, treasuryBefore + (fee * 7000) / 10_000); // 70%
-        assertEq(board.rewardPool(), boardBefore + (fee * 3000) / 10_000); // 30%
+        // Pool gains the 30% dispute share plus the losing raiser's bond.
+        assertEq(board.rewardPool(), boardBefore + (fee * 3000) / 10_000 + BOND);
 
         SweeftVault.Escrow memory e = vault.getEscrow(escrowId);
         assertEq(uint8(e.status), uint8(SweeftVault.EscrowStatus.Completed));
@@ -261,7 +287,8 @@ contract SweeftDisputeBoardTest is Test {
         vm.prank(resolver2);
         board.castVote(disputeId, false);
 
-        assertEq(buyer.balance, buyerBefore + AMOUNT); // full refund, no fee
+        // Full refund of the escrow; the bond is returned too (buyer prevailed).
+        assertEq(buyer.balance, buyerBefore + AMOUNT + BOND);
         assertEq(uint8(vault.getEscrow(escrowId).status), uint8(SweeftVault.EscrowStatus.Refunded));
     }
 
@@ -273,9 +300,7 @@ contract SweeftDisputeBoardTest is Test {
         vm.prank(resolver2);
         board.castVote(disputeId, false);
 
-        // 1-1, still open; third vote decides.
-        SweeftDisputeBoard.DisputeState stateAfterTwo;
-        (,,,, stateAfterTwo,,,,,) = board.getDispute(disputeId);
+        (,,,,, SweeftDisputeBoard.DisputeState stateAfterTwo,,,,,,) = board.getDispute(disputeId);
         assertEq(uint8(stateAfterTwo), uint8(SweeftDisputeBoard.DisputeState.Open));
 
         vm.prank(resolver3);
@@ -283,7 +308,7 @@ contract SweeftDisputeBoardTest is Test {
 
         bool releaseToSeller;
         SweeftDisputeBoard.DisputeState finalState;
-        (,,,, finalState, releaseToSeller,,,,) = board.getDispute(disputeId);
+        (,,,,, finalState, releaseToSeller, , , , , ) = board.getDispute(disputeId);
         assertEq(uint8(finalState), uint8(SweeftDisputeBoard.DisputeState.Resolved));
         assertFalse(releaseToSeller);
     }
@@ -312,31 +337,49 @@ contract SweeftDisputeBoardTest is Test {
         board.castVote(disputeId, true);
     }
 
-    function test_ResolveExpired_OwnerFallback() public {
-        (, uint256 disputeId) = _openAndJoin();
+    // ------------------------------------------------------------------
+    // Expiry (deterministic, permissionless)
+    // ------------------------------------------------------------------
+
+    function test_ResolveExpired_DeterministicRefundWhenUndelivered() public {
+        (uint256 escrowId, uint256 disputeId) = _openAndJoin();
 
         vm.expectRevert(SweeftDisputeBoard.VotingStillOpen.selector);
-        board.resolveExpired(disputeId, false);
+        board.resolveExpired(disputeId);
 
         vm.warp(block.timestamp + 1 hours + 1);
         uint256 buyerBefore = buyer.balance;
-        board.resolveExpired(disputeId, false);
-        assertEq(buyer.balance, buyerBefore + AMOUNT);
+        // Anyone may call it — no owner privilege.
+        vm.prank(resolver1);
+        board.resolveExpired(disputeId);
+        assertEq(buyer.balance, buyerBefore + AMOUNT + BOND);
+        assertEq(uint8(vault.getEscrow(escrowId).status), uint8(SweeftVault.EscrowStatus.Refunded));
     }
 
-    function test_ResolveExpired_OnlyOwner() public {
-        (, uint256 disputeId) = _openAndJoin();
+    function test_ResolveExpired_ReleasesWhenDelivered() public {
+        // Seller marks delivered before the dispute; expiry must release.
+        vm.deal(buyer, AMOUNT);
+        vm.prank(buyer);
+        uint256 escrowId = vault.createEscrow(buyer, seller, uint64(block.timestamp + 7 days), AMOUNT);
+        vm.prank(buyer);
+        vault.fundEscrow{ value: AMOUNT }(escrowId);
+        vm.prank(seller);
+        vault.markDelivered(escrowId);
+
+        vm.deal(buyer, BOND);
+        vm.prank(buyer);
+        uint256 disputeId = board.openDispute{ value: BOND }(escrowId);
+
         vm.warp(block.timestamp + 1 hours + 1);
-        vm.prank(resolver1);
-        vm.expectRevert(SweeftDisputeBoard.NotOwner.selector);
-        board.resolveExpired(disputeId, false);
+        board.resolveExpired(disputeId);
+        assertEq(uint8(vault.getEscrow(escrowId).status), uint8(SweeftVault.EscrowStatus.Completed));
     }
 
     // ------------------------------------------------------------------
     // Rewards
     // ------------------------------------------------------------------
 
-    function test_ClaimReward_VotersGetTenthOfFeeEach() public {
+    function test_ClaimReward_VotersGetShare() public {
         (, uint256 disputeId) = _openAndJoin();
 
         vm.prank(resolver1);
@@ -345,7 +388,7 @@ contract SweeftDisputeBoardTest is Test {
         board.castVote(disputeId, true);
 
         uint256 fee = (AMOUNT * FEE_BPS) / 10_000; // 0.02 ether
-        uint256 expected = (fee * 3000) / 10_000 / 3; // 10% of fee = 0.002 ether
+        uint256 expected = (fee * 3000) / 10_000 / 2; // 30% share / 2 voters
 
         uint256 r1Before = resolver1.balance;
         vm.prank(resolver1);
@@ -368,48 +411,100 @@ contract SweeftDisputeBoardTest is Test {
         board.claimReward(disputeId);
     }
 
-    function test_ClaimReward_FromPoolOnly_StakesSafe() public {
-        // A refund dispute pays resolvers from the accumulated pool, never
-        // from staked funds.
-        (uint256 escrowId, uint256 disputeId) = _openAndJoin();
-        escrowId;
-
-        vm.prank(resolver1);
-        board.castVote(disputeId, false);
-        vm.prank(resolver2);
-        board.castVote(disputeId, false);
-
-        // Pool is empty (no fee on refunds) — claim reverts; stakes untouched.
-        uint256 stakesTotal = 80 ether;
-        assertEq(board.rewardPool(), 0);
-        vm.prank(resolver1);
-        vm.expectRevert(SweeftDisputeBoard.TransferFailed.selector);
-        board.claimReward(disputeId);
-
-        // Stakers can still withdraw their full stake.
-        vm.prank(resolver4);
-        board.requestUnstake();
-        vm.warp(block.timestamp + 1 hours + 1);
-        uint256 before = resolver4.balance;
-        vm.prank(resolver4);
-        board.withdrawStake();
-        assertEq(resolver4.balance, before + 20 ether);
-        stakesTotal; // silence warning
-    }
-
-    function test_Resolvers_ReleasedFromBoard_AfterSettle() public {
+    function test_ClaimReward_RefundPaysNothing() public {
         (, uint256 disputeId) = _openAndJoin();
-        assertEq(board.activeBoards(resolver1), 1);
+
+        vm.prank(resolver1);
+        board.castVote(disputeId, false);
+        vm.prank(resolver2);
+        board.castVote(disputeId, false);
+
+        // A refund collects no fee, so there is no resolver reward.
+        assertEq(board.resolverReward(disputeId), 0);
+        vm.prank(resolver1);
+        vm.expectRevert(SweeftDisputeBoard.NoStake.selector);
+        board.claimReward(disputeId);
+    }
+
+    // ------------------------------------------------------------------
+    // Slashing
+    // ------------------------------------------------------------------
+
+    function test_Slash_MinorityVoter() public {
+        (, uint256 disputeId) = _openAndJoin();
+        uint256 stakeBefore = board.stakeOf(resolver2);
+
+        vm.prank(resolver1);
+        board.castVote(disputeId, true);
+        vm.prank(resolver2);
+        board.castVote(disputeId, false); // minority
+        vm.prank(resolver3);
+        board.castVote(disputeId, true); // 2-1 release
+
+        uint256 slash = (stakeBefore * 1000) / 10_000; // 10%
+        assertEq(board.stakeOf(resolver2), stakeBefore - slash);
+        assertEq(board.stakeOf(resolver1), stakeBefore); // majority untouched
+    }
+
+    function test_NoSlash_NonVoterOnEarlySettle() public {
+        (, uint256 disputeId) = _openAndJoin();
+        uint256 stakeBefore = board.stakeOf(resolver3);
+
+        // Settlement happens on the second vote; resolver3 never gets a turn.
+        vm.prank(resolver1);
+        board.castVote(disputeId, true);
+        vm.prank(resolver2);
+        board.castVote(disputeId, true);
+
+        assertEq(board.stakeOf(resolver3), stakeBefore);
+    }
+
+    function test_Slash_NonVotersOnExpiry() public {
+        (, uint256 disputeId) = _openAndJoin();
+        uint256 stakeBefore = board.stakeOf(resolver1);
+
+        vm.warp(block.timestamp + 1 hours + 1);
+        board.resolveExpired(disputeId);
+
+        uint256 slash = (stakeBefore * 1000) / 10_000;
+        assertEq(board.stakeOf(resolver1), stakeBefore - slash);
+    }
+
+    // ------------------------------------------------------------------
+    // Locks
+    // ------------------------------------------------------------------
+
+    function test_Resolvers_LockedThroughAppealWindow() public {
+        (, uint256 disputeId) = _openAndJoin();
 
         vm.prank(resolver1);
         board.castVote(disputeId, true);
         vm.prank(resolver2);
         board.castVote(disputeId, true);
 
-        assertEq(board.activeBoards(resolver1), 0);
-        assertEq(board.activeBoards(resolver2), 0);
-
+        // Still locked immediately after settlement.
         vm.prank(resolver1);
-        board.requestUnstake(); // no longer blocked
+        vm.expectRevert(SweeftDisputeBoard.StakeLocked.selector);
+        board.requestUnstake();
+
+        // After the voting period plus the appeal window, the lock lifts.
+        vm.warp(block.timestamp + 1 hours + 1 days + 1);
+        vm.prank(resolver1);
+        board.requestUnstake();
     }
+}
+
+contract MockKS {
+    mapping(address => bool) internal r;
+    mapping(address => bool) internal p;
+    function setRegistered(address a, bool reg, bool proven) external { r[a] = reg; p[a] = proven; }
+    function pqcKeyStatus(address a) external view returns (bool, uint8, bytes memory, bool) {
+        return (r[a], 1, r[a] ? bytes(hex"aa") : bytes(""), p[a]);
+    }
+}
+
+contract MockPV {
+    bool internal result = true;
+    function setResult(bool v) external { result = v; }
+    function pqcVerify(bytes calldata, bytes calldata, bytes calldata) external view returns (bool) { return result; }
 }

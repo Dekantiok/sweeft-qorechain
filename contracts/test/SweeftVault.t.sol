@@ -10,9 +10,14 @@ import { SweeftVault, IPQCVerify, IPQCKeyStatus } from "../src/SweeftVault.sol";
 
 contract MockOracleRegistry {
     mapping(address => bool) public verifiers;
+    uint8 public threshold = 1;
 
     function setVerifier(address account, bool enabled) external {
         verifiers[account] = enabled;
+    }
+
+    function setThreshold(uint8 t) external {
+        threshold = t;
     }
 
     function isVerifier(address account) external view returns (bool) {
@@ -318,12 +323,12 @@ contract SweeftVaultTest is Test {
 
         vault.release(id, dummySig);
 
-        // Same escrow cannot be released twice; nonce has advanced.
+        // Same escrow cannot be released twice; escrow status is terminal.
         vm.expectRevert(SweeftVault.NotReleaseEligible.selector);
         vault.release(id, dummySig);
 
-        // Nonce incremented exactly once.
-        assertEq(vault.pqcNonce(buyer), 1);
+        // Nonce incremented exactly once, keyed per escrow.
+        assertEq(vault.escrowNonce(id), 1);
     }
 
     function test_Release_AnyoneCanSubmit() public {
@@ -435,7 +440,91 @@ contract SweeftVaultTest is Test {
     function test_Attest_RejectedOnUnknownEscrow() public {
         oracle.setVerifier(oracleVerifier, true);
         vm.prank(oracleVerifier);
-        vm.expectRevert(SweeftVault.InvalidStatus.selector);
+        vm.expectRevert(SweeftVault.InvalidEscrow.selector);
         vault.attestEvidence(999, keccak256("proof"));
+    }
+
+    // ------------------------------------------------------------------
+    // 9. v5 hardening
+    // ------------------------------------------------------------------
+
+    function test_CreateEscrow_RejectsPastDeadline() public {
+        vm.prank(buyer);
+        vm.expectRevert(SweeftVault.InvalidDeadline.selector);
+        vault.createEscrow(buyer, seller, uint64(block.timestamp - 1), 1 ether);
+    }
+
+    function test_CreateEscrow_RejectsTooFarDeadline() public {
+        vm.prank(buyer);
+        vm.expectRevert(SweeftVault.InvalidDeadline.selector);
+        vault.createEscrow(buyer, seller, uint64(block.timestamp + 91 days), 1 ether);
+    }
+
+    function test_CreateEscrow_RequiresRegisteredBuyerKey() public {
+        MockPQCKeyStatus(PQC_KEY_STATUS_ADDR).setKey(buyer, "", false, false);
+        vm.prank(buyer);
+        vm.expectRevert(SweeftVault.GuardianKeyNotRegistered.selector);
+        vault.createEscrow(buyer, seller, _deadline(7 days), 1 ether);
+    }
+
+    function test_Refund_BlockedAfterDelivered() public {
+        uint256 id = _createAndFund(1 ether, 7 days);
+        vm.prank(seller);
+        vault.markDelivered(id);
+        vm.warp(block.timestamp + 7 days);
+
+        // Seller marked delivery: the buyer must dispute, not unilaterally refund.
+        assertFalse(vault.isRefundable(id));
+        vm.expectRevert(SweeftVault.NotRefundable.selector);
+        vault.refundAfterDeadline(id, dummySig);
+    }
+
+    function test_FeeSnapshot_NotAffectedByLaterChange() public {
+        uint256 id = _createAndFund(1 ether, 7 days);
+        vm.prank(buyer);
+        vault.confirmReceipt(id);
+
+        // Owner raises the fee after funding; the escrow keeps its snapshot.
+        vault.setFeeBps(500); // 5%
+
+        uint256 sellerBefore = seller.balance;
+        vault.release(id, dummySig);
+
+        uint256 snapshottedFee = (1 ether * FEE_BPS) / 10_000; // original 2%
+        assertEq(seller.balance, sellerBefore + 1 ether - snapshottedFee);
+    }
+
+    function test_VerifierThreshold_TwoOfThree() public {
+        uint256 id = _createAndFund(1 ether, 7 days);
+        address v2 = address(0x0B2);
+        oracle.setVerifier(oracleVerifier, true);
+        oracle.setVerifier(v2, true);
+        oracle.setThreshold(2);
+
+        vm.prank(oracleVerifier);
+        vault.attestEvidence(id, keccak256("proof-a"));
+        assertFalse(vault.getEscrow(id).evidenceAttested); // 1 of 2
+
+        vm.prank(v2);
+        vault.attestEvidence(id, keccak256("proof-b"));
+        assertTrue(vault.getEscrow(id).evidenceAttested); // threshold met
+    }
+
+    function test_PerEscrowNonce_Independent() public {
+        uint256 idA = _createAndFund(1 ether, 7 days);
+        uint256 idB = _createAndFund(1 ether, 7 days);
+
+        vm.prank(buyer);
+        vault.confirmReceipt(idA);
+        vm.prank(buyer);
+        vault.confirmReceipt(idB);
+
+        // Settling A must not invalidate B's signature window.
+        vault.release(idA, dummySig);
+        assertEq(vault.escrowNonce(idA), 1);
+        assertEq(vault.escrowNonce(idB), 0);
+
+        vault.release(idB, dummySig);
+        assertEq(vault.escrowNonce(idB), 1);
     }
 }

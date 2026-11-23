@@ -23,14 +23,13 @@ contract SweeftMarketplace {
 
     struct Listing {
         address seller;
-        uint256 price; // total total (goods + logistics) for a purchase
+        uint256 price; // total (goods + logistics) for a purchase
         uint64 quantity;
         ListingStatus status;
         string metadataUri;
         bytes32 metadataHash; // sha256 of the metadata JSON
         uint64 createdAt;
         uint64 updatedAt;
-        // v4 appended fields for ABI/upgrade sanity (struct append at end)
         address logisticsPartner;
         uint256 logisticsFee; // portion of price that is the carrier payout
     }
@@ -66,6 +65,8 @@ contract SweeftMarketplace {
     error WrongPayment();
     error InvalidBuyer();
     error EscrowCreationFailed();
+    error PriceAboveMax();
+    error MetadataMismatch();
 
     // ------------------------------------------------------------------
     // Storage
@@ -93,8 +94,6 @@ contract SweeftMarketplace {
     }
 
     /// @notice Create a physical listing with a logistics allocation.
-    /// @dev price = total (goods + logistics fee); logisticsFee is paid to
-    ///      logisticsPartner at escrow release. Zero partner = digital goods.
     function createListingWithLogistics(
         uint256 price,
         uint64 quantity,
@@ -157,6 +156,8 @@ contract SweeftMarketplace {
         Listing storage listing = listings[listingId];
         _requireSeller(listing);
         if (price == 0) revert InvalidPrice();
+        // A price below the logistics fee would make the listing unbuyable.
+        if (listing.logisticsFee > price) revert InvalidPrice();
 
         listing.price = price;
         listing.updatedAt = uint64(block.timestamp);
@@ -179,12 +180,24 @@ contract SweeftMarketplace {
     // Buyer actions
     // ------------------------------------------------------------------
 
-    /// @notice Buy a listing: creates an escrow in the Vault and transfers the
-    ///         payment to it. The buyer later funds the escrow from the Vault.
-    function purchase(uint256 listingId, uint64 deliveryDeadline) external payable returns (uint256 escrowId) {
+    /// @notice Buy a listing, pinning the terms the buyer reviewed: the exact
+    ///         payment (`maxPrice`) and the metadata hash. If the seller has
+    ///         changed either since review, the purchase reverts.
+    /// @param listingId the listing to buy
+    /// @param deliveryDeadline unix seconds; must satisfy the vault's window
+    /// @param maxPrice the most the buyer will pay (usually the quoted price)
+    /// @param expectedMetadataHash the metadata hash the buyer reviewed
+    function purchase(
+        uint256 listingId,
+        uint64 deliveryDeadline,
+        uint256 maxPrice,
+        bytes32 expectedMetadataHash
+    ) external payable returns (uint256 escrowId) {
         Listing storage listing = listings[listingId];
         if (listing.status != ListingStatus.Active) revert ListingNotActive();
         if (listing.quantity == 0) revert OutOfStock();
+        if (listing.price > maxPrice) revert PriceAboveMax();
+        if (listing.metadataHash != expectedMetadataHash) revert MetadataMismatch();
         if (msg.value != listing.price) revert WrongPayment();
         if (msg.sender == listing.seller) revert InvalidBuyer();
 
@@ -197,7 +210,6 @@ contract SweeftMarketplace {
         escrowId = vault.createEscrowWithLogistics{ value: msg.value }(
             msg.sender, listing.seller, listing.logisticsPartner, deliveryDeadline, msg.value, listing.logisticsFee
         );
-        if (escrowId == 0 && vault.escrowCount() == 0) revert EscrowCreationFailed();
 
         emit ListingPurchased(listingId, escrowId, msg.sender, listing.seller, listing.price);
     }

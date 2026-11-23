@@ -11,10 +11,10 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+from datetime import timedelta
 
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
-from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
 from apps.blockchain.services.relayer import RelayerError, escrow_state, is_verifier, submit_release
@@ -112,7 +112,6 @@ def release_request(request, escrow_id: int):
     )
 
 
-@csrf_exempt
 @require_POST
 def release_submit(request, escrow_id: int):
     """Accept the wallet-produced ML-DSA-87 signature and relay the release."""
@@ -131,6 +130,8 @@ def release_submit(request, escrow_id: int):
         signature = base64.b64decode(signature_b64)
     except Exception:
         return JsonResponse({"error": "signature is not valid base64"}, status=400)
+    if not _valid_ml_dsa_signature(signature):
+        return JsonResponse({"error": "signature is not a plausible ML-DSA-87 signature"}, status=400)
 
     try:
         result = submit_release(escrow_id, signature)
@@ -147,8 +148,42 @@ def release_submit(request, escrow_id: int):
 # Autopilot — pre-authorized release
 # ---------------------------------------------------------------------------
 
+#: A stored pre-signed release is a bearer authorization; it expires on its own
+#: and is cleared once used.
+AUTOPILOT_TTL = timedelta(days=30)
+#: ML-DSA-87 signatures are 4,627 bytes (base64 ~6,172 chars). Reject anything
+#: wildly outside that range before spending relayer gas.
+ML_DSA_87_SIG_LEN = 4627
 
-@csrf_exempt
+
+def _valid_ml_dsa_signature(signature: bytes) -> bool:
+    # Allow a small tolerance for encodings; reject obviously wrong blobs.
+    return ML_DSA_87_SIG_LEN - 64 <= len(signature) <= ML_DSA_87_SIG_LEN + 64
+
+
+def _session_wallet(request) -> str:
+    return (request.session.get("wallet_account") or {}).get("evm", "").lower()
+
+
+def _require_buyer(request, escrow):
+    """Return an error response unless the session wallet is the escrow buyer."""
+    wallet = _session_wallet(request)
+    if not wallet:
+        return JsonResponse({"error": "connect your wallet first"}, status=401)
+    if escrow.buyer.evm_address.lower() != wallet:
+        return JsonResponse({"error": "only the buyer can do this"}, status=403)
+    return None
+
+
+def _internal_token_ok(request) -> bool:
+    import os
+
+    expected = os.getenv("SWEEFT_INTERNAL_TOKEN", "")
+    if not expected:
+        return False
+    return request.headers.get("X-Internal-Token", "") == expected
+
+
 @require_POST
 def autopilot_pre_authorize(request, escrow_id: int):
     """Buyer pre-signs the release (QoreX) — the AI may submit exactly this
@@ -156,6 +191,10 @@ def autopilot_pre_authorize(request, escrow_id: int):
     cap the buyer approved. Scope is frozen: escrow, recipient, amount, nonce.
     """
     escrow = get_object_or_404(Escrow, on_chain_id=escrow_id)
+    denied = _require_buyer(request, escrow)
+    if denied:
+        return denied
+
     try:
         payload = json.loads(request.body or b"{}")
     except json.JSONDecodeError:
@@ -169,14 +208,11 @@ def autopilot_pre_authorize(request, escrow_id: int):
     from django.utils import timezone
 
     try:
-        base64.b64decode(signature_b64)
+        signature = base64.b64decode(signature_b64)
     except Exception:
         return JsonResponse({"error": "signature is not valid base64"}, status=400)
-
-    # Must be the buyer; escrow must be funded (or at least created with terms)
-    wallet = (request.session.get("wallet_account") or {}).get("evm", "").lower()
-    if wallet and escrow.buyer.evm_address.lower() != wallet:
-        return JsonResponse({"error": "only the buyer can pre-authorize their release"}, status=403)
+    if not _valid_ml_dsa_signature(signature):
+        return JsonResponse({"error": "signature is not a plausible ML-DSA-87 signature"}, status=400)
 
     escrow.autopilot_enabled = True
     escrow.autopilot_release_signature_b64 = signature_b64
@@ -186,26 +222,37 @@ def autopilot_pre_authorize(request, escrow_id: int):
         "autopilot_enabled", "autopilot_release_signature_b64",
         "autopilot_signer", "autopilot_authorized_at", "updated_at",
     ])
-    return JsonResponse({"ok": True, "escrow_id": escrow_id, "signed_scope": {
+    return JsonResponse({"ok": True, "escrow_id": escrow_id, "expires_in_days": AUTOPILOT_TTL.days, "signed_scope": {
         "amount_wei": escrow.amount_uqor, "nonce": escrow.pqc_nonce,
         "note": "One-time — the carrier pays the exact recipient/amount this signature allows, nothing more.",
     }})
 
 
-@csrf_exempt
 @require_POST
 def autopilot_execute(request, escrow_id: int):
     """Submit the stored pre-signed release if the escrow is eligible.
 
-    Called by the AI executor (or any caller testing it). Verifies shape
-    and that the chain still considers the escrow release-eligible before
-    relaying. Idempotent: a completed escrow returns its tx.
+    Internal/agent-facing: callers must present the worker token (X-Internal-Token)
+    or be the buyer's own session. Verifies shape, expiry and chain eligibility
+    before relaying. Idempotent: a completed escrow returns its tx.
     """
     import base64
 
     escrow = get_object_or_404(Escrow, on_chain_id=escrow_id)
+    caller_is_buyer = _session_wallet(request) == escrow.buyer.evm_address.lower()
+    if not (caller_is_buyer or _internal_token_ok(request)):
+        return JsonResponse({"error": "not authorized to execute autopilot"}, status=403)
+
     if not escrow.autopilot_enabled or not escrow.autopilot_release_signature_b64:
         return JsonResponse({"error": "no pre-authorization stored for this escrow"}, status=409)
+
+    from django.utils import timezone
+
+    if escrow.autopilot_authorized_at and timezone.now() - escrow.autopilot_authorized_at > AUTOPILOT_TTL:
+        escrow.autopilot_enabled = False
+        escrow.autopilot_release_signature_b64 = ""
+        escrow.save(update_fields=["autopilot_enabled", "autopilot_release_signature_b64", "updated_at"])
+        return JsonResponse({"error": "pre-authorization expired — ask the buyer to sign again"}, status=409)
 
     try:
         state = escrow_state(escrow_id)
@@ -227,15 +274,20 @@ def autopilot_execute(request, escrow_id: int):
         return JsonResponse({"error": f"relay failed: {exc}"}, status=502)
 
     escrow.autopilot_execute_tx = result["tx_hash"]
-    escrow.save(update_fields=["autopilot_execute_tx", "updated_at"])
+    # Single-use bearer authorization: clear it after execution.
+    escrow.autopilot_enabled = False
+    escrow.autopilot_release_signature_b64 = ""
+    escrow.save(update_fields=["autopilot_execute_tx", "autopilot_enabled", "autopilot_release_signature_b64", "updated_at"])
     return JsonResponse({"ok": True, **result})
 
 
-@csrf_exempt
 @require_POST
 def autopilot_revoke(request, escrow_id: int):
     """Buyer revokes the stored pre-authorization (does not affect the chain)."""
     escrow = get_object_or_404(Escrow, on_chain_id=escrow_id)
+    denied = _require_buyer(request, escrow)
+    if denied:
+        return denied
     escrow.autopilot_enabled = False
     escrow.autopilot_release_signature_b64 = ""
     escrow.save(update_fields=["autopilot_enabled", "autopilot_release_signature_b64", "updated_at"])
@@ -252,9 +304,22 @@ def evidence_submit(request, escrow_id: int):
     except json.JSONDecodeError:
         return JsonResponse({"error": "invalid JSON body"}, status=400)
 
-    wallet = (request.session.get("wallet_account") or {}).get("evm", "").lower()
+    wallet = _session_wallet(request)
     if not wallet:
         return JsonResponse({"error": "connect your wallet first"}, status=401)
+
+    # Only a party to the escrow (buyer, seller or assigned carrier) may submit
+    # evidence — otherwise the verifier queue can be spammed by anyone.
+    parties = {escrow.buyer.evm_address.lower(), escrow.seller.evm_address.lower()}
+    if (escrow.logistics_partner_address or "").lower():
+        parties.add(escrow.logistics_partner_address.lower())
+    if wallet not in parties:
+        return JsonResponse({"error": "you are not a party to this escrow"}, status=403)
+
+    # Cap evidence volume per escrow so a single party cannot flood reviewers.
+    MAX_EVIDENCE_PER_ESCROW = 20
+    if FulfilmentEvidence.objects.filter(escrow=escrow).count() >= MAX_EVIDENCE_PER_ESCROW:
+        return JsonResponse({"error": "evidence limit reached for this escrow"}, status=429)
 
     evidence_type = payload.get("evidence_type", FulfilmentEvidence.EvidenceType.OTHER)
     valid_types = {choice.value for choice in FulfilmentEvidence.EvidenceType}

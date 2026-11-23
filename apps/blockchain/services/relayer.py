@@ -9,6 +9,7 @@ own testnet account; it pays gas and keeps a scoped EVM window open.
 from __future__ import annotations
 
 import logging
+import threading
 
 from web3 import Web3
 
@@ -19,7 +20,12 @@ from integrations.qorechain.window import ensure_relayer_window, relayer_private
 
 logger = logging.getLogger(__name__)
 
-RELEASE_GAS = 8_000_000
+#: Fallback gas cap when estimation is unavailable.
+RELEASE_GAS_FALLBACK = 2_000_000
+#: ML-DSA-87 signatures are 4,627 bytes; anything else is malformed input.
+ML_DSA_87_SIG_LEN = 4627
+#: Serialize nonce reads/writes so concurrent relays don't collide.
+_nonce_lock = threading.Lock()
 
 
 class RelayerError(RuntimeError):
@@ -37,20 +43,40 @@ def _vault_contract(w3: Web3):
     return w3.eth.contract(address=w3.to_checksum_address(address), abi=abi)
 
 
-def _send(w3: Web3, account, fn_call, *, value: int = 0, gas: int) -> dict:
-    tx = fn_call.build_transaction(
-        {
-            "from": account.address,
-            "value": value,
-            "gas": gas,
-            "gasPrice": w3.eth.gas_price,
-            "nonce": w3.eth.get_transaction_count(account.address, "pending"),
-            "chainId": get_network().evm_chain_id,
-        }
-    )
-    signed = account.sign_transaction(tx)
-    tx_hash = w3.eth.send_raw_transaction(signed.rawTransaction)
-    receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=180)
+def _valid_signature(signature: bytes) -> bool:
+    return ML_DSA_87_SIG_LEN - 64 <= len(signature) <= ML_DSA_87_SIG_LEN + 64
+
+
+def _send(w3: Web3, account, fn_call, *, value: int = 0) -> dict:
+    """Simulate, estimate gas, then send — never burn gas on a doomed call."""
+    call_args = {"from": account.address, "value": value}
+    try:
+        fn_call.call(call_args)
+    except Exception as exc:  # simulation reverted: refuse before spending gas
+        raise RelayerError(f"simulation reverted (transaction would fail): {str(exc)[:200]}")
+
+    try:
+        estimate = fn_call.estimate_gas(call_args)
+        gas = int(estimate * 12 // 10)  # 20% headroom
+    except Exception:
+        gas = RELEASE_GAS_FALLBACK
+
+    with _nonce_lock:
+        nonce = w3.eth.get_transaction_count(account.address, "pending")
+        tx = fn_call.build_transaction(
+            {
+                "from": account.address,
+                "value": value,
+                "gas": gas,
+                "gasPrice": w3.eth.gas_price,
+                "nonce": nonce,
+                "chainId": get_network().evm_chain_id,
+            }
+        )
+        signed = account.sign_transaction(tx)
+        tx_hash = w3.eth.send_raw_transaction(signed.rawTransaction)
+
+    receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=90)
     if receipt.status != 1:
         raise RelayerError(f"transaction reverted: {tx_hash.hex()}")
     return {"tx_hash": tx_hash.hex(), "block": receipt.blockNumber, "gas_used": receipt.gasUsed}
@@ -62,22 +88,26 @@ def submit_release(escrow_id: int, signature: bytes) -> dict:
     The signature must be the buyer's ML-DSA-87 signature over the QoreSign
     payload for this escrow; the contract verifies it on-chain.
     """
+    if not _valid_signature(signature):
+        raise RelayerError("signature is not a plausible ML-DSA-87 signature")
     w3 = get_evm_client()
     account = w3.eth.account.from_key(relayer_private_key_hex())
     vault = _vault_contract(w3)
     ensure_relayer_window()
     logger.info("relaying release for escrow %s", escrow_id)
-    return _send(w3, account, vault.functions.release(escrow_id, signature), gas=RELEASE_GAS)
+    return _send(w3, account, vault.functions.release(escrow_id, signature))
 
 
 def submit_refund(escrow_id: int, signature: bytes) -> dict:
     """Relay `SweeftVault.refundAfterDeadline(escrowId, signature)`."""
+    if not _valid_signature(signature):
+        raise RelayerError("signature is not a plausible ML-DSA-87 signature")
     w3 = get_evm_client()
     account = w3.eth.account.from_key(relayer_private_key_hex())
     vault = _vault_contract(w3)
     ensure_relayer_window()
     logger.info("relaying refund for escrow %s", escrow_id)
-    return _send(w3, account, vault.functions.refundAfterDeadline(escrow_id, signature), gas=RELEASE_GAS)
+    return _send(w3, account, vault.functions.refundAfterDeadline(escrow_id, signature))
 
 
 def escrow_state(escrow_id: int) -> dict:
@@ -97,9 +127,15 @@ def escrow_state(escrow_id: int) -> dict:
         "attested": escrow[8],
         "released": escrow[9],
         "verifier": escrow[10],
+        "logistics_partner": escrow[11],
+        "logistics_amount": int(escrow[12]),
+        "carrier_attested": escrow[13],
+        "carrier_status": escrow[19] if len(escrow) > 19 else "",
+        "verifier_attestations": int(escrow[21]) if len(escrow) > 21 else 0,
         "release_eligible": vault.functions.isReleaseEligible(escrow_id).call(),
         "refundable": vault.functions.isRefundable(escrow_id).call(),
-        "pqc_nonce": vault.functions.pqcNonce(w3.to_checksum_address(escrow[0])).call(),
+        # v5: nonce is per-escrow, so parallel escrows stay independent.
+        "pqc_nonce": int(vault.functions.escrowNonce(escrow_id).call()),
     }
 
 
@@ -146,8 +182,25 @@ def is_verifier(address: str) -> bool:
         return False
 
 
-def attest_carrier_evidence(escrow_id: int, payload_hash: bytes, signature: bytes, payload: bytes) -> dict:
-    """Submit the carrier's signed tracking payload to the Vault (as the carrier)."""
+def carrier_nonce(carrier_evm: str) -> int:
+    """Current single-use nonce for a carrier (v5 attestation binding)."""
+    w3 = get_evm_client()
+    vault = _vault_contract(w3)
+    return int(vault.functions.carrierNonce(w3.to_checksum_address(carrier_evm)).call())
+
+
+def attest_carrier_evidence(
+    escrow_id: int,
+    tracking_number: str,
+    status: str,
+    issued_at: int,
+    signature: bytes,
+) -> dict:
+    """Submit the carrier's signed v5 attestation to the Vault (as the carrier).
+
+    The vault rebuilds the canonical message from (carrier, escrowId, tracking,
+    status, issuedAt, nonce) and verifies the ML-DSA-87 signature on-chain.
+    """
     from apps.logistics.carriers import demo_carrier_keypair
 
     _, _, carrier_evm = demo_carrier_keypair()
@@ -162,7 +215,7 @@ def attest_carrier_evidence(escrow_id: int, payload_hash: bytes, signature: byte
     vault = _vault_contract(w3)
     ensure_relayer_window()  # opener for carrier too (best-effort)
 
-    fn = vault.functions.attestCarrierEvidence(escrow_id, payload_hash, signature, payload)
+    fn = vault.functions.attestCarrierEvidence(escrow_id, tracking_number, status, issued_at, signature)
     tx = fn.build_transaction(
         {
             "from": eth_account.address,

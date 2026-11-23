@@ -4,13 +4,19 @@ pragma solidity ^0.8.24;
 import { SweeftVault } from "./SweeftVault.sol";
 
 /// @title SweeftDisputeBoard — staked resolver panels for escrow disputes
-/// @notice Anyone who stakes at least `minStake` QOR may join an open dispute.
-///         The first three eligible resolvers form the board; parties and the
-///         attesting verifier are excluded. A 2-of-3 majority settles the
-///         escrow through the Vault. Resolvers who vote share the dispute
-///         reward pool: each receives 10% of that escrow's platform fee
-///         (the 30% resolver share split three ways), paid from the pool that
-///         accumulates from every completed release.
+/// @notice Anyone who stakes at least the per-dispute minimum may join an open
+///         dispute (first three eligible resolvers form the board). Parties,
+///         the verifier and the carrier are excluded. A 2-of-3 majority settles
+///         the escrow through the Vault.
+///
+///         Hardening (v5):
+///           - stake required scales with escrow value (base + ~1%)
+///           - minority voters and non-voters are slashed at settlement
+///           - the raiser posts a bond, returned if their side prevails
+///           - resolver locks extend past settlement by an appeal window
+///           - the expiry fallback is a deterministic rule, not owner discretion
+///           - rewards come from this dispute's own fee; refunds pay no reward,
+///             so the pool cannot be drained by fee-less resolutions
 contract SweeftDisputeBoard {
     // ------------------------------------------------------------------
     // Types
@@ -27,14 +33,17 @@ contract SweeftDisputeBoard {
         address raiser;
         uint64 openedAt;
         uint64 votingEndsAt;
+        uint64 unlockAt;
         DisputeState state;
         bool releaseToSeller; // final outcome
         uint8 votesForRelease;
         uint8 votesForRefund;
         uint8 memberCount;
+        uint256 bond;
         address[3] members;
         mapping(address => bool) isMember;
         mapping(address => bool) hasVoted;
+        mapping(address => bool) votedRelease;
     }
 
     // ------------------------------------------------------------------
@@ -44,7 +53,8 @@ contract SweeftDisputeBoard {
     event Staked(address indexed account, uint256 amount, uint256 total);
     event UnstakeRequested(address indexed account, uint64 availableAt);
     event StakeWithdrawn(address indexed account, uint256 amount);
-    event DisputeOpened(uint256 indexed disputeId, uint256 indexed escrowId, address indexed raiser, uint64 votingEndsAt);
+    event Slashed(address indexed account, uint256 amount);
+    event DisputeOpened(uint256 indexed disputeId, uint256 indexed escrowId, address indexed raiser, uint64 votingEndsAt, uint256 bond);
     event ResolverJoined(uint256 indexed disputeId, address indexed resolver, uint8 position);
     event ResolverVoted(uint256 indexed disputeId, address indexed resolver, bool releaseToSeller);
     event DisputeSettled(uint256 indexed disputeId, uint256 indexed escrowId, bool releaseToSeller);
@@ -72,6 +82,7 @@ contract SweeftDisputeBoard {
     error VotingClosed();
     error VotingStillOpen();
     error NoMajority();
+    error BondTooLow();
     error TransferFailed();
 
     // ------------------------------------------------------------------
@@ -81,32 +92,36 @@ contract SweeftDisputeBoard {
     SweeftVault public immutable vault;
     address public owner;
 
-    /// @notice Minimum stake to serve on a board (20 QOR).
-    uint256 public constant MIN_STAKE = 20 ether;
-    /// @notice Board size is hard-capped at 3 members.
-    uint256 internal constant MAX_BOARD_SIZE = 3;
-    /// @notice Vote counting is bounded by distinct voters; the cap is
-    ///         defensive (overflow is impossible at wallet scale).
-    uint256 internal constant MAX_VOTES = 10_000;
-    /// @notice Unstake cooldown after requesting withdrawal.
-    uint64 public unstakeCooldown = 1 hours;
-    /// @notice Voting window for a dispute.
-    uint64 public votingPeriod = 48 hours;
-
+    /// @notice Base minimum stake to serve on a board (20 QOR).
     uint256 public minStake = 20 ether;
+    /// @notice Additional stake proportional to escrow value (100 = 1%).
+    uint256 public constant STAKE_BPS = 100;
+    /// @notice Fraction of a resolver's stake slashed for a wrong/absent vote.
+    uint256 public constant SLASH_BPS = 1000; // 10%
+    /// @notice Raiser bond as a fraction of escrow value, with a floor.
+    uint256 public constant DISPUTE_BOND_BPS = 100; // 1%
+    uint256 public constant MIN_DISPUTE_BOND = 0.1 ether;
+
+    uint256 internal constant MAX_BOARD_SIZE = 3;
+
+    uint64 public unstakeCooldown = 1 hours;
+    uint64 public votingPeriod = 48 hours;
+    /// @notice Minimum lock after settlement, to leave room for an appeal.
+    uint64 public appealWindow = 1 days;
 
     mapping(address => uint256) public stakeOf;
     mapping(address => uint64) public unstakeAvailableAt;
-    mapping(address => uint256) public activeBoards;
+    /// @notice Earliest time a resolver's stake may be released (join/settle).
+    mapping(address => uint64) public lockedUntil;
 
-    /// @notice Accumulated resolver reward pool — fee shares from the Vault
-    ///         only. Stakes are tracked separately and never pay rewards.
+    /// @notice Accumulated resolver reward pool — fee shares from the Vault.
     uint256 public rewardPool;
 
     uint256 public disputeCount;
     mapping(uint256 => Dispute) private disputes;
 
-    /// @notice The Vault calls this when forwarding the dispute share of a fee.
+    uint256 private _lock = 1;
+
     function receiveFeeShare() external payable {
         if (msg.sender != address(vault)) revert NotVault();
         rewardPool += msg.value;
@@ -121,6 +136,13 @@ contract SweeftDisputeBoard {
     modifier onlyOwner() {
         if (msg.sender != owner) revert NotOwner();
         _;
+    }
+
+    modifier nonReentrant() {
+        if (_lock != 1) revert DisputeNotOpen();
+        _lock = 2;
+        _;
+        _lock = 1;
     }
 
     // ------------------------------------------------------------------
@@ -139,6 +161,10 @@ contract SweeftDisputeBoard {
         votingPeriod = newPeriod;
     }
 
+    function setAppealWindow(uint64 newWindow) external onlyOwner {
+        appealWindow = newWindow;
+    }
+
     function transferOwnership(address newOwner) external onlyOwner {
         if (newOwner == address(0)) revert ZeroAmount();
         emit OwnershipTransferred(owner, newOwner);
@@ -155,18 +181,18 @@ contract SweeftDisputeBoard {
         emit Staked(msg.sender, msg.value, stakeOf[msg.sender]);
     }
 
-    /// @notice Begin unstaking. Blocked while serving on an active board.
+    /// @notice Begin unstaking. Blocked while any lock is active.
     function requestUnstake() external {
         if (stakeOf[msg.sender] == 0) revert NoStake();
-        if (activeBoards[msg.sender] > 0) revert StakeLocked();
+        if (block.timestamp < lockedUntil[msg.sender]) revert StakeLocked();
         unstakeAvailableAt[msg.sender] = uint64(block.timestamp) + unstakeCooldown;
         emit UnstakeRequested(msg.sender, unstakeAvailableAt[msg.sender]);
     }
 
-    function withdrawStake() external {
+    function withdrawStake() external nonReentrant {
         uint256 amount = stakeOf[msg.sender];
         if (amount == 0) revert NoStake();
-        if (activeBoards[msg.sender] > 0) revert StakeLocked();
+        if (block.timestamp < lockedUntil[msg.sender]) revert StakeLocked();
         if (unstakeAvailableAt[msg.sender] == 0 || block.timestamp < unstakeAvailableAt[msg.sender]) {
             revert CooldownActive();
         }
@@ -182,15 +208,26 @@ contract SweeftDisputeBoard {
     // Disputes
     // ------------------------------------------------------------------
 
-    /// @notice Open a dispute for an escrow that has been frozen on the Vault.
-    ///         Called by the raiser (buyer or seller): freezes in the Vault
-    ///         first via raiseDispute, then registers here.
-    function openDispute(uint256 escrowId) external returns (uint256 disputeId) {
+    /// @notice Minimum stake a resolver must hold to join a dispute over an
+    ///         escrow of `escrowAmount`.
+    function minStakeFor(uint256 escrowAmount) public view returns (uint256) {
+        return minStake + (escrowAmount * STAKE_BPS) / 10_000;
+    }
+
+    /// @notice Raiser bond for an escrow of `escrowAmount`.
+    function disputeBondFor(uint256 escrowAmount) public pure returns (uint256) {
+        uint256 bond = (escrowAmount * DISPUTE_BOND_BPS) / 10_000;
+        return bond < MIN_DISPUTE_BOND ? MIN_DISPUTE_BOND : bond;
+    }
+
+    /// @notice Open a dispute for a funded escrow, posting the raiser bond.
+    function openDispute(uint256 escrowId) external payable returns (uint256 disputeId) {
         SweeftVault.Escrow memory escrow = vault.getEscrow(escrowId);
         if (escrow.buyer == address(0)) revert UnknownDispute();
         if (msg.sender != escrow.buyer && msg.sender != escrow.seller) revert ExcludedParty();
+        uint256 requiredBond = disputeBondFor(escrow.amount);
+        if (msg.value < requiredBond) revert BondTooLow();
 
-        // Freeze the escrow (reverts unless we are the raiser and it is funded).
         vault.raiseDispute(escrowId);
 
         disputeId = disputeCount;
@@ -201,12 +238,15 @@ contract SweeftDisputeBoard {
         d.raiser = msg.sender;
         d.openedAt = uint64(block.timestamp);
         d.votingEndsAt = uint64(block.timestamp) + votingPeriod;
+        d.unlockAt = d.votingEndsAt + appealWindow;
         d.state = DisputeState.Open;
+        d.bond = msg.value;
 
-        emit DisputeOpened(disputeId, escrowId, msg.sender, d.votingEndsAt);
+        emit DisputeOpened(disputeId, escrowId, msg.sender, d.votingEndsAt, msg.value);
     }
 
-    /// @notice Join an open dispute's board. First three eligible resolvers.
+    /// @notice Join an open dispute's board. First three eligible resolvers,
+    ///         each holding at least `minStakeFor(escrow.amount)`.
     function joinDispute(uint256 disputeId) external {
         Dispute storage d = disputes[disputeId];
         if (d.state == DisputeState.None) revert UnknownDispute();
@@ -214,16 +254,19 @@ contract SweeftDisputeBoard {
         if (block.timestamp >= d.votingEndsAt) revert VotingClosed();
         if (d.memberCount >= MAX_BOARD_SIZE) revert BoardFull();
         if (d.isMember[msg.sender]) revert AlreadyMember();
-        if (stakeOf[msg.sender] < minStake) revert StakeTooLow();
 
         SweeftVault.Escrow memory escrow = vault.getEscrow(d.escrowId);
+        uint256 required = minStakeFor(escrow.amount);
+        if (stakeOf[msg.sender] < required) revert StakeTooLow();
+
         if (msg.sender == escrow.buyer || msg.sender == escrow.seller) revert ExcludedParty();
         if (escrow.verifier != address(0) && msg.sender == escrow.verifier) revert ExcludedParty();
+        if (escrow.logisticsPartner != address(0) && msg.sender == escrow.logisticsPartner) revert ExcludedParty();
 
         d.isMember[msg.sender] = true;
         d.members[d.memberCount] = msg.sender;
         d.memberCount += 1;
-        activeBoards[msg.sender] += 1;
+        _extendLock(msg.sender, d.votingEndsAt + appealWindow);
 
         emit ResolverJoined(disputeId, msg.sender, d.memberCount);
     }
@@ -238,6 +281,7 @@ contract SweeftDisputeBoard {
         if (d.hasVoted[msg.sender]) revert AlreadyVoted();
 
         d.hasVoted[msg.sender] = true;
+        d.votedRelease[msg.sender] = releaseToSeller;
         if (releaseToSeller) {
             d.votesForRelease += 1;
         } else {
@@ -246,41 +290,80 @@ contract SweeftDisputeBoard {
         emit ResolverVoted(disputeId, msg.sender, releaseToSeller);
 
         if (d.votesForRelease >= 2) {
-            _settle(disputeId, d, true);
+            _settle(disputeId, d, true, false);
         } else if (d.votesForRefund >= 2) {
-            _settle(disputeId, d, false);
+            _settle(disputeId, d, false, false);
         }
     }
 
-    /// @notice Owner fallback for disputes that reach their deadline without a
-    ///         majority. Not a per-dispute DAO vote — a liveness escape hatch,
-    ///         DAO-revocable via ownership. Refund-by-default protects buyers.
-    function resolveExpired(uint256 disputeId, bool releaseToSeller) external onlyOwner {
+    /// @notice Permissionless liveness fallback when a panel reaches its
+    ///         deadline without a majority. The outcome is the deterministic
+    ///         default: release if fulfilment was claimed (delivered or carrier
+    ///         attested), otherwise refund the buyer. No owner discretion.
+    function resolveExpired(uint256 disputeId) external {
         Dispute storage d = disputes[disputeId];
         if (d.state != DisputeState.Open) revert DisputeNotOpen();
         if (block.timestamp < d.votingEndsAt) revert VotingStillOpen();
         if (d.votesForRelease >= 2 || d.votesForRefund >= 2) revert NoMajority();
-        _settle(disputeId, d, releaseToSeller);
+
+        SweeftVault.Escrow memory escrow = vault.getEscrow(d.escrowId);
+        bool releaseToSeller = escrow.delivered || escrow.carrierAttested;
+        _settle(disputeId, d, releaseToSeller, true);
     }
 
-    /// @notice Settlement — explicitly unrolled for the 3 member slots.
-    ///         No loop is used, so the work per dispute is a fixed small
-    ///         constant regardless of join order.
-    function _settle(uint256 disputeId, Dispute storage d, bool releaseToSeller) internal {
+    /// @param slashNonVoters true when settling by expiry (members who never
+    ///        voted failed their duty); false when the panel settled by
+    ///        majority, since the dissenting member may not have had a turn.
+    function _settle(uint256 disputeId, Dispute storage d, bool releaseToSeller, bool slashNonVoters) internal {
         d.state = DisputeState.Resolved;
         d.releaseToSeller = releaseToSeller;
 
-        if (d.memberCount > 0) _releaseMember(d.members[0]);
-        if (d.memberCount > 1) _releaseMember(d.members[1]);
-        if (d.memberCount > 2) _releaseMember(d.members[2]);
+        // Slash resolvers who voted against the outcome (and, on expiry,
+        // those who never voted).
+        for (uint256 i = 0; i < d.memberCount; i++) {
+            address member = d.members[i];
+            bool correct = d.hasVoted[member] && (d.votedRelease[member] == releaseToSeller);
+            bool shouldSlash = d.hasVoted[member] ? !correct : slashNonVoters;
+            if (shouldSlash) {
+                _slash(member);
+            }
+            _extendLock(member, uint64(block.timestamp) + appealWindow);
+        }
+
+        _settleBond(d, releaseToSeller);
 
         vault.resolveDispute(d.escrowId, releaseToSeller);
         emit DisputeSettled(disputeId, d.escrowId, releaseToSeller);
     }
 
-    function _releaseMember(address member) internal {
-        if (activeBoards[member] > 0) {
-            activeBoards[member] -= 1;
+    function _slash(address member) internal {
+        uint256 stake = stakeOf[member];
+        if (stake == 0) return;
+        uint256 slash = (stake * SLASH_BPS) / 10_000;
+        if (slash == 0) return;
+        stakeOf[member] = stake - slash;
+        rewardPool += slash;
+        emit Slashed(member, slash);
+    }
+
+    function _settleBond(Dispute storage d, bool releaseToSeller) internal {
+        if (d.bond == 0) return;
+        bool raiserIsBuyer = d.raiser == vault.getEscrow(d.escrowId).buyer;
+        bool raiserWins = raiserIsBuyer ? !releaseToSeller : releaseToSeller;
+        if (raiserWins) {
+            (bool ok,) = d.raiser.call{ value: d.bond }("");
+            if (!ok) {
+                rewardPool += d.bond;
+            }
+        } else {
+            // A losing raiser's bond is forfeited to the resolver reward pool.
+            rewardPool += d.bond;
+        }
+    }
+
+    function _extendLock(address member, uint64 until) internal {
+        if (until > lockedUntil[member]) {
+            lockedUntil[member] = until;
         }
     }
 
@@ -288,23 +371,26 @@ contract SweeftDisputeBoard {
     // Rewards
     // ------------------------------------------------------------------
 
-    /// @notice Public view — anyone may read the reward amount. Intentionally
-    ///         NOT onlyOwner: it is a pure view over public dispute state.
-    /// @dev    QCAI Stage 1 flagged this area for access control; it is a view
-    ///         and holds no privileged write.
+    /// @notice Per-resolver reward for a settled, released dispute. Funded by
+    ///         this escrow's own fee (30% resolver share, split across voters).
+    ///         A refund collects no fee, so it pays no reward — the pool cannot
+    ///         be drained by fee-less resolutions.
     function resolverReward(uint256 disputeId) public view returns (uint256) {
         Dispute storage d = disputes[disputeId];
-        if (d.state != DisputeState.Resolved) return 0;
+        if (d.state != DisputeState.Resolved || !d.releaseToSeller) return 0;
+
+        uint256 voters = uint256(d.votesForRelease) + uint256(d.votesForRefund);
+        if (voters == 0) return 0;
+
         SweeftVault.Escrow memory escrow = vault.getEscrow(d.escrowId);
         uint256 goods = escrow.amount - escrow.logisticsAmount;
-        uint256 fee = (goods * vault.feeBps()) / 10_000;
-        return (fee * 3_000) / 10_000 / 3;
+        uint256 fee = (goods * vault.escrowFeeBps(d.escrowId)) / 10_000;
+        return ((fee * 3_000) / 10_000) / voters;
     }
 
     mapping(uint256 => mapping(address => bool)) public rewardClaimed;
 
-    /// @notice Claim the resolver reward for a settled dispute you voted on.
-    function claimReward(uint256 disputeId) external {
+    function claimReward(uint256 disputeId) external nonReentrant {
         Dispute storage d = disputes[disputeId];
         if (d.state != DisputeState.Resolved) revert DisputeNotOpen();
         if (!d.isMember[msg.sender] || !d.hasVoted[msg.sender]) revert NotMember();
@@ -333,11 +419,13 @@ contract SweeftDisputeBoard {
             address raiser,
             uint64 openedAt,
             uint64 votingEndsAt,
+            uint64 unlockAt,
             DisputeState state,
             bool releaseToSeller,
             uint8 votesForRelease,
             uint8 votesForRefund,
             uint8 memberCount,
+            uint256 bond,
             address[3] memory members
         )
     {
@@ -347,11 +435,13 @@ contract SweeftDisputeBoard {
             d.raiser,
             d.openedAt,
             d.votingEndsAt,
+            d.unlockAt,
             d.state,
             d.releaseToSeller,
             d.votesForRelease,
             d.votesForRefund,
             d.memberCount,
+            d.bond,
             d.members
         );
     }

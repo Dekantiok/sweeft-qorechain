@@ -8,7 +8,7 @@ import {SweeftMarketplace} from "../src/SweeftMarketplace.sol";
 import {SweeftDisputeBoard} from "../src/SweeftDisputeBoard.sol";
 
 /// @notice Fuzz + invariant suite for the Vault money paths.
-///         Run with: forge test --match-contract SweeftVaultInvariantTest --fuzz-runs 1000
+///         Run with: forge test --match-contract SweeftVaultInvariantTest
 contract SweeftVaultInvariantTest is Test {
     SweeftVault internal vault;
     SweeftOracleRegistry internal registry;
@@ -17,6 +17,7 @@ contract SweeftVaultInvariantTest is Test {
     address internal buyer = address(0xB0B);
     address internal seller = address(0x5E11E);
     address internal treasury = address(0x7EA5);
+    address internal carrier = address(0xCA99);
 
     uint256 internal constant FEE_BPS = 200;
     uint256 internal totalEscrowed;
@@ -30,26 +31,33 @@ contract SweeftVaultInvariantTest is Test {
         vault.setMarketplace(address(market));
         vm.deal(buyer, 1000 ether);
         vm.deal(seller, 10 ether);
-        _installPqcMocks(buyer);
+        _installPqcMocks();
+        vault.registerCarrier(carrier, "LOG-INV-001");
     }
 
-    // --- the five invariants ---
+    // --- invariants ---
 
     /// Vault never pays out more than was escrowed into it.
     function invariant_vaultNeverPaysMoreThanEscrowed() public view {
         assertLe(address(vault).balance, totalEscrowed);
     }
 
-    /// Fee splits always add to the fee.
+    /// Fee splits always add to the fee (within 1 wei of rounding dust).
     function invariant_feeSplitsAddToFee() public {
         uint256 fee = (1 ether * FEE_BPS) / 10000;
         uint256 t = (fee * 7000) / 10000;
         uint256 d = (fee * 3000) / 10000;
         assertLe(t + d, fee);
-        assertGe(t + d, fee - 1); // rounding: at most 1 wei dust
+        assertGe(t + d, fee - 1);
     }
 
-    /// A release can be submitted at most once per escrow.
+    /// Credits held by the vault are always fully backed by its balance.
+    function invariant_creditsAreBacked() public view {
+        assertLe(vault.credits(buyer) + vault.credits(seller), address(vault).balance);
+    }
+
+    // --- fuzz ---
+
     function fuzz_releaseReplay(uint256 seed) public {
         vm.assume(seed > 0);
         uint256 id = _fund(seed % 3 + 1);
@@ -62,34 +70,23 @@ contract SweeftVaultInvariantTest is Test {
         vault.release(id, hex"deadbeef");
     }
 
-    /// Nonces are monotonic per buyer.
-    function invariant_pqcNonceMonotonic() public view {
-        uint256 n = vault.pqcNonce(buyer);
-        assertGe(n, 0); // never decreases — the vault only ever increments it
-    }
-
-    /// Carrier can attest a funded escrow exactly once per delivery cycle.
-    function fuzz_carrierAttestOnce(address carrier, uint256 seed) public {
-        vm.assume(carrier != address(0) && carrier != buyer && carrier != seller);
-        if (!vault.isCarrier(carrier)) vm.skip(true);
-        uint256 id = _fund(seed % 2 + 1);
-        bytes memory payload = "sweeft-carrier-v1|LOG-TEST|DEMO-X|0|DELIVERED|CREATED@0,DELIVERED@1000";
-        bytes32 h = keccak256(payload);
+    function fuzz_carrierAttestOnce(uint256 seed) public {
+        uint256 id = _fundLogistics(seed % 2 + 1);
         vm.prank(carrier);
-        vault.attestCarrierEvidence(id, h, hex"deadbeef", payload);
+        vault.attestCarrierEvidence(id, "DEMO-INV", "DELIVERED", uint64(block.timestamp), hex"deadbeef");
         SweeftVault.Escrow memory e = vault.getEscrow(id);
         assertTrue(e.carrierAttested);
-        assertEq(e.carrierPayloadHash, h);
+        assertTrue(e.delivered);
+        assertEq(e.carrierSigner, carrier);
     }
 
-    /// Marketplace purchase never creates an unfunded escrow.
-    function fuzz_marketPurchaseFunds(uint256 price, uint256 deadline) public {
+    function fuzz_marketPurchaseFunds(uint256 price) public {
         vm.assume(price > 0 && price < 2 ether);
         vm.prank(seller);
         uint256 lid = market.createListing(price, 1, "uri", keccak256("m"));
         vm.deal(buyer, price);
         vm.prank(buyer);
-        uint256 escrowId = market.purchase{value: price}(lid, uint64(deadline + block.timestamp));
+        uint256 escrowId = market.purchase{value: price}(lid, uint64(block.timestamp + 2 days), price, keccak256("m"));
         SweeftVault.Escrow memory e = vault.getEscrow(escrowId);
         assertEq(e.amount, price);
         assertEq(uint8(e.status), uint8(SweeftVault.EscrowStatus.Funded));
@@ -100,7 +97,7 @@ contract SweeftVaultInvariantTest is Test {
 
     function _fund(uint256 amount) internal returns (uint256) {
         vm.prank(buyer);
-        uint256 id = vault.createEscrow(buyer, seller, uint64(block.timestamp + 1 days), amount);
+        uint256 id = vault.createEscrow(buyer, seller, uint64(block.timestamp + 2 days), amount);
         vm.deal(buyer, amount);
         vm.prank(buyer);
         vault.fundEscrow{value: amount}(id);
@@ -108,21 +105,34 @@ contract SweeftVaultInvariantTest is Test {
         return id;
     }
 
-    function _installPqcMocks(address guardian) internal {
+    function _fundLogistics(uint256 amount) internal returns (uint256) {
+        uint256 total = amount + 0.1 ether;
+        vm.prank(buyer);
+        uint256 id = vault.createEscrowWithLogistics(buyer, seller, carrier, uint64(block.timestamp + 2 days), total, 0.1 ether);
+        vm.deal(buyer, total);
+        vm.prank(buyer);
+        vault.fundEscrow{value: total}(id);
+        totalEscrowed += total;
+        return id;
+    }
+
+    function _installPqcMocks() internal {
         MockKS ks = new MockKS();
         MockPV pv = new MockPV();
         vm.etch(0x0000000000000000000000000000000000000a02, address(ks).code);
         vm.etch(0x0000000000000000000000000000000000000a01, address(pv).code);
-        MockKS(0x0000000000000000000000000000000000000a02).setRegistered(guardian, true, true);
+        MockKS(0x0000000000000000000000000000000000000a02).setRegistered(buyer, true, true);
+        MockKS(0x0000000000000000000000000000000000000a02).setRegistered(carrier, true, true);
         MockPV(0x0000000000000000000000000000000000000a01).setResult(true);
     }
 }
 
 contract MockKS {
     mapping(address => bool) internal r;
-    function setRegistered(address a, bool reg, bool p) external { r[a] = reg; }
+    mapping(address => bool) internal p;
+    function setRegistered(address a, bool reg, bool proven) external { r[a] = reg; p[a] = proven; }
     function pqcKeyStatus(address a) external view returns (bool, uint8, bytes memory, bool) {
-        return (r[a], 1, r[a] ? bytes(hex"aa") : bytes(""), r[a]);
+        return (r[a], 1, r[a] ? bytes(hex"aa") : bytes(""), p[a]);
     }
 }
 contract MockPV {

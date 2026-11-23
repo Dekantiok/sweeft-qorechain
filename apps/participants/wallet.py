@@ -30,6 +30,9 @@ logger = logging.getLogger(__name__)
 
 SESSION_KEY = "wallet_account"
 
+#: Challenges are single-use and short-lived.
+CHALLENGE_TTL_SECONDS = 300
+
 
 def current_wallet(request) -> dict | None:
     """The connected wallet from the session, if any."""
@@ -44,14 +47,25 @@ def challenge(request):
 
     nonce = secrets.token_hex(16)
     network = get_network()
+    issued = int(time.time())
+    expires = issued + CHALLENGE_TTL_SECONDS
+    domain = request.get_host()
     message = (
         f"Sweeft login\n"
+        f"domain: {domain}\n"
         f"address: {address}\n"
+        f"chain-id: {network.chain_id}\n"
         f"nonce: {nonce}\n"
-        f"issued: {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}"
+        f"issued: {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(issued))}\n"
+        f"expires: {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(expires))}"
     )
-    request.session["wallet_challenge"] = {"message": message, "address": address.lower()}
-    return JsonResponse({"message": message, "nonce": nonce, "chain_id": network.chain_id})
+    request.session["wallet_challenge"] = {
+        "message": message,
+        "address": address.lower(),
+        "issued_at": issued,
+        "domain": domain,
+    }
+    return JsonResponse({"message": message, "nonce": nonce, "chain_id": network.chain_id, "expires_in": CHALLENGE_TTL_SECONDS})
 
 
 def _verify_qorex(address: str, message: str, signature_pq_b64: str, message_signature_json: str | None = None) -> tuple[bool, str]:
@@ -148,6 +162,12 @@ def verify(request):
     if message != stored.get("message") or address.lower() != stored.get("address"):
         return JsonResponse({"error": "challenge mismatch — press connect again"}, status=400)
 
+    # Single-use + expiry: a challenge cannot be replayed or used late.
+    issued_at = stored.get("issued_at")
+    if not issued_at or (time.time() - float(issued_at)) > CHALLENGE_TTL_SECONDS:
+        request.session.pop("wallet_challenge", None)
+        return JsonResponse({"error": "challenge expired — press connect again"}, status=400)
+
     if method == "qorex":
         full_sig = payload.get("message_signature") or payload.get("signature_json")
         if full_sig is not None and not isinstance(full_sig, str):
@@ -159,6 +179,8 @@ def verify(request):
         ok, reason = False, "unknown method"
 
     if not ok:
+        # Do not leave a usable challenge behind on a failed attempt.
+        request.session.pop("wallet_challenge", None)
         return JsonResponse({"error": reason}, status=401)
 
     # Normalise both address forms for display and future actions.
@@ -171,6 +193,8 @@ def verify(request):
         evm = address
         qor = hex_to_bech32(address)
 
+    # Rotate the session key on login to prevent fixation.
+    request.session.cycle_key()
     request.session[SESSION_KEY] = {"evm": evm, "qor": qor, "method": method}
     request.session.pop("wallet_challenge", None)
     return JsonResponse({"ok": True, "evm": evm, "qor": qor, "method": method})

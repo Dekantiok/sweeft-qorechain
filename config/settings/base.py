@@ -41,7 +41,12 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "config.middleware.ContentSecurityPolicyMiddleware",
 ]
+
+# Session cookie hardening (overridden/extended in production).
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
 
 ROOT_URLCONF = "config.urls"
 

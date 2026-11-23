@@ -21,10 +21,8 @@ contract MockKeyStatus {
 }
 contract MockVerify {
     bool internal result = true;
-    mapping(string => bool) internal wrongFor;
-    mapping(bytes => bool) internal wrongPayload;
     function setResult(bool r) external { result = r; }
-    function pqcVerify(bytes calldata, bytes calldata m, bytes calldata) external view returns (bool) { return result; }
+    function pqcVerify(bytes calldata, bytes calldata, bytes calldata) external view returns (bool) { return result; }
 }
 
 contract SweeftLogisticsTest is Test {
@@ -61,6 +59,19 @@ contract SweeftLogisticsTest is Test {
         vault.registerCarrier(carrier, "LOG-DEMO-001");
     }
 
+    function _fundedLogisticsEscrow(uint256 total, uint256 log) internal returns (uint256 id) {
+        vm.deal(buyer, total);
+        vm.prank(buyer);
+        id = vault.createEscrowWithLogistics(buyer, seller, carrier, uint64(block.timestamp + 7 days), total, log);
+        vm.prank(buyer);
+        vault.fundEscrow{value: total}(id);
+    }
+
+    function _attestDelivered(uint256 id) internal {
+        vm.prank(carrier);
+        vault.attestCarrierEvidence(id, "DEMO-123", "DELIVERED", uint64(block.timestamp), hex"deadbeef");
+    }
+
     function test_registerCarrier_ownerOnly() public {
         vm.prank(address(0xBAD));
         vm.expectRevert(SweeftVault.NotOwner.selector);
@@ -68,72 +79,75 @@ contract SweeftLogisticsTest is Test {
     }
 
     function test_attestCarrierEvidence_valid() public {
-        vm.prank(buyer);
-        uint256 id = vault.createEscrowWithLogistics(buyer, seller, carrier, uint64(block.timestamp + 7 days), 1 ether, 0.1 ether);
-        vm.deal(buyer, 1 ether);
-        vm.prank(buyer);
-        vault.fundEscrow{value: 1 ether}(id);
+        uint256 id = _fundedLogisticsEscrow(1 ether, 0.1 ether);
 
-        bytes memory payload = "sweaft-carrier-v1|LOG-DEMO-001|DEMO-123|1|DELIVERED|CREATED@0,DELIVERED@1000";
-        bytes32 h = keccak256(payload);
         vm.prank(carrier);
-        vault.attestCarrierEvidence(id, h, hex"deadbeef", payload);
+        vault.attestCarrierEvidence(id, "DEMO-123", "DELIVERED", uint64(block.timestamp), hex"deadbeef");
 
         SweeftVault.Escrow memory e = vault.getEscrow(id);
         assertTrue(e.carrierAttested);
-        assertEq(e.carrierPayloadHash, h);
         assertEq(e.carrierSigner, carrier);
         assertTrue(e.evidenceAttested);
         assertTrue(e.delivered);
+        assertEq(e.carrierStatus, "DELIVERED");
     }
 
     function test_attestCarrierEvidence_notCarrier() public {
-        vm.prank(buyer);
-        uint256 id = vault.createEscrowWithLogistics(buyer, seller, carrier, uint64(block.timestamp + 7 days), 1 ether, 0.1 ether);
-        vm.deal(buyer, 1 ether);
-        vm.prank(buyer);
-        vault.fundEscrow{value: 1 ether}(id);
+        uint256 id = _fundedLogisticsEscrow(1 ether, 0.1 ether);
 
-        bytes memory payload = "sweaft-carrier-v1|LOG-DEMO-001|DEMO-123|1|DELIVERED|CREATED@0";
         vm.expectRevert(SweeftVault.NotCarrier.selector);
-        vault.attestCarrierEvidence(id, keccak256(payload), hex"00", payload);
+        vault.attestCarrierEvidence(id, "DEMO-123", "DELIVERED", uint64(block.timestamp), hex"00");
+    }
+
+    function test_attestCarrierEvidence_otherCarrierRejected() public {
+        // A registered carrier that is not this escrow's logistics partner
+        // cannot attest for it (binds the attestation to the escrow).
+        address other = address(0xDEAD);
+        vault.registerCarrier(other, "LOG-OTHER-002");
+        MockKeyStatus(0x0000000000000000000000000000000000000a02).setRegistered(other, true, true);
+
+        uint256 id = _fundedLogisticsEscrow(1 ether, 0.1 ether);
+        vm.prank(other);
+        vm.expectRevert(SweeftVault.NotCarrier.selector);
+        vault.attestCarrierEvidence(id, "DEMO-123", "DELIVERED", uint64(block.timestamp), hex"00");
     }
 
     function test_attestCarrierEvidence_badSignature() public {
-        vm.prank(buyer);
-        uint256 id = vault.createEscrowWithLogistics(buyer, seller, carrier, uint64(block.timestamp + 7 days), 1 ether, 0);
-        vm.deal(buyer, 1 ether);
-        vm.prank(buyer);
-        vault.fundEscrow{value: 1 ether}(id);
+        uint256 id = _fundedLogisticsEscrow(1 ether, 0);
 
         MockVerify(0x0000000000000000000000000000000000000a01).setResult(false);
-        bytes memory payload = "sweaft-carrier-v1|LOG-DEMO-001|DEMO-123|1|DELIVERED|CREATED@0";
         vm.prank(carrier);
         vm.expectRevert(SweeftVault.BadCarrierSignature.selector);
-        vault.attestCarrierEvidence(id, keccak256(payload), hex"00", payload);
+        vault.attestCarrierEvidence(id, "DEMO-123", "DELIVERED", uint64(block.timestamp), hex"00");
     }
 
-    function test_attestCarrierEvidence_badHash() public {
-        vm.prank(buyer);
-        uint256 id = vault.createEscrowWithLogistics(buyer, seller, carrier, uint64(block.timestamp + 7 days), 1 ether, 0);
-        vm.deal(buyer, 1 ether);
-        vm.prank(buyer);
-        vault.fundEscrow{value: 1 ether}(id);
-
-        bytes memory payload = "sweaft-carrier-v1|LOG-DEMO-001|DEMO-123|1|DELIVERED|CREATED@0";
+    function test_attestCarrierEvidence_staleRejected() public {
+        uint256 id = _fundedLogisticsEscrow(1 ether, 0);
+        vm.warp(block.timestamp + 30 days);
+        uint64 stale = uint64(block.timestamp - 8 days);
         vm.prank(carrier);
-        vm.expectRevert(SweeftVault.BadPayloadHash.selector);
-        vault.attestCarrierEvidence(id, keccak256("tampered"), hex"00", payload);
+        vm.expectRevert(SweeftVault.StaleAttestation.selector);
+        vault.attestCarrierEvidence(id, "DEMO-123", "DELIVERED", stale, hex"00");
     }
 
-    function test_release_withLogistics_paysCarrier() public {
+    function test_nonDeliveredStatusDoesNotFulfil() public {
+        uint256 id = _fundedLogisticsEscrow(1 ether, 0.1 ether);
+
+        vm.prank(carrier);
+        vault.attestCarrierEvidence(id, "DEMO-123", "LOST", uint64(block.timestamp), hex"deadbeef");
+
+        SweeftVault.Escrow memory e = vault.getEscrow(id);
+        assertTrue(e.carrierAttested);
+        assertFalse(e.delivered);
+        assertFalse(e.evidenceAttested);
+        assertEq(e.carrierStatus, "LOST");
+    }
+
+    function test_release_withLogistics_paysCarrierWhenDelivered() public {
         uint256 total = 1.1 ether;
         uint256 log = 0.1 ether;
-        vm.prank(buyer);
-        uint256 id = vault.createEscrowWithLogistics(buyer, seller, carrier, uint64(block.timestamp + 7 days), total, log);
-        vm.deal(buyer, total);
-        vm.prank(buyer);
-        vault.fundEscrow{value: total}(id);
+        uint256 id = _fundedLogisticsEscrow(total, log);
+        _attestDelivered(id);
         vm.prank(buyer);
         vault.confirmReceipt(id);
 
@@ -156,6 +170,22 @@ contract SweeftLogisticsTest is Test {
         assertEq(uint8(vault.getEscrow(id).status), uint8(SweeftVault.EscrowStatus.Completed));
     }
 
+    function test_release_withoutCarrierAttestation_holdsLogisticsForBuyer() public {
+        uint256 total = 1.1 ether;
+        uint256 log = 0.1 ether;
+        uint256 id = _fundedLogisticsEscrow(total, log);
+        vm.prank(buyer);
+        vault.confirmReceipt(id);
+
+        uint256 carrierBefore = carrier.balance;
+        vault.release(id, hex"deadbeef");
+
+        // Carrier never proved delivery: it is not paid, and the logistics
+        // share is credited to the buyer.
+        assertEq(carrier.balance, carrierBefore);
+        assertEq(vault.credits(buyer), log);
+    }
+
     function test_marketplace_listingWithLogistics() public {
         vm.prank(seller);
         uint256 lid = market.createListingWithLogistics(1.1 ether, 1, "uri", keccak256("m"), carrier, 0.1 ether);
@@ -165,7 +195,7 @@ contract SweeftLogisticsTest is Test {
 
         vm.deal(buyer, 1.1 ether);
         vm.prank(buyer);
-        uint256 escrowId = market.purchase{value: 1.1 ether}(lid, uint64(block.timestamp + 7 days));
+        uint256 escrowId = market.purchase{value: 1.1 ether}(lid, uint64(block.timestamp + 7 days), 1.1 ether, keccak256("m"));
         SweeftVault.Escrow memory e = vault.getEscrow(escrowId);
         assertEq(e.logisticsPartner, carrier);
         assertEq(e.logisticsAmount, 0.1 ether);
@@ -175,14 +205,9 @@ contract SweeftLogisticsTest is Test {
 
     function test_dispute_refund_includesLogistics() public {
         uint256 total = 1.1 ether;
-        vm.prank(buyer);
-        uint256 id = vault.createEscrowWithLogistics(buyer, seller, carrier, uint64(block.timestamp + 7 days), total, 0.1 ether);
-        vm.deal(buyer, total);
-        vm.prank(buyer);
-        vault.fundEscrow{value: total}(id);
+        uint256 id = _fundedLogisticsEscrow(total, 0.1 ether);
         vm.prank(buyer);
         vault.raiseDispute(id);
-        // board would settle; here refund path via pq needed — simulate board call
         vm.prank(address(board));
         uint256 buyerBefore = buyer.balance;
         vault.resolveDispute(id, false);

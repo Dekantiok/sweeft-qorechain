@@ -218,41 +218,43 @@ def api_carrier_attest(request, escrow_id: int):
     if payload_dict.get("status") != "DELIVERED":
         return JsonResponse({"ok": False, "error": "shipment is not DELIVERED yet — advance the demo carrier first"}, status=400)
 
-    try:
-        signed = carriers.sign_carrier_payload(payload_dict)
-    except Exception as e:
-        return JsonResponse({"ok": False, "error": f"signing failed: {e}"}, status=500)
+    import time
 
-    raw = carriers.canonical_carrier_message(signed).encode()
-    from eth_utils import keccak
-
-    payload_hash = keccak(raw)
-    signature = bytes.fromhex(signed["signature"])
-
-    from apps.blockchain.services.relayer import attest_carrier_evidence
+    from apps.blockchain.services.relayer import attest_carrier_evidence, carrier_nonce
 
     try:
-        result = attest_carrier_evidence(escrow_id, payload_hash, signature, raw)
+        _, _, carrier_evm = carriers.demo_carrier_keypair()
+        nonce = carrier_nonce(carrier_evm)
+        issued_at = int(time.time())
+        signed = carriers.sign_carrier_attestation(
+            escrow_id, shipment.tracking_number, "DELIVERED", nonce, issued_at
+        )
+        signature = bytes.fromhex(signed["signature"])
+        result = attest_carrier_evidence(
+            escrow_id, shipment.tracking_number, "DELIVERED", issued_at, signature
+        )
     except Exception as e:
         return JsonResponse({"ok": False, "error": str(e)}, status=500)
+
+    payload_hash = "0x" + carriers.hash_attestation(signed["message"])
 
     VerificationRequest.objects.create(
         escrow=shipment.escrow,
         shipment=shipment,
         status="VERIFIED",
         requested_by=_wallet(request),
-        input_payload=signed,
-        result={"tx_hash": result["tx_hash"], "payload_hash": "0x" + payload_hash.hex()},
+        input_payload={"message": signed["message"], "signature": signed["signature"], "issued_at": issued_at},
+        result={"tx_hash": result["tx_hash"], "payload_hash": payload_hash},
         tx_hash=result["tx_hash"],
         completed_at=__import__("django").utils.timezone.now(),
-        attestation_note="Demo Carrier ML-DSA-87 signature verified on-chain by SweeftVault (pqcVerify).",
+        attestation_note="Demo Carrier ML-DSA-87 signature verified on-chain by SweeftVault (pqcVerify), bound to this escrow.",
     )
     if shipment.escrow:
         shipment.escrow.carrier_attested = True
-        shipment.escrow.carrier_payload_hash = "0x" + payload_hash.hex()
+        shipment.escrow.carrier_payload_hash = payload_hash
         shipment.escrow.save(update_fields=["carrier_attested", "carrier_payload_hash", "updated_at"])
 
-    return JsonResponse({"ok": True, **result, "payload_hash": "0x" + payload_hash.hex()})
+    return JsonResponse({"ok": True, **result, "payload_hash": payload_hash})
 
 
 @require_POST
