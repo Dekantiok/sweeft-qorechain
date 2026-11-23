@@ -203,6 +203,100 @@ def tool_execute_autopilot(escrow_id: int) -> dict:
     return {"ok": True, "tx_hash": result["tx_hash"], "escrow_id": int(escrow_id), "actor": "AI autopilot (pre-signed release)"}
 
 
+def tool_negotiate(listing_id: int, offered_qor: float = 0, details: str = "") -> dict:
+    """Bargain against a listing's floor without revealing it.
+
+    The seller's floor number is never returned. Outcomes:
+      accepted  — offer is at/above the floor, seller may update the on-chain price
+      countered — below floor, ships a mid counter
+      rejected  — far below floor, no counter
+    All within the buyer's mandate caps (checked).
+    """
+    from apps.marketplace.models import Listing
+    from apps.marketplace.negotiation_models import Negotiation
+
+    listing = Listing.objects.filter(on_chain_id=int(listing_id)).first()
+    if not listing:
+        return {"error": f"listing {listing_id} not found"}
+    if listing.status != Listing.Status.ACTIVE:
+        return {"error": "listing is not active"}
+
+    try:
+        offered = int(round(float(offered_qor) * 10**18))  # wei, matches on-chain price
+    except (TypeError, ValueError):
+        return {"error": "offered_qor must be a number"}
+    list_price = int(listing.price_uqor)
+
+    # Mandate check first — the AI can never bargain above caps
+    from .tools import tool_check_mandate
+
+    caps = tool_check_mandate("purchase", float(offered_qor) if offered_qor else 0)
+    if not caps.get("within_caps"):
+        return {"error": "offer outside mandate caps — refusing to negotiate"}
+
+    floor = int(listing.floor_price_uqor or 0)
+    # No floor (or seller auto-accepts): any offer inside mandate is a deal.
+    if not floor or (listing.auto_accept_floor and offered >= floor):
+        negotiation = Negotiation.objects.create(
+            listing=listing,
+            buyer=listing.seller,  # AI offers on behalf of the buyer wallet; placeholder till linked
+            proposed_uqor=offered,
+            details=str(details)[:1000],
+            state=Negotiation.State.ACCEPTED,
+        )
+        return {
+            "ok": True,
+            "status": "accepted",
+            "negotiation_id": negotiation.pk,
+            "listing_id": listing.on_chain_id,
+            "offered_qor": round(offered / 1e18, 6),
+            "note": "Seller has accepted. The buyer now purchases at this price (the seller updates the listing price first if needed).",
+        }
+
+    # Below floor: counter at midpoint when close, reject when far
+    distance_below = floor - offered
+    if floor and distance_below <= floor // 5:  # within 20%
+        counter = (offered + floor) // 2
+        Negotiation.objects.create(
+            listing=listing,
+            buyer=listing.seller,
+            proposed_uqor=offered,
+            counter_uqor=counter,
+            details=str(details)[:1000],
+            state=Negotiation.State.COUNTERED,
+        )
+        return {
+            "ok": True,
+            "status": "countered",
+            "listing_id": listing.on_chain_id,
+            "offered_qor": round(offered / 1e18, 6),
+            "counter_qor": round(counter / 1e18, 6),
+            "note": "Seller counter-offered. Accept and the AI drafts a purchase at this price — your wallet still signs.",
+        }
+
+    Negotiation.objects.create(
+        listing=listing,
+        buyer=listing.seller,
+        proposed_uqor=offered,
+        details=str(details)[:1000],
+        state=Negotiation.State.REJECTED,
+    )
+    return {
+        "ok": True,
+        "status": "rejected",
+        "listing_id": listing.on_chain_id,
+        "offered_qor": round(offered / 1e18, 6),
+        "note": "Offer rejected — try closer to the list price, or buy directly.",
+    }
+
+
+def just_accept(listing, offered: int) -> bool:
+    floor = int(listing.floor_price_uqor or 0)
+    if not floor:
+        return False
+    return bool(listing.auto_accept_floor and offered >= floor)
+
+
 TOOLS_REGISTRY = {
     "search_listings": tool_search_listings,
     "get_escrow_status": tool_get_escrow_status,
@@ -211,6 +305,7 @@ TOOLS_REGISTRY = {
     "create_escrow_draft": tool_create_escrow_draft,
     "check_mandate": tool_check_mandate,
     "execute_autopilot": tool_execute_autopilot,
+    "negotiate": tool_negotiate,
 }
 
 

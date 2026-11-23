@@ -108,6 +108,22 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "negotiate",
+            "description": "Bargain with a listing's seller against their floor (floor number is never revealed). Returns accepted/countered/rejected.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "listing_id": {"type": "integer"},
+                    "offered_qor": {"type": "number"},
+                    "details": {"type": "string"},
+                },
+                "required": ["listing_id", "offered_qor"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "execute_autopilot",
             "description": "Submit a stored pre-signed release for an escrow (Autopilot). Only succeeds if the buyer pre-signed and the escrow is release-eligible. Cannot change terms.",
             "parameters": {

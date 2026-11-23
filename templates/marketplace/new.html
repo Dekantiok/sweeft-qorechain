@@ -47,6 +47,12 @@
                 <option value="physical">Physical (carrier — Demo Carrier)</option>
             </select>
         </div>
+        <div>
+            <label class="text-xs uppercase tracking-wider text-slate-500">Negotiation floor (QOR — optional, 0 = fixed price)</label>
+            <input id="f-floor" type="text" inputmode="decimal" placeholder="0.08"
+                   class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none">
+            <p class="mt-1 text-[11px] text-slate-500">The AI can bargain down to this floor — it's never revealed in negotiation.</p>
+        </div>
         <div id="logistics-fields" class="hidden">
             <label class="text-xs uppercase tracking-wider text-slate-500">Logistics fee (QOR, reserved from the price)</label>
             <input id="f-logistics-fee" type="text" inputmode="decimal" value="0"

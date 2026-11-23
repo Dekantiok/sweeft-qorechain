@@ -60,6 +60,13 @@ class Listing(models.Model):
     logistics_partner_address = models.CharField(max_length=42, blank=True)
     logistics_fee_uqor = models.DecimalField(max_digits=30, decimal_places=0, default=0)
 
+    # Negotiation (AI agent can bargain against the floor; acceptance updates the price)
+    floor_price_uqor = models.DecimalField(
+        max_digits=30, decimal_places=0, default=0,
+        help_text="Lowest price the seller will accept in negotiation (0 = no negotiation, fixed price)",
+    )
+    auto_accept_floor = models.BooleanField(default=False, help_text="Seller flips this on to auto-accept offers at/above the floor")
+
     created_tx = models.CharField(max_length=80, blank=True)
     created_block = models.PositiveBigIntegerField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -88,3 +95,8 @@ class ListingImage(models.Model):
 
     class Meta:
         ordering = ["position", "id"]
+
+
+# Negotiation models live in a sibling module but belong to this app;
+# import eagerly so migrations and the indexer can find them.
+from .negotiation_models import Negotiation as Negotiation  # noqa: E402,F401
