@@ -54,8 +54,13 @@ def challenge(request):
     return JsonResponse({"message": message, "nonce": nonce, "chain_id": network.chain_id})
 
 
-def _verify_qorex(address: str, message: str, signature_pq_b64: str) -> tuple[bool, str]:
-    """Verify an ML-DSA-87 signature against the account's registered key."""
+def _verify_qorex(address: str, message: str, signature_pq_b64: str, message_signature_json: str | None = None) -> tuple[bool, str]:
+    """Verify a QoreX message signature against the registered ML-DSA-87 key.
+
+    Preferred path uses the official QoreSign library — verify_message over the
+    full hybrid signature (classical + PQ). Fallback keeps an ML-DSA-only check
+    for clients that only send the PQ part.
+    """
     try:
         import qorsdk
         from qorsdk.address import bech32_to_hex
@@ -71,18 +76,33 @@ def _verify_qorex(address: str, message: str, signature_pq_b64: str) -> tuple[bo
     if not status.get("registered"):
         return False, "this account has no ML-DSA-87 key registered — open QoreX and register one first"
 
-    # fetch_pqc_status returns the normalised shape: { registered, pubkey, ... }
     public_key_b64 = status.get("pubkey") or (status.get("account") or {}).get("public_key")
     if not public_key_b64:
         return False, "the registered key could not be read"
+    try:
+        public_key = base64.b64decode(public_key_b64)
+    except Exception:
+        return False, "malformed key encoding"
+
+    if message_signature_json:
+        try:
+            from qoresign import message_signature_from_json, verify_message
+
+            sig_obj = message_signature_from_json(message_signature_json)
+            verify_message(network.chain_id, address.lower(), message.encode(), sig_obj, public_key, True)
+        except Exception as exc:
+            return False, f"QoreSign verification failed: {str(exc)[:160]}"
+        try:
+            bech32_to_hex(address)
+        except Exception:
+            return False, "invalid qor1 address"
+        return True, ""
 
     payload = f"qorechain-msg-v1|{network.chain_id}|{message}".encode()
     try:
-        public_key = base64.b64decode(public_key_b64)
         signature = base64.b64decode(signature_pq_b64)
     except Exception:
         return False, "malformed signature encoding"
-
     if not qorsdk.pqc_verify(public_key, payload, signature):
         return False, "signature does not match the registered key"
 
@@ -129,7 +149,10 @@ def verify(request):
         return JsonResponse({"error": "challenge mismatch — press connect again"}, status=400)
 
     if method == "qorex":
-        ok, reason = _verify_qorex(address, message, payload.get("signature_pq_b64", ""))
+        full_sig = payload.get("message_signature") or payload.get("signature_json")
+        if full_sig is not None and not isinstance(full_sig, str):
+            full_sig = json.dumps(full_sig)
+        ok, reason = _verify_qorex(address, message, payload.get("signature_pq_b64", ""), full_sig)
     elif method == "evm":
         ok, reason = _verify_evm(address, message, payload.get("signature", ""))
     else:

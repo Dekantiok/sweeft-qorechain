@@ -294,6 +294,7 @@
                 address: bech32Address,
                 message: challenge.message,
                 signature_pq_b64: pqB64,
+                message_signature: JSON.stringify(signature),
             });
             if (result.error) throw new Error(result.error);
 

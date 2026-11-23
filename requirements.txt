@@ -16,3 +16,4 @@ openai>=1.40
 # HTTP
 requests>=2.31
 Pillow>=10.0
+qorechain-qoresign (>=0.2.0)
