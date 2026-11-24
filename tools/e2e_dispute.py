@@ -26,7 +26,8 @@ import qor_lib as lib  # noqa: E402
 
 AMOUNT = 10**17  # 0.1 QOR
 FEE_BPS = 200  # 2%
-MIN_STAKE = 20 * 10**18  # 20 QOR
+MIN_STAKE = 21 * 10**18  # 20 QOR base + 1% of escrow (v5 proportional stake)
+DISPUTE_BOND = 10**17  # 0.1 QOR (v5 raiser bond)
 
 
 def _qor(wei: int) -> str:
@@ -81,9 +82,11 @@ def main() -> None:
     )
     print(f"      escrow #{escrow_id} funded with {_qor(AMOUNT)} QOR")
 
-    print("[2/5] buyer raises a dispute — escrow freezes")
+    print("[2/5] buyer raises a dispute — escrow freezes, bond posted")
     dispute_id = board.functions.disputeCount().call()
-    result = lib.send_evm_expect_success(w3, buyer, board.functions.openDispute(escrow_id), gas=400_000)
+    result = lib.send_evm_expect_success(
+        w3, buyer, board.functions.openDispute(escrow_id), value=DISPUTE_BOND, gas=400_000
+    )
     status = vault.functions.getEscrow(escrow_id).call()[5]
     assert status == 5, f"escrow should be Disputed(5), got {status}"
     print(f"      dispute #{dispute_id} opened — tx {result['hash'][:18]}…")
@@ -113,8 +116,8 @@ def main() -> None:
     print(f"      reward pool: {_qor(pool_before)} -> {_qor(pool_after)} QOR (+30% of fee)")
 
     # ------------------------------------------------------------------
-    print("[5/5] voters claim their rewards (10% of fee each)")
-    expected_reward = (fee * 3000) // 10_000 // 3
+    print("[5/5] voters claim their rewards (30% of fee split across voters)")
+    expected_reward = (fee * 3000) // 10_000 // 2
     for r in resolvers[:2]:
         pool_before_claim = board.functions.rewardPool().call()
         lib.send_evm_expect_success(w3, r, board.functions.claimReward(dispute_id), gas=300_000)

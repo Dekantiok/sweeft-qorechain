@@ -138,7 +138,7 @@ class Runner:
         print(f"      tx {result['hash']}")
 
         print("[3/4] buyer signs the release message with ML-DSA-87 (QoreX format)")
-        nonce = self.vault.functions.pqcNonce(self.w3.to_checksum_address(self.buyer.evm)).call()
+        nonce = self.vault.functions.escrowNonce(escrow_id).call()
         message = lib.release_message(VAULT_ADDRESS, escrow_id, self.buyer.evm, self.seller.evm, AMOUNT, nonce)
         payload = lib.pqc_signing_payload(message)
         signature = pqc_sign(self.buyer.pqc.secret_key, payload)
@@ -161,7 +161,7 @@ class Runner:
         print("=" * 64)
         print(f"seller received : {delta} uqor ({delta / 1_000_000:.6f} QOR)")
         print(f"escrow status   : {status} (2 = Completed)")
-        print(f"nonce after     : {self.vault.functions.pqcNonce(self.w3.to_checksum_address(self.buyer.evm)).call()}")
+        print(f"nonce after     : {self.vault.functions.escrowNonce(escrow_id).call()}")
         for name in ("create", "confirm", "release"):
             print(f"{name:7s} tx      : {self.results[name]['hash']}")
 

@@ -16,8 +16,9 @@ comes only from verified outcomes, and a DAO governs who may attest.
 
 **Django coordinates the application. Smart contracts enforce financial rules.
 QoreChain provides the blockchain infrastructure.** AI assists and can act as a
-delegated buyer under a chain-enforced spending mandate — it never holds the
-authority to move funds outside that mandate.
+delegated buyer under a bounded mandate — Django enforces per-transaction and
+rolling daily caps in code, and the on-chain spending rule remains the hard cap.
+The agent never holds the authority to move funds outside that mandate.
 
 ```
 Browser / QoreX            Django (modular monolith)           QoreChain Diana
@@ -41,14 +42,14 @@ AI assistant     ────────▶ apps/ai       (draft/execute w/ man
 
 | Component | Purpose | Status |
 |---|---|---|
-| **Sweeft Market** | On-chain listings + Django discovery/search | v4: physical/digital listings with logistics allocation |
-| **Sweeft Vault** | Escrow with PQ-gated release, 2% fee on release, carrier attestation | v4 deployed + logistics E2E passing on testnet |
-| **Sweeft Oracle** | Fulfilment evidence + verifier attestations | DAO-governed verifiers proven on-chain |
+| **Sweeft Market** | On-chain listings + Django discovery/search | v5: listings pin price + metadata hash at purchase; seller fees re-checked on price updates |
+| **Sweeft Vault** | Escrow with PQ-gated release, 2% fee on release, carrier attestation | v5: deadline bounds, per-escrow nonce, fee/treasury snapshots, M-of-N verifier threshold, pull-payment fallback |
+| **Sweeft Oracle** | Fulfilment evidence + verifier attestations | DAO-governed verifiers with a configurable M-of-N threshold |
 | **Sweeft Cred** | Reputation from verified outcomes only | scoring live from indexed completions |
-| **Sweeft AI** | Natural-language commerce, mandate-capped autonomous buying (Meta Model API) | adapter in place, chat wiring in progress |
-| **Sweeft DAO** | Proposal registry; governs verifiers, fees and dispute parameters | DAO2 owns registry, vault and board |
-| **Dispute Board** | Staked resolver panels (20 QOR min, 3 members, 2-of-3) | v4 deployed + dispute E2E proven |
-| **Logistics** | Verified physical delivery (carrier ML-DSA signatures on-chain) + digital goods | partner registry, Partner API, Demo Carrier, carrier attestation (v4) proven on testnet |
+| **Sweeft AI** | Natural-language commerce, mandate-capped autonomous buying (Meta Model API) | chat wired; mandate enforced in code (per-tx + daily); Autopilot proven on testnet; negotiation against listing floors |
+| **Sweeft DAO** | Proposal registry; governs verifiers, fees and dispute parameters | DAO2: bounded voting periods, (target,selector) allowlist, quorum, timelock, proposer bond; owns registry/vault/board |
+| **Dispute Board** | Staked resolver panels (proportional stake, 3 members, 2-of-3) | v5: stake scales with escrow, minority/non-voter slashing, raiser bond, appeal window, deterministic expiry |
+| **Logistics** | Verified physical delivery (carrier ML-DSA signatures on-chain) + digital goods | carrier attestation bound to (escrow, carrier, status, nonce); DELIVERED-only fulfilment; Demo Carrier is simulated |
 
 ## Quick start (development)
 
@@ -91,15 +92,37 @@ PQC precompiles (testnet): `pqcVerify` at `0x…0a01`, `pqcKeyStatus` at `0x…0
 
 - Only the buyer can fund their escrow; only stored roles may act.
 - Release requires the buyer's ML-DSA-87 signature over a message binding
-  chain ID, contract, recipient, amount and nonce — verified on-chain.
+  chain ID, contract, recipient, amount and a per-escrow nonce — verified
+  on-chain by `pqcVerify`.
 - A leaked classical (secp256k1) key alone cannot move escrowed funds.
-- Escrow terms cannot be modified after funding; duplicate deposits and
-  releases are rejected; state transitions are validated.
-- The AI agent acts only within an owner-signed, chain-enforced spending
-  mandate (QoreChain authenticators); it cannot release escrow, attest as an
-  oracle, or vote in the DAO.
+- **Escrow terms are frozen at funding**: the platform fee and treasury are
+  snapshotted into the escrow at creation, so a later DAO change cannot alter an
+  in-flight deal. Duplicate deposits and releases are rejected.
+- **Bounded delivery windows**: creation rejects deadlines outside
+  `[1 day, 90 days]`, so a buyer cannot set a past deadline to refund instantly.
+- **Carrier attestation is bound** to `(carrier, escrow, tracking, status,
+  nonce, freshness)` and only `DELIVERED` counts as fulfilment; any other status
+  leaves the buyer's refund path open.
+- **M-of-N verifier threshold**: one verifier can never, alone, mark an escrow
+  attested and block the buyer's refund.
+- **Pull-with-fallback payouts**: if a recipient rejects a transfer, the funds
+  are credited for later withdrawal instead of bricking settlement; money paths
+  are reentrancy-guarded.
+- **Governance is hard to capture**: DAO proposals need an allowlisted
+  `(target, selector)`, a 3-day minimum voting period, quorum, a 2-day timelock
+  and a proposer bond; the DAO owns the registry, vault and board.
+- **Disputes cost something**: resolvers stake proportionally to the escrow,
+  minority/non-voters are slashed, raisers post a bond, and expiry resolves by a
+  deterministic rule rather than owner discretion.
+- The AI agent acts only within an owner-granted mandate: Django enforces
+  per-transaction and rolling daily caps **in code** (and refuses to spend with
+  no active mandate), while the on-chain spending rule is the hard cap. The
+  agent cannot release escrow, attest as an oracle, or vote in the DAO.
 - AI output is never treated as authorization; the contract independently
-  enforces its rules.
+  enforces its rules. Retrieved listing text is treated as untrusted data.
+
+See `docs/AUDIT.md` for the finding-by-finding mapping (including the external
+review response) and `contracts/test/` for the regression suites.
 
 ## Wallets — QoreX and EVM wallets, and why both
 
@@ -126,7 +149,8 @@ request's behalf.
 ## Documentation
 
 - [`docs/implementation-blueprint.md`](docs/implementation-blueprint.md) — original implementation blueprint
-- [`docs/AUDIT.md`](docs/AUDIT.md) — QCAI audit: Stage 1 72/100 + Stage 2 72/100 (PDFs in `docs/audit/`, finding-by-finding resolutions)
+- [`docs/AUDIT.md`](docs/AUDIT.md) — QCAI audit (Stage 1 & 2) plus the response to the external security review (v5 hardening, finding by finding)
+- [`docs/proofs/`](docs/proofs/) — live testnet transaction inventory and the keeper attack log
 - [`AI_USAGE.md`](AI_USAGE.md) — how AI was used during development
 
 ## Licence

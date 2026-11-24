@@ -73,7 +73,7 @@ def main() -> None:
 
     # Attack 2: tampered amount (real escrow id, +1 wei)
     def tampered():
-        nonce = vault.functions.pqcNonce(w3.to_checksum_address(buyer.evm)).call()
+        nonce = vault.functions.escrowNonce(escrow_id).call()
         vault_addr = lib.contract_address("SweeftVault")
         msg = f"sweeft-release-v1|vault={vault_addr.lower()}|escrow={escrow_id}|buyer={buyer.evm.lower()}|recipient={seller.evm.lower()}|amount={10**16+1}|nonce={nonce}".encode()
         return lib.send_evm(w3, buyer, vault.functions.release(escrow_id, pqc_sign(buyer.pqc.secret_key, lib.pqc_signing_payload(msg))), gas=8_000_000)
@@ -83,7 +83,12 @@ def main() -> None:
 
     # Attack 3: non-carrier attestation
     def non_carrier():
-        return lib.send_evm(w3, buyer, vault.functions.attestCarrierEvidence(escrow_id, b"\x00" * 32, b"\x00" * 10, b"fake"), gas=600_000)
+        return lib.send_evm(
+            w3,
+            buyer,
+            vault.functions.attestCarrierEvidence(escrow_id, "FAKE", "DELIVERED", int(time.time()), b"\x00" * 10),
+            gas=600_000,
+        )
 
     attempt("carrier attestation by non-carrier", non_carrier)
     print("  non-carrier:", "refused" if ATTACKS[-1]["refused"] else "ACCEPTED — ALERT")

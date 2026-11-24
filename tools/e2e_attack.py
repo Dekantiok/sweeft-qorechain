@@ -110,7 +110,7 @@ class AttackRunner:
         # ------------------------------------------------------------------
         print("Attack 1: release signed with the WRONG ML-DSA-87 key")
         escrow_id = self._fresh_escrow()
-        nonce = self.vault.functions.pqcNonce(self.w3.to_checksum_address(self.buyer.evm)).call()
+        nonce = self.vault.functions.escrowNonce(escrow_id).call()
         message = self._release_message(escrow_id, AMOUNT, nonce)
         forged_signature = pqc_sign(self.seller.pqc.secret_key, lib.pqc_signing_payload(message))  # seller's key, not buyer's
         result = self._send(self.vault.functions.release(escrow_id, forged_signature), gas=8_000_000)
@@ -127,7 +127,7 @@ class AttackRunner:
         # ------------------------------------------------------------------
         print("Attack 2: valid buyer key, TAMPERED amount in the signed message")
         escrow_id = self._fresh_escrow()
-        nonce = self.vault.functions.pqcNonce(self.w3.to_checksum_address(self.buyer.evm)).call()
+        nonce = self.vault.functions.escrowNonce(escrow_id).call()
         tampered = self._release_message(escrow_id, AMOUNT + 1_000_000, nonce)  # claims 1 QOR more
         tampered_signature = pqc_sign(self.buyer.pqc.secret_key, lib.pqc_signing_payload(tampered))
         result = self._send(self.vault.functions.release(escrow_id, tampered_signature), gas=8_000_000)
@@ -140,7 +140,7 @@ class AttackRunner:
 
         # ------------------------------------------------------------------
         print("Control: correct buyer signature settles the escrow")
-        nonce = self.vault.functions.pqcNonce(self.w3.to_checksum_address(self.buyer.evm)).call()
+        nonce = self.vault.functions.escrowNonce(escrow_id).call()
         message = self._release_message(escrow_id, AMOUNT, nonce)
         signature = pqc_sign(self.buyer.pqc.secret_key, lib.pqc_signing_payload(message))
         result = self._send(self.vault.functions.release(escrow_id, signature), gas=8_000_000)

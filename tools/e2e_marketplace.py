@@ -136,7 +136,7 @@ def main() -> None:
     escrow_id = vault.functions.escrowCount().call()
     deadline = w3.eth.get_block("latest")["timestamp"] + DELIVERY_WINDOW
     result = lib.send_evm_expect_success(
-        w3, buyer, market.functions.purchase(listing_id, deadline), value=PRICE, gas=800_000
+        w3, buyer, market.functions.purchase(listing_id, deadline, PRICE, metadata_hash), value=PRICE, gas=800_000
     )
     print(f"      escrow #{escrow_id} — tx {result['hash']}")
 
@@ -169,7 +169,7 @@ def main() -> None:
         lib.die("escrow never became release-eligible")
 
     print("[settle] buyer signs the release message with ML-DSA-87 (QoreX format)")
-    nonce = vault.functions.pqcNonce(w3.to_checksum_address(buyer.evm)).call()
+    nonce = vault.functions.escrowNonce(escrow_id).call()
     message = lib.release_message(lib.contract_address("SweeftVault"), escrow_id, buyer.evm, seller.evm, PRICE, nonce)
     payload = lib.pqc_signing_payload(message)
     signature = pqc_sign(buyer.pqc.secret_key, payload)
