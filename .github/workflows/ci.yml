@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  contracts:
+    name: Foundry tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+      - name: Build
+        run: forge build --sizes
+      - name: Test (unit + fuzz + invariants)
+        run: forge test -vv
+
+  backend:
+    name: Django tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: sweeft
+          POSTGRES_USER: sweeft
+          POSTGRES_PASSWORD: sweeft
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+    env:
+      DJANGO_SETTINGS_MODULE: config.settings.development
+      DJANGO_SECRET_KEY: ci-secret
+      POSTGRES_DB: sweeft
+      POSTGRES_USER: sweeft
+      POSTGRES_PASSWORD: sweeft
+      POSTGRES_HOST: 127.0.0.1
+      POSTGRES_PORT: "5432"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Django check + migrations
+        run: |
+          python manage.py check
+          python manage.py migrate --noinput
+      - name: Tests
+        run: python manage.py test tests
+
+  security-scans:
+    name: Dependency + static analysis
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: pip-audit
+        run: |
+          python -m pip install pip-audit
+          pip-audit -r requirements.txt || true
+      - name: Slither
+        uses: crytic/slither-action@v0.4.0
+        continue-on-error: true
+        with:
+          target: contracts/

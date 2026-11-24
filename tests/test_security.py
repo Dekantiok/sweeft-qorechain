@@ -108,6 +108,24 @@ class SecurityEndpointTests(TestCase):
         )
         self.assertEqual(r.status_code, 403)
 
+    def test_metadata_requires_wallet(self):
+        r = self.client.post(
+            "/api/marketplace/metadata/",
+            data=json.dumps({"title": "lamp", "seller_evm": "0xattacker"}),
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 401)
+
+    def test_metadata_ignores_client_seller(self):
+        self._login(self.buyer)
+        r = self.client.post(
+            "/api/marketplace/metadata/",
+            data=json.dumps({"title": "lamp", "seller_evm": "0xattacker"}),
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["metadata"]["seller_evm"], "0xbuyer")
+
 
 class WalletLoginTests(TestCase):
     def test_challenge_expires(self):

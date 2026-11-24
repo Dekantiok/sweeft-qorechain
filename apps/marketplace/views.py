@@ -101,6 +101,12 @@ def api_metadata(request):
     except json.JSONDecodeError:
         return JsonResponse({"error": "invalid JSON body"}, status=400)
 
+    # Require a connected wallet; the seller identity comes from the session,
+    # never from client-supplied JSON.
+    wallet = (request.session.get("wallet_account") or {}).get("evm", "").lower()
+    if not wallet:
+        return JsonResponse({"error": "connect your wallet first"}, status=401)
+
     title = str(payload.get("title", "")).strip()
     if not title:
         return JsonResponse({"error": "title is required"}, status=400)
@@ -109,7 +115,7 @@ def api_metadata(request):
         "title": title[:200],
         "description": str(payload.get("description", ""))[:4000],
         "category": str(payload.get("category", "")).strip()[:80],
-        "seller_evm": str(payload.get("seller_evm", "")).strip(),
+        "seller_evm": wallet,
         "created_at": int(time.time()),
         "sweeft_metadata_version": 1,
     }
