@@ -2,18 +2,59 @@
 
 **Network:** QoreChain Diana (Cosmos chain `qorechain-diana`, EVM chain ID `9800`)
 **Deployer:** `qor1etuzhk8tmpmrfmakzzhx8fau788r4jrapjkzlp` / `0xcaF82Bd8EBd87634eFb610aE63a7bCf1CE3ac87D`
-**Deployed:** 19 November 2026
 **Explorer:** https://explore.qore.network
 
-## Contracts
+## v5 — hardened stack (current; 24 November 2026)
+
+Deployed with `contracts/script/DeployV5.s.sol` after the external security
+review (see `docs/AUDIT.md`). Wiring verified on-chain via `eth_call`
+(`tools/verify_wiring_v5.py`).
 
 | Contract | Address | Notes |
 |---|---|---|
-| SweeftOracleRegistry | `0xecb16561cfdff10336b278f8107a077fe7a53c6d` | kept across v3/v4; ownership in DAO2 |
-| **SweeftVault (v4)** | `0x7c170ec8ab48dfa5c86ce96c9bd4d21af6d84fc9` | adds carrier attestation + logistics split |
-| **SweeftMarketplace (v4)** | `0xa2075dbca3a80192e1158cba4a822bfe835c3ea6` | physical listings carry logistics allocation |
-| **SweeftDisputeBoard** | `0x3fe1c7e2c014b4ec9c847cc35718449245eaacb1` | staked resolver panels (20 QOR min) |
-| **SweeftDAO2** | `0x1af66554af38e16458c0b72352517483723379db` | owns vault + board; allowlisted targets |
+| **SweeftOracleRegistry (v5)** | `0x07712806b83fac288f2f61f892cd26f8778b94a2` | M-of-N `threshold` (1 on testnet); owner = DAO2 |
+| **SweeftVault (v5)** | `0x979d3d6688600fdee7ce61e978bd8398d5e1b007` | deadline bounds, per-escrow nonce, fee snapshot, bound carrier attestation |
+| **SweeftMarketplace (v5)** | `0xee9f9f0967db0fb3739cb4cd8e2e75fbf5896419` | purchase pins price + metadata hash |
+| **SweeftDisputeBoard (v5)** | `0x1aa3156cb862e3569fa12dc8ab5145efb2d15fb9` | proportional stake, slashing, bond, appeal window |
+| **SweeftDAO2 (v5)** | `0x23dc3d2014c62095b8b5a23c7552301cf829bdaf` | bounded periods, selector allowlist, quorum, timelock, bond; owns itself + the stack |
+
+Verified constants: `feeBps = 200`, `MIN_VOTING_PERIOD = 3 days`,
+`TIMELOCK = 2 days`, `PROPOSER_BOND = 0.05 QOR`, registry `threshold = 1`.
+Verifier: `0x9E9745aABd5706291C0D4CA2FD2022B832a875c8`. Carrier (Demo, `LOG-DEMO-001`):
+`0xd2908Fd85fc5D5141AD2Bdd3913394245236Ec41`.
+
+### v5 hardening (summary — full mapping in `docs/AUDIT.md`)
+
+- Carrier attestation is bound to `(carrier, escrow, tracking, status, nonce,
+  freshness)`; only `DELIVERED` counts; the caller must be the escrow's partner.
+- Delivery deadlines are bounded `[1 day, 90 days]`; buyer must hold a proven key.
+- Platform fee + treasury are snapshotted per escrow at creation.
+- Verifier attestation requires the registry threshold (M-of-N).
+- Money paths are reentrancy-guarded with a push-with-credit fallback.
+- DAO governance: `(target, selector)` allowlist, quorum, timelock, proposer bond.
+
+### v5 end-to-end evidence (24 November 2026)
+
+`tools/e2e_flow.py` against vault `0x979d…b007` — full PQ-gated release:
+
+| Step | Transaction |
+|---|---|
+| createEscrow #1 (funded atomically) | `0x6d08013616c75a7fde269f07fe3827559d3ea3c1ae502e869742150b5c2d4bff` |
+| confirmReceipt | `0xb946f50bc0791bda706b33c48ba9d61a59aa4222eb9a847f5f38162cdb27d7c2` |
+| release (ML-DSA-87 verified on-chain via `pqcVerify`) | `0x25b1fa6d99fdc1e0dd7b22acbf127b8ad81dcbe7c8f165ace5df1c51ddc37570` |
+
+Observed: seller received 49,000 uqor (50,000 − 2% fee), escrow **Completed**,
+per-escrow nonce advanced to 1.
+
+## v4 — logistics stack (19 November 2026; superseded by v5)
+
+| Contract | Address | Notes |
+|---|---|---|
+| SweeftOracleRegistry (v4) | `0xecb16561cfdff10336b278f8107a077fe7a53c6d` | kept across v3/v4 |
+| SweeftVault (v4) | `0x7c170ec8ab48dfa5c86ce96c9bd4d21af6d84fc9` | carrier attestation + logistics split |
+| SweeftMarketplace (v4) | `0xa2075dbca3a80192e1158cba4a822bfe835c3ea6` | physical listings carry logistics allocation |
+| SweeftDisputeBoard (v4) | `0x3fe1c7e2c014b4ec9c847cc35718449245eaacb1` | staked resolver panels (20 QOR min) |
+| SweeftDAO2 (v4) | `0x1af66554af38e16458c0b72352517483723379db` | owned vault + board |
 | SweeftDAO (v1) | `0x03a0c71c42dcef463f8b472cb39991cedac2dc1b` | executed the registry migration |
 
 ### v4 additions (logistics — Phase 2)

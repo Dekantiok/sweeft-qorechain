@@ -116,7 +116,7 @@ class Runner:
         print()
 
         escrow_id = self.vault.functions.escrowCount().call()
-        deadline = self.w3.eth.get_block("latest")["timestamp"] + 86_400
+        deadline = self.w3.eth.get_block("latest")["timestamp"] + 172_800
         print(f"[1/4] createEscrow id={escrow_id} amount={AMOUNT} uqor (funded atomically)")
         result = self._send(
             self.vault.functions.createEscrow(
@@ -147,7 +147,7 @@ class Runner:
         print("[4/4] release(escrowId, signature) — precompile verifies on-chain")
         seller_before = self.w3.eth.get_balance(self.w3.to_checksum_address(self.seller.evm))
         result = self._send(
-            self.vault.functions.release(escrow_id, signature), gas=8_000_000
+            self.vault.functions.release(escrow_id, signature), gas=600_000
         )
         self.results["release"] = result
         print(f"      tx {result['hash']}")
@@ -156,16 +156,19 @@ class Runner:
         delta = seller_after - seller_before
         escrow = self.vault.functions.getEscrow(escrow_id).call()
         status = escrow[5]
+        # Platform fee is 2% of the escrowed amount, charged on release.
+        fee = (AMOUNT * 200) // 10_000
+        expected = AMOUNT - fee
 
         print()
         print("=" * 64)
-        print(f"seller received : {delta} uqor ({delta / 1_000_000:.6f} QOR)")
+        print(f"seller received : {delta} uqor ({delta / 1_000_000:.6f} QOR) — expected {expected} (amount {AMOUNT} - 2% fee {fee})")
         print(f"escrow status   : {status} (2 = Completed)")
         print(f"nonce after     : {self.vault.functions.escrowNonce(escrow_id).call()}")
         for name in ("create", "confirm", "release"):
             print(f"{name:7s} tx      : {self.results[name]['hash']}")
 
-        if status != 2 or delta != AMOUNT:
+        if status != 2 or delta != expected:
             _die("final assertions failed")
         print()
         print("END-TO-END PQ RELEASE: PASS")

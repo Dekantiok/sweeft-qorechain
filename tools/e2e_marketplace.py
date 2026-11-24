@@ -134,7 +134,9 @@ def main() -> None:
     print()
     print("[buy] buyer purchases — escrow created and funded atomically")
     escrow_id = vault.functions.escrowCount().call()
-    deadline = w3.eth.get_block("latest")["timestamp"] + DELIVERY_WINDOW
+    # v5 bounds the deadline to [1 day, 90 days]; use 2 days and then confirm
+    # receipt (the buyer-confirmation release path).
+    deadline = w3.eth.get_block("latest")["timestamp"] + 172_800
     result = lib.send_evm_expect_success(
         w3, buyer, market.functions.purchase(listing_id, deadline, PRICE, metadata_hash), value=PRICE, gas=800_000
     )
@@ -160,13 +162,11 @@ def main() -> None:
 
     # ------------------------------------------------------------------
     print()
-    print(f"[settle] waiting for the inspection window ({DELIVERY_WINDOW}s)")
-    for _ in range(60):
-        if vault.functions.isReleaseEligible(escrow_id).call():
-            break
-        time.sleep(5)
+    print("[settle] buyer confirms receipt — release becomes eligible")
+    result = lib.send_evm_expect_success(w3, buyer, vault.functions.confirmReceipt(escrow_id), gas=200_000)
+    print(f"      tx {result['hash']}")
     if not vault.functions.isReleaseEligible(escrow_id).call():
-        lib.die("escrow never became release-eligible")
+        lib.die("escrow not release-eligible after confirmation")
 
     print("[settle] buyer signs the release message with ML-DSA-87 (QoreX format)")
     nonce = vault.functions.escrowNonce(escrow_id).call()

@@ -44,7 +44,7 @@ def main():
 
     # 2. buyer purchases, pinning price + metadata hash (v5)
     escrow_id = vault.functions.escrowCount().call()
-    deadline = w3.eth.get_block("latest")["timestamp"] + 86400
+    deadline = w3.eth.get_block("latest")["timestamp"] + 172800
     r = lib.send_evm_expect_success(
         w3, buyer, market.functions.purchase(listing_id, deadline, price, meta_hash), value=price, gas=800_000
     )
