@@ -50,6 +50,11 @@ Every High/Medium is one of four by-design patterns (full triage in
 | `divide-before-multiply` (6) | `_payoutFirstRound`, `_finalizeAppeal` | Intentional dust rounding on `perVoter = fee / voters`; total paid never exceeds the bond |
 | `unused-return` (3) | `_require*Signature` | `pqcKeyStatus` fields (algorithm/pubkey) intentionally unread; `registered`/`proven` are checked |
 
+CI (`crytic/slither-action`, `fail-on: medium`) excludes exactly these five
+detector classes via `slither-args` — all other detectors still block on
+Medium+. Excluding in CI (rather than comment-disabling in source) keeps the
+audited bundle byte-identical to the deployed code.
+
 ## Dependency audit — pip-audit on v6
 
 CI (`pip-audit -r requirements.txt`, blocking) initially failed 2026-11-25:
