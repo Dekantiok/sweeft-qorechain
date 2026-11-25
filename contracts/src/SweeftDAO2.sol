@@ -317,17 +317,19 @@ contract SweeftDAO2 {
             return "";
         }
 
+        // State first (CEI): the proposal is marked Executed before the
+        // external call, so a re-entered call sees a closed proposal. A
+        // failing target flips it to Failed (funds still go to treasury).
+        p.state = ProposalState.Executed;
         bool ok;
         (ok, result) = p.target.call(p.callData);
         if (!ok) {
-            // Mark Failed rather than reverting, so it cannot stay Open forever.
             p.state = ProposalState.Failed;
             _payTreasury(PROPOSER_BOND);
             emit ProposalFailed(proposalId, result);
             return result;
         }
 
-        p.state = ProposalState.Executed;
         _refundBond(p.proposer);
         emit ProposalExecuted(proposalId, result);
     }

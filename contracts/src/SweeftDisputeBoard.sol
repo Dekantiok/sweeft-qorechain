@@ -425,8 +425,10 @@ contract SweeftDisputeBoard {
         if (d.state != DisputeState.Resolved) revert DisputeNotOpen();
         if (block.timestamp < d.unlockAt) revert AppealWindowActive();
 
-        _payoutFirstRound(disputeId, d);
+        // State first (CEI): the dispute is Final before any payout or the
+        // external vault call, so a re-entered call sees a closed dispute.
         d.state = DisputeState.Final;
+        _payoutFirstRound(disputeId, d);
         vault.resolveDispute(d.escrowId, d.releaseToSeller);
         emit DisputeSettled(disputeId, d.escrowId, d.releaseToSeller);
     }
@@ -525,6 +527,11 @@ contract SweeftDisputeBoard {
             }
         }
 
+        // State first (CEI): Final + the final outcome are recorded before
+        // any payout or the external vault call.
+        d.state = DisputeState.Final;
+        d.releaseToSeller = finalOutcome;
+
         _payoutFirstRound(disputeId, d);
 
         // Appeal panel is paid from the appeal bond for either outcome.
@@ -552,8 +559,6 @@ contract SweeftDisputeBoard {
             }
         }
 
-        d.state = DisputeState.Final;
-        d.releaseToSeller = finalOutcome;
         vault.resolveDispute(d.escrowId, finalOutcome);
         emit AppealResolved(disputeId, finalOutcome, overturned);
         emit DisputeSettled(disputeId, d.escrowId, finalOutcome);
@@ -587,6 +592,10 @@ contract SweeftDisputeBoard {
         }
     }
 
+    /// @notice Upper bound on panel-draw attempts per dispute, as a multiple
+    ///         of the pool size (QC4-6: explicitly bounded loop).
+    uint256 public constant MAX_DRAW_ATTEMPTS_PER_POOL = 6;
+
     function _drawPanel(
         Dispute storage d,
         SweeftVault.Escrow memory escrow,
@@ -595,14 +604,16 @@ contract SweeftDisputeBoard {
     ) internal returns (uint8 chosen) {
         uint256 required = minStakeFor(escrow.amount);
         uint256 n = resolverPool.length;
-        uint256 attempts;
+        if (n == 0) return 0;
 
-        while (chosen < size && n > 0 && attempts < n * 6) {
+        // Bounded for-loop: at most n * MAX_DRAW_ATTEMPTS_PER_POOL iterations,
+        // whatever the pool contains (parties/verifier/carrier are skipped).
+        uint256 maxAttempts = n * MAX_DRAW_ATTEMPTS_PER_POOL;
+        for (uint256 attempts; attempts < maxAttempts && chosen < size; attempts++) {
             uint256 idx = uint256(
                 keccak256(abi.encode(block.prevrandao, d.escrowId, round, chosen, attempts))
             ) % n;
             address cand = resolverPool[idx];
-            attempts++;
 
             if (d.roundOf[cand] != 0) continue; // already on a panel
             if (stakeOf[cand] < required) continue;

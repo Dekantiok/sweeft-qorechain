@@ -625,6 +625,9 @@ contract SweeftVault {
     }
 
     function _feeForAmount(uint256 amount, uint256 bps) internal pure returns (uint256) {
+        // Explicit overflow guard (QC4-3): Solidity >=0.8 would revert, but
+        // the check makes the bound visible to auditors and static tools.
+        if (bps > 0 && amount > type(uint256).max / bps) revert InvalidAmount();
         return (amount * bps) / 10_000;
     }
 

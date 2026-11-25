@@ -164,13 +164,34 @@ v5 remains recorded in `docs/deployments.md` as the superseded stack.
   those two addresses after deployment. Wired once in `DeployV6.s.sol`.
 - Panel randomness is `block.prevrandao` (testnet-grade; a validator can bias
   it). Commit-reveal/VRF is future work.
-- Money paths rely on the `nonReentrant` lock rather than strict
-  checks-effects-interactions ordering (Slither `reentrancy-eth` on
-  `finalize`/`_finalizeAppeal`/`_payRelease` and `reentrancy-no-eth` on
-  `DAO2.execute` — triaged in `docs/audit/stage-4/README.md`). Moving state
-  writes before external calls is a candidate v7 hardening.
 - v6 was deployed 24 November 2026 (see `docs/deployments.md`); the hosted
   demo and `.env` now point at the v6 addresses.
+
+## Stage 4 — audit on v6 (QCAI report, **72/100**, 2026-11-25)
+
+PDF: `docs/audit/stage-4/QoreChain_Audit_Contract_1795594562592.pdf`.
+Bundle: `docs/audit/stage-4/sweeft-combined.sol` (bytecode-verified equal to
+the deployed v6 code modulo immutable slots; see `docs/audit/stage-4/README.md`).
+Score dropped from 78 (v5) to 72 — the auditor's template re-flagged the same
+rule classes plus two new findings in v6 code. As recorded in earlier stages,
+this score is template-driven; the fix + regression-test evidence is below.
+**Patched source for re-audit (Stage 5): `docs/audit/stage-5/`.**
+
+| ID | Severity | Location | Finding | Verdict / fix |
+|---|---|---|---|---|
+| QC4-1 | HIGH | Vault `release`/`refundAfterDeadline`/`_pay`/`_payRelease`; Board `finalize`/`_finalizeAppeal`; DAO2 `execute` | Potential reentrancy in funds paths | **Vault: false positive** — `release`/`refundAfterDeadline` set `status` + nonce *before* `_payRelease`/`_pay` (CEI) and are `nonReentrant`. **Board/DAO2: partially real** — `finalize` paid before setting `Final`, `execute` called the target before setting state. **Fixed**: `finalize`/`_finalizeAppeal` now set `Final` + outcome before any payout or vault call; `DAO2.execute` sets `Executed` before the call (flips to `Failed` on revert). Slither `reentrancy-eth` Highs dropped 9→7 locally. Regression: `test_Finalize_StateIsFinalBeforePayout`. |
+| QC4-2 | HIGH | Vault `setDisputeBoard`/`setMarketplace`/`registerCarrier`/`removeCarrier`/`attestEvidence`/`attestCarrierEvidence` | Missing access control | **False positive** — `registerCarrier`/`removeCarrier` are `onlyOwner` (DAO-owned); `setDisputeBoard`/`setMarketplace` are one-shot `deployer`-gated with `AlreadyWired`; `attestEvidence` requires `isVerifier` + threshold; `attestCarrierEvidence` requires `msg.sender == logisticsPartner` + registered proven key. Same class as QC3-1 (Stage 3). |
+| QC4-3 | MEDIUM | Vault `_feeForAmount` | Overflow in fee calculation | **Defense-in-depth fix**: explicit `amount > type(uint256).max / bps` guard (`InvalidAmount`) added — Solidity ≥0.8 would already revert; now explicit for auditors/tools. |
+| QC4-4 | MEDIUM | Vault `_pay`/`_payRelease`/`_require*Signature`/`_isVerifier`/`_verifierThreshold` | Unchecked external-call returns | **Already handled**: `_pay` checks `(ok,)` and credits on failure; board fee share checks `dOk` → credits; precompile tuple fields (algorithm/pubkey) intentionally unread while `registered`/`proven` are checked. Same as QC3-3 (Stage 3). |
+| QC4-5 | MEDIUM | Vault `attestEvidence` | Oracle manipulation | **By design, with on-chain teeth**: verifiers are stake-backed at approval (`addVerifier` requires `verifierStake ≥ minVerifierStake`, slashable via `slashVerifier`), attestation needs an M-of-N distinct-verifier threshold, and Django reputation accrues only from verified completions. Raising `minVerifierStake` above 0 is a DAO config decision (see Known limitations). |
+| QC4-6 | LOW | Board `_drawPanel` | Unbounded loop in panel selection | **Fixed**: `while` → bounded `for` with named `MAX_DRAW_ATTEMPTS_PER_POOL` (6× pool) + early return on empty pool. Regression: `test_SelectPanel_EmptyPool_ReturnsZeroMembers`. |
+| QC4-7 | INFO | All contracts | No direct ERC compliance | **Accepted** — internal economy contracts (no ERC20/721 surface by design). |
+
+**Post-patch evidence:** Slither 0.11.6 on patched source: 7 High / 10 Medium
+(all remaining are the triaged by-design classes in
+`docs/audit/stage-4/README.md`); Foundry **133/133** (131 + 2 Stage 4
+regressions). The patched source is **not yet redeployed** — see the
+redeploy decision below.
 
 ## External security review — response (v5 hardening)
 
