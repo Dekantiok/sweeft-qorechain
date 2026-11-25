@@ -7,6 +7,11 @@ guard. **Not yet redeployed** — see `REDEPLOY` below.
 
 ## Submission (manual step — dashboard sign-in required)
 
+Done 2026-11-25: fresh audit returned report
+`QoreChain_Audit_Contract_1795595561507.pdf` (**72/100**, same 7 findings;
+see `docs/AUDIT.md` Stage 5). The earlier identical PDF was a cached
+re-run and was discarded.
+
 1. Regenerate if `contracts/src/` changed:
    ```
    .venv/bin/python tools/bundle_contracts.py stage-5
@@ -29,10 +34,9 @@ guard. **Not yet redeployed** — see `REDEPLOY` below.
 
 Tests: 133/133 Foundry (2 new regressions), 28/28 Django.
 
-## REDEPLOY
+## REDEPLOY — done 2026-11-25
 
-The live v6 stack (see `docs/deployments.md`) still runs the pre-patch
-bytecode. Deploying the patch means a new stack (v7) via
-`contracts/script/DeployV6.s.sol` (same wiring, new addresses) plus updating
-`.env`/hosted env; escrows #2/#3 on the v6 vault remain settleable on v6
-(do not abandon them mid-flight). Decide with the team before broadcasting.
+The patched source is now **live as v7** (Vault `0xA575…1c6`; see
+`docs/deployments.md`). v6 remains deployed and settleable; all new
+trades use v7. The Stage 5 audit was run on the same source (report above),
+so audited code == live code.

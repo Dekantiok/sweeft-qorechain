@@ -1,0 +1,790 @@
+%PDF-1.3
+%ºß¬à
+3 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 595.2799999999999727 841.8899999999999864]
+/Contents 4 0 R
+>>
+endobj
+4 0 obj
+<<
+/Length 10371
+>>
+stream
+0.5670000000000001 w
+0 G
+BT
+/F1 22 Tf
+25.2999999999999972 TL
+0.063 0.725 0.506 rg
+39.6850393700787407 785.1970866141732586 Td
+(QoreChain AI) Tj
+ET
+BT
+/F1 16 Tf
+18.3999999999999986 TL
+0.157 g
+39.6850393700787407 756.8506299212598378 Td
+(Security Audit Report) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.392 g
+39.6850393700787407 728.5041732283464171 Td
+(Generated: 11/25/2026, 9:32:41 AM) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.392 g
+39.6850393700787407 700.15771653543311 Td
+(Blockchain: ethereum) Tj
+ET
+0.78 G
+39.6850393700787407 685.9844881889763428 m
+555.5905511811024553 685.9844881889763428 l
+S
+BT
+/F1 12 Tf
+13.7999999999999989 TL
+0. g
+39.6850393700787407 657.6380314960629221 Td
+(Audit Overview) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0. g
+39.6850393700787407 629.291574803149615 Td
+(Overall Security Score: 72/100) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0. g
+39.6850393700787407 615.1183464566928478 Td
+(Risk Level: HIGH) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0. g
+39.6850393700787407 600.9451181102361943 Td
+(Quantum Readiness: not scored for this setting) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0. g
+39.6850393700787407 586.7718897637794271 Td
+(Total Vulnerabilities: 7) Tj
+ET
+BT
+/F1 12 Tf
+13.7999999999999989 TL
+0. g
+39.6850393700787407 544.2522047244094665 Td
+(Executive Summary) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.235 g
+39.6850393700787407 515.9057480314959321 Td
+(The SweeftVault contract presents several high-risk vulnerabilities including potential reentrancy attacks, missing) Tj
+T* (access controls, and unchecked external calls. While the contract implements some security measures like PQC) Tj
+T* (signatures and reentrancy guards, there are still significant areas for improvement. The codebase is complex with) Tj
+T* (multiple interconnected contracts, making thorough testing and auditing essential.) Tj
+ET
+0.78 G
+0.5670000000000001 w
+0.78 G
+0.5670000000000001 w
+0.06 0.73 0.51 rg
+0.78 G
+0. w
+0.06 0.73 0.51 rg
+40. 430.8663779527558404 77.1489892782845743 -21.4999999999999964 re
+f
+BT
+/F2 10 Tf
+11.5 TL
+1. g
+45. 417.3663779527558972 Td
+(Vulnerability) Tj
+ET
+0.06 0.73 0.51 rg
+0.78 G
+0. w
+0.06 0.73 0.51 rg
+117.1489892782845743 430.8663779527558404 48.6000000000000014 -21.4999999999999964 re
+f
+BT
+/F2 10 Tf
+11.5 TL
+1. g
+122.1489892782845601 417.3663779527558972 Td
+(Severity) Tj
+ET
+0.06 0.73 0.51 rg
+0.78 G
+0. w
+0.06 0.73 0.51 rg
+165.7489892782845686 430.8663779527558404 162.0100000000000477 -21.4999999999999964 re
+f
+BT
+/F2 10 Tf
+11.5 TL
+1. g
+170.7489892782845686 417.3663779527558972 Td
+(Location) Tj
+ET
+0.06 0.73 0.51 rg
+0.78 G
+0. w
+0.06 0.73 0.51 rg
+327.7589892782846164 430.8663779527558404 227.5210107217778557 -21.4999999999999964 re
+f
+BT
+/F2 10 Tf
+11.5 TL
+1. g
+332.7589892782845595 417.3663779527558972 Td
+(Recommendation) Tj
+ET
+0.78 G
+0.5670000000000001 w
+0.96 g
+0.78 G
+0. w
+0.96 g
+40. 409.3663779527558404 77.1489892782845743 -61.75 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+45. 396.71637795275592 Td
+(Potential) Tj
+T* (Reentrancy in) Tj
+T* (Funds Release) Tj
+T* (and Refund) Tj
+T* (Functions) Tj
+ET
+0.96 g
+0.78 G
+0. w
+0.96 g
+117.1489892782845743 409.3663779527558404 48.6000000000000014 -61.75 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+122.1489892782845601 396.71637795275592 Td
+(HIGH) Tj
+ET
+0.96 g
+0.78 G
+0. w
+0.96 g
+165.7489892782845686 409.3663779527558404 162.0100000000000477 -61.75 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+170.7489892782845686 396.71637795275592 Td
+(SweeftVault.sol:release\(\),) Tj
+T* (SweeftVault.sol:refundAfterDeadline\(\),) Tj
+T* (SweeftVault.sol:_payRelease\(\),) Tj
+T* (SweeftVault.sol:_pay\(\)) Tj
+ET
+0.96 g
+0.78 G
+0. w
+0.96 g
+327.7589892782846164 409.3663779527558404 227.5210107217778557 -61.75 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+332.7589892782845595 396.71637795275592 Td
+(Use the Checks-Effects-Interactions pattern more) Tj
+T* (strictly. Ensure all state changes are completed before) Tj
+T* (making external calls. Consider using a more robust) Tj
+T* (reentrancy guard mechanism.) Tj
+ET
+1. g
+0.78 G
+0. w
+1. g
+40. 347.6163779527558972 77.1489892782845743 -51.3999999999999986 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+45. 334.96637795275592 Td
+(Missing Access) Tj
+T* (Control on) Tj
+T* (Critical) Tj
+T* (Functions) Tj
+ET
+1. g
+0.78 G
+0. w
+1. g
+117.1489892782845743 347.6163779527558972 48.6000000000000014 -51.3999999999999986 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+122.1489892782845601 334.96637795275592 Td
+(HIGH) Tj
+ET
+1. g
+0.78 G
+0. w
+1. g
+165.7489892782845686 347.6163779527558972 162.0100000000000477 -51.3999999999999986 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+170.7489892782845686 334.96637795275592 Td
+(SweeftVault.sol:setDisputeBoard\(\),) Tj
+T* (SweeftVault.sol:setMarketplace\(\)) Tj
+ET
+1. g
+0.78 G
+0. w
+1. g
+327.7589892782846164 347.6163779527558972 227.5210107217778557 -51.3999999999999986 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+332.7589892782845595 334.96637795275592 Td
+(Ensure these functions are properly restricted and) Tj
+T* (consider adding additional validation to prevent) Tj
+T* (unintended modifications.) Tj
+ET
+0.96 g
+0.78 G
+0. w
+0.96 g
+40. 296.2163779527558631 77.1489892782845743 -41.0499999999999972 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+45. 283.5663779527559427 Td
+(Potential) Tj
+T* (Overflow in Fee) Tj
+T* (Calculation) Tj
+ET
+0.96 g
+0.78 G
+0. w
+0.96 g
+117.1489892782845743 296.2163779527558631 48.6000000000000014 -41.0499999999999972 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+122.1489892782845601 283.5663779527559427 Td
+(MEDIUM) Tj
+ET
+0.96 g
+0.78 G
+0. w
+0.96 g
+165.7489892782845686 296.2163779527558631 162.0100000000000477 -41.0499999999999972 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+170.7489892782845686 283.5663779527559427 Td
+(SweeftVault.sol:_feeForAmount\(\)) Tj
+ET
+0.96 g
+0.78 G
+0. w
+0.96 g
+327.7589892782846164 296.2163779527558631 227.5210107217778557 -41.0499999999999972 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+332.7589892782845595 283.5663779527559427 Td
+(Use SafeMath or similar libraries to ensure all) Tj
+T* (arithmetic operations are safe from overflow/underflow.) Tj
+ET
+1. g
+0.78 G
+0. w
+1. g
+40. 255.1663779527558233 77.1489892782845743 -41.0499999999999972 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+45. 242.5163779527558745 Td
+(Unchecked) Tj
+T* (Returns from) Tj
+T* (External Calls) Tj
+ET
+1. g
+0.78 G
+0. w
+1. g
+117.1489892782845743 255.1663779527558233 48.6000000000000014 -41.0499999999999972 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+122.1489892782845601 242.5163779527558745 Td
+(MEDIUM) Tj
+ET
+1. g
+0.78 G
+0. w
+1. g
+165.7489892782845686 255.1663779527558233 162.0100000000000477 -41.0499999999999972 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+170.7489892782845686 242.5163779527558745 Td
+(SweeftVault.sol:_pay\(\),) Tj
+T* (SweeftVault.sol:_payRelease\(\),) Tj
+T* (SweeftDisputeBoard.sol:_send\(\)) Tj
+ET
+1. g
+0.78 G
+0. w
+1. g
+327.7589892782846164 255.1663779527558233 227.5210107217778557 -41.0499999999999972 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+332.7589892782845595 242.5163779527558745 Td
+(Always check the return value of external calls and) Tj
+T* (handle failures appropriately, such as using fallback) Tj
+T* (credits.) Tj
+ET
+0.96 g
+0.78 G
+0. w
+0.96 g
+40. 214.116377952755812 77.1489892782845743 -41.0499999999999972 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+45. 201.4663779527558063 Td
+(Potential Oracle) Tj
+T* (Manipulation) Tj
+ET
+0.96 g
+0.78 G
+0. w
+0.96 g
+117.1489892782845743 214.116377952755812 48.6000000000000014 -41.0499999999999972 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+122.1489892782845601 201.4663779527558063 Td
+(MEDIUM) Tj
+ET
+0.96 g
+0.78 G
+0. w
+0.96 g
+165.7489892782845686 214.116377952755812 162.0100000000000477 -41.0499999999999972 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+170.7489892782845686 201.4663779527558063 Td
+(SweeftVault.sol:_isVerifier\(\),) Tj
+T* (SweeftVault.sol:_verifierThreshold\(\)) Tj
+ET
+0.96 g
+0.78 G
+0. w
+0.96 g
+327.7589892782846164 214.116377952755812 227.5210107217778557 -41.0499999999999972 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+332.7589892782845595 201.4663779527558063 Td
+(Implement additional checks or fallback mechanisms) Tj
+T* (for oracle interactions to mitigate potential) Tj
+T* (manipulation risks.) Tj
+ET
+1. g
+0.78 G
+0. w
+1. g
+40. 173.0663779527557722 77.1489892782845743 -41.0499999999999972 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+45. 160.4163779527558518 Td
+(Unbounded) Tj
+T* (Loop in Panel) Tj
+T* (Drawing) Tj
+ET
+1. g
+0.78 G
+0. w
+1. g
+117.1489892782845743 173.0663779527557722 48.6000000000000014 -41.0499999999999972 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+122.1489892782845601 160.4163779527558518 Td
+(LOW) Tj
+ET
+1. g
+0.78 G
+0. w
+1. g
+165.7489892782845686 173.0663779527557722 162.0100000000000477 -41.0499999999999972 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+170.7489892782845686 160.4163779527558518 Td
+(SweeftDisputeBoard.sol:_drawPanel\(\)) Tj
+ET
+1. g
+0.78 G
+0. w
+1. g
+327.7589892782846164 173.0663779527557722 227.5210107217778557 -41.0499999999999972 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+332.7589892782845595 160.4163779527558518 Td
+(Consider adding a maximum iteration limit or) Tj
+T* (alternative drawing mechanism to prevent excessive) Tj
+T* (gas consumption.) Tj
+ET
+0.96 g
+0.78 G
+0. w
+0.96 g
+40. 132.0163779527557608 77.1489892782845743 -41.0499999999999972 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+45. 119.3663779527557836 Td
+(No ERC) Tj
+T* (Standards) Tj
+T* (Implemented) Tj
+ET
+0.96 g
+0.78 G
+0. w
+0.96 g
+117.1489892782845743 132.0163779527557608 48.6000000000000014 -41.0499999999999972 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+122.1489892782845601 119.3663779527557836 Td
+(INFO) Tj
+ET
+0.96 g
+0.78 G
+0. w
+0.96 g
+165.7489892782845686 132.0163779527557608 162.0100000000000477 -41.0499999999999972 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+170.7489892782845686 119.3663779527557836 Td
+(All contracts) Tj
+ET
+0.96 g
+0.78 G
+0. w
+0.96 g
+327.7589892782846164 132.0163779527557608 227.5210107217778557 -41.0499999999999972 re
+f
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.314 g
+332.7589892782845595 119.3663779527557836 Td
+(Consider implementing relevant ERC standards where) Tj
+T* (applicable to improve interoperability.) Tj
+ET
+0.78 G
+0.5670000000000001 w
+0.78 G
+0. w
+0.78 G
+0.5670000000000001 w
+0.78 G
+0.5670000000000001 w
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.588 g
+227.5977952755905562 19.8427559055116944 Td
+(Page 1 of 1 - Powered by QoreChain AI) Tj
+ET
+endstream
+endobj
+1 0 obj
+<</Type /Pages
+/Kids [3 0 R ]
+/Count 1
+>>
+endobj
+5 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+6 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+7 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-Oblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+8 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-BoldOblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+9 0 obj
+<<
+/Type /Font
+/BaseFont /Courier
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+10 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+11 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-Oblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+12 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-BoldOblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+13 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Roman
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+14 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+15 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Italic
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+16 0 obj
+<<
+/Type /Font
+/BaseFont /Times-BoldItalic
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+17 0 obj
+<<
+/Type /Font
+/BaseFont /ZapfDingbats
+/Subtype /Type1
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+18 0 obj
+<<
+/Type /Font
+/BaseFont /Symbol
+/Subtype /Type1
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+2 0 obj
+<<
+/ProcSet [/PDF /Text /ImageB /ImageC /ImageI]
+/Font <<
+/F1 5 0 R
+/F2 6 0 R
+/F3 7 0 R
+/F4 8 0 R
+/F5 9 0 R
+/F6 10 0 R
+/F7 11 0 R
+/F8 12 0 R
+/F9 13 0 R
+/F10 14 0 R
+/F11 15 0 R
+/F12 16 0 R
+/F13 17 0 R
+/F14 18 0 R
+>>
+/XObject <<
+>>
+>>
+endobj
+19 0 obj
+<<
+/Producer (jsPDF 4.0.0)
+/CreationDate (D:20261125093241+01'00')
+>>
+endobj
+20 0 obj
+<<
+/Type /Catalog
+/Pages 1 0 R
+/OpenAction [3 0 R /FitH null]
+/PageLayout /OneColumn
+>>
+endobj
+xref
+0 21
+0000000000 65535 f 
+0000010576 00000 n 
+0000012393 00000 n 
+0000000015 00000 n 
+0000000152 00000 n 
+0000010633 00000 n 
+0000010758 00000 n 
+0000010888 00000 n 
+0000011021 00000 n 
+0000011158 00000 n 
+0000011281 00000 n 
+0000011410 00000 n 
+0000011542 00000 n 
+0000011678 00000 n 
+0000011806 00000 n 
+0000011933 00000 n 
+0000012062 00000 n 
+0000012195 00000 n 
+0000012297 00000 n 
+0000012641 00000 n 
+0000012727 00000 n 
+trailer
+<<
+/Size 21
+/Root 20 0 R
+/Info 19 0 R
+/ID [ <61800EF072FAC0370ED9D2BF5B2DAB43> <61800EF072FAC0370ED9D2BF5B2DAB43> ]
+>>
+startxref
+12831
+%%EOF

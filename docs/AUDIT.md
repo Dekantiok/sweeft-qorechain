@@ -193,6 +193,39 @@ this score is template-driven; the fix + regression-test evidence is below.
 regressions). The patched source is **not yet redeployed** — see the
 redeploy decision below.
 
+## Stage 5 — audit on patched v6 (QCAI report, **72/100**, 2026-11-25)
+
+PDF: `docs/audit/stage-5/QoreChain_Audit_Contract_1795595561507.pdf`
+(a genuinely fresh submission — new report ID; the first "Stage 5" PDF was
+byte-identical to Stage 4 and was discarded).
+Bundle: `docs/audit/stage-5/sweeft-combined.sol` (the patched source).
+
+**Verdict: the score did not move (72), but the findings did.** Score is
+rule-template-driven: the loop fix, the overflow guard and the CEI reorder
+are all in the audited code, yet `Unbounded Loop`/`Overflow`/`Reentrancy`
+still fire on the same functions (the auditor wants "SafeMath"/"maximum
+iteration limit" textually; our `MAX_DRAW_ATTEMPTS_PER_POOL` and
+`type(uint256).max / bps` guard are functionally those things). This matches
+the Stage 1→3 pattern (72→72→78) and Haven Escrow's 35/100 — the jury value
+is the mapping below, not the number. The patched stack is now **live as
+v7** (see `docs/deployments.md`).
+
+| ID (Stage 4 → 5) | Severity | Stage 5 status |
+|---|---|---|
+| QC4-1 reentrancy | HIGH | Same flag (Vault `release`/`refund`/`_pay`/`_payRelease` — already CEI + `nonReentrant`; Board/DAO2 reordered in the patch). No change in verdict. |
+| QC4-2 access control | HIGH | **Narrowed**: only `setDisputeBoard`/`setMarketplace` flagged now (was 6 functions). `registerCarrier`/`removeCarrier`/`attestEvidence`/`attestCarrierEvidence` acknowledged as controlled. Remaining two are one-shot deployer-gated (`AlreadyWired`) — a design commitment, documented as a known limitation. |
+| QC4-3 overflow | MEDIUM | Same flag despite the explicit guard (`Use SafeMath` is template text; Solidity ≥0.8 checked math + guard). |
+| QC4-4 unchecked returns | MEDIUM | Same class, now also names Board `_send` (checked `(ok,)` → credits fallback). |
+| QC4-5 oracle manipulation | MEDIUM | Moved to `_isVerifier`/`_verifierThreshold` (fail-closed `RegistryUnavailable`, stake-backed verifiers — see Stage 4 row). |
+| QC4-6 unbounded loop | LOW | Same flag despite `MAX_DRAW_ATTEMPTS_PER_POOL` bounded `for` (auditor wants a "maximum iteration limit" — we have one; template doesn't credit it). |
+| QC4-7 ERC compliance | INFO | Unchanged, accepted. |
+
+**Bottom line:** two audit rounds on ~identical templates (72 → 72) with real
+code improvements in between (Slither Highs 9→7, 133 tests) prove the score
+is not code-responsive. Sweeft's audit story for the jury is: QCAI 78/100
+(v5) + 72/100 on v6/v7 with every finding mapped to a fix or a documented
+false positive — stronger evidence than any single number.
+
 ## External security review — response (v5 hardening)
 
 A line-by-line external review of `contracts/src/*` and the Django apps produced
