@@ -2,21 +2,24 @@
 """Bundle contracts/src/*.sol into one file for the QCAI Contract Auditor.
 
 Usage:
-    .venv/bin/python tools/bundle_contracts.py
+    .venv/bin/python tools/bundle_contracts.py [stage]
 
-Writes docs/audit/stage-3/sweeft-combined.sol and a tarball of the sources.
+Writes docs/audit/<stage>/sweeft-combined.sol and a tarball of the sources.
+Defaults to stage-3 (historical); pass "stage-4" for the v6 audit.
 """
 
 from __future__ import annotations
 
+import sys
 import tarfile
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 SRC = REPO / "contracts" / "src"
-OUT_DIR = REPO / "docs" / "audit" / "stage-3"
+STAGE = sys.argv[1] if len(sys.argv) > 1 else "stage-3"
+OUT_DIR = REPO / "docs" / "audit" / STAGE
 OUT = OUT_DIR / "sweeft-combined.sol"
-TARBALL = OUT_DIR / "sweeft-contracts-stage3.tar.gz"
+TARBALL = OUT_DIR / f"sweeft-contracts-{STAGE.replace('stage-', '')}.tar.gz"
 
 # Deterministic order: core vault first, then the rest.
 ORDER = [

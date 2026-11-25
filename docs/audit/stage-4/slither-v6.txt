@@ -1,0 +1,401 @@
+'forge clean' running (wd: /root/projects/sweeft-qorechain/contracts)
+'forge config --json' running
+'forge build --build-info --deny never --skip ./test/** ./script/** --force' running (wd: /root/projects/sweeft-qorechain/contracts)
+INFO:Detectors:
+Detector: arbitrary-send-eth
+SweeftDAO2._payTreasury(uint256) (src/SweeftDAO2.sol#403-407) sends eth to arbitrary user
+	Dangerous calls:
+	- (ok,None) = treasury.call{value: amount}() (src/SweeftDAO2.sol#405)
+SweeftDisputeBoard._send(address,uint256) (src/SweeftDisputeBoard.sol#642-646) sends eth to arbitrary user
+	Dangerous calls:
+	- (ok,None) = address(to).call{value: amount}() (src/SweeftDisputeBoard.sol#644)
+SweeftVault._payRelease(uint256,SweeftVault.Escrow) (src/SweeftVault.sol#641-683) sends eth to arbitrary user
+	Dangerous calls:
+	- (dOk,None) = disputeBoard.call{value: disputeShare}(abi.encodeWithSignature(receiveFeeShare())) (src/SweeftVault.sol#671-673)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#functions-that-send-ether-to-arbitrary-destinations
+INFO:Detectors:
+Detector: reentrancy-eth
+Reentrancy in SweeftDisputeBoard._finalizeAppeal(uint256,SweeftDisputeBoard.Dispute,bool) (src/SweeftDisputeBoard.sol#505-560):
+	External calls:
+	- _payoutFirstRound(disputeId,d) (src/SweeftDisputeBoard.sol#528)
+		- (ok,None) = address(to).call{value: amount}() (src/SweeftDisputeBoard.sol#644)
+	State variables written after the call(s):
+	- d.appealRewardPerVoter = perVoter (src/SweeftDisputeBoard.sol#536)
+	SweeftDisputeBoard.disputes (src/SweeftDisputeBoard.sol#179) can be used in cross function reentrancies:
+	- SweeftDisputeBoard.appealInfo(uint256) (src/SweeftDisputeBoard.sol#741-768)
+	- SweeftDisputeBoard.appealMembers(uint256) (src/SweeftDisputeBoard.sol#782-784)
+	- SweeftDisputeBoard.getDispute(uint256) (src/SweeftDisputeBoard.sol#700-739)
+	- SweeftDisputeBoard.hasVoted(uint256,address) (src/SweeftDisputeBoard.sol#770-772)
+	- SweeftDisputeBoard.memberCount(uint256) (src/SweeftDisputeBoard.sol#774-776)
+	- SweeftDisputeBoard.memberRound(uint256,address) (src/SweeftDisputeBoard.sol#786-788)
+	- SweeftDisputeBoard.members(uint256) (src/SweeftDisputeBoard.sol#778-780)
+	- SweeftDisputeBoard.openDispute(uint256) (src/SweeftDisputeBoard.sol#314-337)
+	- SweeftDisputeBoard.resolverReward(uint256,address) (src/SweeftDisputeBoard.sol#653-657)
+	- SweeftDisputeBoard.selectPanel(uint256) (src/SweeftDisputeBoard.sol#343-356)
+	- d.appealBond = 0 (src/SweeftDisputeBoard.sol#544)
+	SweeftDisputeBoard.disputes (src/SweeftDisputeBoard.sol#179) can be used in cross function reentrancies:
+	- SweeftDisputeBoard.appealInfo(uint256) (src/SweeftDisputeBoard.sol#741-768)
+	- SweeftDisputeBoard.appealMembers(uint256) (src/SweeftDisputeBoard.sol#782-784)
+	- SweeftDisputeBoard.getDispute(uint256) (src/SweeftDisputeBoard.sol#700-739)
+	- SweeftDisputeBoard.hasVoted(uint256,address) (src/SweeftDisputeBoard.sol#770-772)
+	- SweeftDisputeBoard.memberCount(uint256) (src/SweeftDisputeBoard.sol#774-776)
+	- SweeftDisputeBoard.memberRound(uint256,address) (src/SweeftDisputeBoard.sol#786-788)
+	- SweeftDisputeBoard.members(uint256) (src/SweeftDisputeBoard.sol#778-780)
+	- SweeftDisputeBoard.openDispute(uint256) (src/SweeftDisputeBoard.sol#314-337)
+	- SweeftDisputeBoard.resolverReward(uint256,address) (src/SweeftDisputeBoard.sol#653-657)
+	- SweeftDisputeBoard.selectPanel(uint256) (src/SweeftDisputeBoard.sol#343-356)
+	- rewardPool += perVoter * voters (src/SweeftDisputeBoard.sol#537)
+	SweeftDisputeBoard.rewardPool (src/SweeftDisputeBoard.sol#176) can be used in cross function reentrancies:
+	- SweeftDisputeBoard.receiveFeeShare() (src/SweeftDisputeBoard.sol#183-186)
+	- SweeftDisputeBoard.rewardPool (src/SweeftDisputeBoard.sol#176)
+	- rewardPool += d.appealBond (src/SweeftDisputeBoard.sol#541)
+	SweeftDisputeBoard.rewardPool (src/SweeftDisputeBoard.sol#176) can be used in cross function reentrancies:
+	- SweeftDisputeBoard.receiveFeeShare() (src/SweeftDisputeBoard.sol#183-186)
+	- SweeftDisputeBoard.rewardPool (src/SweeftDisputeBoard.sol#176)
+	- rewardPool += remainder (src/SweeftDisputeBoard.sol#551)
+	SweeftDisputeBoard.rewardPool (src/SweeftDisputeBoard.sol#176) can be used in cross function reentrancies:
+	- SweeftDisputeBoard.receiveFeeShare() (src/SweeftDisputeBoard.sol#183-186)
+	- SweeftDisputeBoard.rewardPool (src/SweeftDisputeBoard.sol#176)
+Reentrancy in SweeftDisputeBoard._finalizeAppeal(uint256,SweeftDisputeBoard.Dispute,bool) (src/SweeftDisputeBoard.sol#505-560):
+	External calls:
+	- _payoutFirstRound(disputeId,d) (src/SweeftDisputeBoard.sol#528)
+		- (ok,None) = address(to).call{value: amount}() (src/SweeftDisputeBoard.sol#644)
+	- ! _send(payee,remainder) (src/SweeftDisputeBoard.sol#550)
+		- (ok,None) = address(to).call{value: amount}() (src/SweeftDisputeBoard.sol#644)
+	State variables written after the call(s):
+	- d.state = DisputeState.Final (src/SweeftDisputeBoard.sol#555)
+	SweeftDisputeBoard.disputes (src/SweeftDisputeBoard.sol#179) can be used in cross function reentrancies:
+	- SweeftDisputeBoard.appealInfo(uint256) (src/SweeftDisputeBoard.sol#741-768)
+	- SweeftDisputeBoard.appealMembers(uint256) (src/SweeftDisputeBoard.sol#782-784)
+	- SweeftDisputeBoard.getDispute(uint256) (src/SweeftDisputeBoard.sol#700-739)
+	- SweeftDisputeBoard.hasVoted(uint256,address) (src/SweeftDisputeBoard.sol#770-772)
+	- SweeftDisputeBoard.memberCount(uint256) (src/SweeftDisputeBoard.sol#774-776)
+	- SweeftDisputeBoard.memberRound(uint256,address) (src/SweeftDisputeBoard.sol#786-788)
+	- SweeftDisputeBoard.members(uint256) (src/SweeftDisputeBoard.sol#778-780)
+	- SweeftDisputeBoard.openDispute(uint256) (src/SweeftDisputeBoard.sol#314-337)
+	- SweeftDisputeBoard.resolverReward(uint256,address) (src/SweeftDisputeBoard.sol#653-657)
+	- SweeftDisputeBoard.selectPanel(uint256) (src/SweeftDisputeBoard.sol#343-356)
+	- d.releaseToSeller = finalOutcome (src/SweeftDisputeBoard.sol#556)
+	SweeftDisputeBoard.disputes (src/SweeftDisputeBoard.sol#179) can be used in cross function reentrancies:
+	- SweeftDisputeBoard.appealInfo(uint256) (src/SweeftDisputeBoard.sol#741-768)
+	- SweeftDisputeBoard.appealMembers(uint256) (src/SweeftDisputeBoard.sol#782-784)
+	- SweeftDisputeBoard.getDispute(uint256) (src/SweeftDisputeBoard.sol#700-739)
+	- SweeftDisputeBoard.hasVoted(uint256,address) (src/SweeftDisputeBoard.sol#770-772)
+	- SweeftDisputeBoard.memberCount(uint256) (src/SweeftDisputeBoard.sol#774-776)
+	- SweeftDisputeBoard.memberRound(uint256,address) (src/SweeftDisputeBoard.sol#786-788)
+	- SweeftDisputeBoard.members(uint256) (src/SweeftDisputeBoard.sol#778-780)
+	- SweeftDisputeBoard.openDispute(uint256) (src/SweeftDisputeBoard.sol#314-337)
+	- SweeftDisputeBoard.resolverReward(uint256,address) (src/SweeftDisputeBoard.sol#653-657)
+	- SweeftDisputeBoard.selectPanel(uint256) (src/SweeftDisputeBoard.sol#343-356)
+Reentrancy in SweeftVault._payRelease(uint256,SweeftVault.Escrow) (src/SweeftVault.sol#641-683):
+	External calls:
+	- _pay(e.logisticsPartner,e.logisticsAmount) (src/SweeftVault.sol#648)
+		- (ok,None) = to.call{value: amount}() (src/SweeftVault.sol#635)
+	- _pay(e.treasurySnapshot,treasuryShare) (src/SweeftVault.sol#668)
+		- (ok,None) = to.call{value: amount}() (src/SweeftVault.sol#635)
+	State variables written after the call(s):
+	- _pay(e.treasurySnapshot,treasuryShare) (src/SweeftVault.sol#668)
+		- credits[to] += amount (src/SweeftVault.sol#637)
+	SweeftVault.credits (src/SweeftVault.sol#211) can be used in cross function reentrancies:
+	- SweeftVault.credits (src/SweeftVault.sol#211)
+Reentrancy in SweeftVault._payRelease(uint256,SweeftVault.Escrow) (src/SweeftVault.sol#641-683):
+	External calls:
+	- _pay(e.logisticsPartner,e.logisticsAmount) (src/SweeftVault.sol#648)
+		- (ok,None) = to.call{value: amount}() (src/SweeftVault.sol#635)
+	- _pay(e.treasurySnapshot,treasuryShare) (src/SweeftVault.sol#668)
+		- (ok,None) = to.call{value: amount}() (src/SweeftVault.sol#635)
+	- (dOk,None) = disputeBoard.call{value: disputeShare}(abi.encodeWithSignature(receiveFeeShare())) (src/SweeftVault.sol#671-673)
+	State variables written after the call(s):
+	- credits[disputeBoard] += disputeShare (src/SweeftVault.sol#675)
+	SweeftVault.credits (src/SweeftVault.sol#211) can be used in cross function reentrancies:
+	- SweeftVault.credits (src/SweeftVault.sol#211)
+Reentrancy in SweeftVault._payRelease(uint256,SweeftVault.Escrow) (src/SweeftVault.sol#641-683):
+	External calls:
+	- _pay(e.logisticsPartner,e.logisticsAmount) (src/SweeftVault.sol#648)
+		- (ok,None) = to.call{value: amount}() (src/SweeftVault.sol#635)
+	- _pay(e.treasurySnapshot,treasuryShare) (src/SweeftVault.sol#668)
+		- (ok,None) = to.call{value: amount}() (src/SweeftVault.sol#635)
+	- (dOk,None) = disputeBoard.call{value: disputeShare}(abi.encodeWithSignature(receiveFeeShare())) (src/SweeftVault.sol#671-673)
+	- _pay(e.seller,sellerAmount) (src/SweeftVault.sol#682)
+		- (ok,None) = to.call{value: amount}() (src/SweeftVault.sol#635)
+	State variables written after the call(s):
+	- _pay(e.seller,sellerAmount) (src/SweeftVault.sol#682)
+		- credits[to] += amount (src/SweeftVault.sol#637)
+	SweeftVault.credits (src/SweeftVault.sol#211) can be used in cross function reentrancies:
+	- SweeftVault.credits (src/SweeftVault.sol#211)
+Reentrancy in SweeftDisputeBoard.finalize(uint256) (src/SweeftDisputeBoard.sol#423-432):
+	External calls:
+	- _payoutFirstRound(disputeId,d) (src/SweeftDisputeBoard.sol#428)
+		- (ok,None) = address(to).call{value: amount}() (src/SweeftDisputeBoard.sol#644)
+	State variables written after the call(s):
+	- d.state = DisputeState.Final (src/SweeftDisputeBoard.sol#429)
+	SweeftDisputeBoard.disputes (src/SweeftDisputeBoard.sol#179) can be used in cross function reentrancies:
+	- SweeftDisputeBoard.appealInfo(uint256) (src/SweeftDisputeBoard.sol#741-768)
+	- SweeftDisputeBoard.appealMembers(uint256) (src/SweeftDisputeBoard.sol#782-784)
+	- SweeftDisputeBoard.getDispute(uint256) (src/SweeftDisputeBoard.sol#700-739)
+	- SweeftDisputeBoard.hasVoted(uint256,address) (src/SweeftDisputeBoard.sol#770-772)
+	- SweeftDisputeBoard.memberCount(uint256) (src/SweeftDisputeBoard.sol#774-776)
+	- SweeftDisputeBoard.memberRound(uint256,address) (src/SweeftDisputeBoard.sol#786-788)
+	- SweeftDisputeBoard.members(uint256) (src/SweeftDisputeBoard.sol#778-780)
+	- SweeftDisputeBoard.openDispute(uint256) (src/SweeftDisputeBoard.sol#314-337)
+	- SweeftDisputeBoard.resolverReward(uint256,address) (src/SweeftDisputeBoard.sol#653-657)
+	- SweeftDisputeBoard.selectPanel(uint256) (src/SweeftDisputeBoard.sol#343-356)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities-1
+INFO:Detectors:
+Detector: divide-before-multiply
+SweeftDisputeBoard._finalizeAppeal(uint256,SweeftDisputeBoard.Dispute,bool) (src/SweeftDisputeBoard.sol#505-560) performs a multiplication on the result of a division:
+	- perVoter = fee / voters (src/SweeftDisputeBoard.sol#535)
+	- rewardPool += perVoter * voters (src/SweeftDisputeBoard.sol#537)
+SweeftDisputeBoard._finalizeAppeal(uint256,SweeftDisputeBoard.Dispute,bool) (src/SweeftDisputeBoard.sol#505-560) performs a multiplication on the result of a division:
+	- perVoter = fee / voters (src/SweeftDisputeBoard.sol#535)
+	- RewardFunded(disputeId,perVoter * voters) (src/SweeftDisputeBoard.sol#538)
+SweeftDisputeBoard._finalizeAppeal(uint256,SweeftDisputeBoard.Dispute,bool) (src/SweeftDisputeBoard.sol#505-560) performs a multiplication on the result of a division:
+	- perVoter = fee / voters (src/SweeftDisputeBoard.sol#535)
+	- remainder = d.appealBond - (perVoter * voters) (src/SweeftDisputeBoard.sol#539)
+SweeftDisputeBoard._payoutFirstRound(uint256,SweeftDisputeBoard.Dispute) (src/SweeftDisputeBoard.sol#564-588) performs a multiplication on the result of a division:
+	- perVoter = fee / voters (src/SweeftDisputeBoard.sol#573)
+	- rewardPool += perVoter * voters (src/SweeftDisputeBoard.sol#575)
+SweeftDisputeBoard._payoutFirstRound(uint256,SweeftDisputeBoard.Dispute) (src/SweeftDisputeBoard.sol#564-588) performs a multiplication on the result of a division:
+	- perVoter = fee / voters (src/SweeftDisputeBoard.sol#573)
+	- RewardFunded(disputeId,perVoter * voters) (src/SweeftDisputeBoard.sol#576)
+SweeftDisputeBoard._payoutFirstRound(uint256,SweeftDisputeBoard.Dispute) (src/SweeftDisputeBoard.sol#564-588) performs a multiplication on the result of a division:
+	- perVoter = fee / voters (src/SweeftDisputeBoard.sol#573)
+	- remainder = bond - (perVoter * voters) (src/SweeftDisputeBoard.sol#577)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#divide-before-multiply
+INFO:Detectors:
+Detector: reentrancy-no-eth
+Reentrancy in SweeftDAO2.execute(uint256,string) (src/SweeftDAO2.sol#304-333):
+	External calls:
+	- (ok,result) = p.target.call(p.callData) (src/SweeftDAO2.sol#321)
+	State variables written after the call(s):
+	- p.state = ProposalState.Failed (src/SweeftDAO2.sol#324)
+	SweeftDAO2.proposals (src/SweeftDAO2.sol#142) can be used in cross function reentrancies:
+	- SweeftDAO2.castVote(uint256,uint8) (src/SweeftDAO2.sol#268-288)
+	- SweeftDAO2.getProposal(uint256) (src/SweeftDAO2.sol#413-415)
+	- SweeftDAO2.isExecutable(uint256) (src/SweeftDAO2.sol#417-420)
+	- SweeftDAO2.proposals (src/SweeftDAO2.sol#142)
+	- SweeftDAO2.propose(address,bytes,string,string,uint64) (src/SweeftDAO2.sol#237-264)
+	- p.state = ProposalState.Executed (src/SweeftDAO2.sol#330)
+	SweeftDAO2.proposals (src/SweeftDAO2.sol#142) can be used in cross function reentrancies:
+	- SweeftDAO2.castVote(uint256,uint8) (src/SweeftDAO2.sol#268-288)
+	- SweeftDAO2.getProposal(uint256) (src/SweeftDAO2.sol#413-415)
+	- SweeftDAO2.isExecutable(uint256) (src/SweeftDAO2.sol#417-420)
+	- SweeftDAO2.proposals (src/SweeftDAO2.sol#142)
+	- SweeftDAO2.propose(address,bytes,string,string,uint64) (src/SweeftDAO2.sol#237-264)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities-2
+INFO:Detectors:
+Detector: unused-return
+SweeftVault._requireRegisteredKey(address) (src/SweeftVault.sol#621-625) ignores return value by (registered,None,pubkey,proven) = PQC_KEYS.pqcKeyStatus(account) (src/SweeftVault.sol#622)
+SweeftVault._requireCarrierSignature(address,bytes,bytes) (src/SweeftVault.sol#704-709) ignores return value by (registered,None,pubkey,proven) = PQC_KEYS.pqcKeyStatus(carrier) (src/SweeftVault.sol#705)
+SweeftVault._requirePqcSignature(address,bytes,bytes) (src/SweeftVault.sol#783-790) ignores return value by (registered,None,pubkey,proven) = PQC_KEYS.pqcKeyStatus(guardian) (src/SweeftVault.sol#784)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#unused-return
+INFO:Detectors:
+Detector: shadowing-local
+SweeftDisputeBoard._slash(address,uint256,uint8).stake (src/SweeftDisputeBoard.sol#627) shadows:
+	- SweeftDisputeBoard.stake() (src/SweeftDisputeBoard.sol#247-255) (function)
+SweeftDisputeBoard.getDispute(uint256).memberCount (src/SweeftDisputeBoard.sol#715) shadows:
+	- SweeftDisputeBoard.memberCount(uint256) (src/SweeftDisputeBoard.sol#774-776) (function)
+SweeftDisputeBoard.getDispute(uint256).members (src/SweeftDisputeBoard.sol#718) shadows:
+	- SweeftDisputeBoard.members(uint256) (src/SweeftDisputeBoard.sol#778-780) (function)
+SweeftDisputeBoard.appealInfo(uint256).appealMembers (src/SweeftDisputeBoard.sol#753) shadows:
+	- SweeftDisputeBoard.appealMembers(uint256) (src/SweeftDisputeBoard.sol#782-784) (function)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#local-variable-shadowing
+INFO:Detectors:
+Detector: events-maths
+SweeftDisputeBoard.receiveFeeShare() (src/SweeftDisputeBoard.sol#183-186) should emit an event for: 
+	- rewardPool += msg.value (src/SweeftDisputeBoard.sol#185) 
+SweeftDisputeBoard.setMinStake(uint256) (src/SweeftDisputeBoard.sol#211-213) should emit an event for: 
+	- minStake = newMinStake (src/SweeftDisputeBoard.sol#212) 
+SweeftDisputeBoard.setUnstakeCooldown(uint64) (src/SweeftDisputeBoard.sol#215-217) should emit an event for: 
+	- unstakeCooldown = newCooldown (src/SweeftDisputeBoard.sol#216) 
+SweeftDisputeBoard.setVotingPeriod(uint64) (src/SweeftDisputeBoard.sol#219-221) should emit an event for: 
+	- votingPeriod = newPeriod (src/SweeftDisputeBoard.sol#220) 
+SweeftDisputeBoard.setAppealWindow(uint64) (src/SweeftDisputeBoard.sol#227-229) should emit an event for: 
+	- appealWindow = newWindow (src/SweeftDisputeBoard.sol#228) 
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#missing-events-arithmetic
+INFO:Detectors:
+Detector: missing-zero-check
+SweeftDAO.constructor(address).targetContract (src/SweeftDAO.sol#77) lacks a zero-check on :
+		- target = targetContract (src/SweeftDAO.sol#78)
+SweeftDAO2.setGuardian(address).newGuardian (src/SweeftDAO2.sol#211) lacks a zero-check on :
+		- guardian = newGuardian (src/SweeftDAO2.sol#213)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#missing-zero-address-validation
+INFO:Detectors:
+Detector: reentrancy-benign
+Reentrancy in SweeftVault._pay(address,uint256) (src/SweeftVault.sol#633-639):
+	External calls:
+	- (ok,None) = to.call{value: amount}() (src/SweeftVault.sol#635)
+	State variables written after the call(s):
+	- credits[to] += amount (src/SweeftVault.sol#637)
+Reentrancy in SweeftDAO2._payTreasury(uint256) (src/SweeftDAO2.sol#403-407):
+	External calls:
+	- (ok,None) = treasury.call{value: amount}() (src/SweeftDAO2.sol#405)
+	State variables written after the call(s):
+	- treasuryCredits += amount (src/SweeftDAO2.sol#406)
+Reentrancy in SweeftDAO2._refundBond(address) (src/SweeftDAO2.sol#397-401):
+	External calls:
+	- (ok,None) = to.call{value: PROPOSER_BOND}() (src/SweeftDAO2.sol#399)
+	State variables written after the call(s):
+	- pendingReturns[to] += PROPOSER_BOND (src/SweeftDAO2.sol#400)
+Reentrancy in SweeftDisputeBoard.openDispute(uint256) (src/SweeftDisputeBoard.sol#314-337):
+	External calls:
+	- vault.raiseDispute(escrowId) (src/SweeftDisputeBoard.sol#322)
+	State variables written after the call(s):
+	- disputeCount = disputeId + 1 (src/SweeftDisputeBoard.sol#325)
+	- d.escrowId = escrowId (src/SweeftDisputeBoard.sol#328)
+	- d.raiser = msg.sender (src/SweeftDisputeBoard.sol#329)
+	- d.openedAt = uint64(block.timestamp) (src/SweeftDisputeBoard.sol#330)
+	- d.joinEndsAt = uint64(block.timestamp) + joinWindow (src/SweeftDisputeBoard.sol#331)
+	- d.votingEndsAt = d.joinEndsAt + votingPeriod (src/SweeftDisputeBoard.sol#332)
+	- d.state = DisputeState.Open (src/SweeftDisputeBoard.sol#333)
+	- d.bond = msg.value (src/SweeftDisputeBoard.sol#334)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities-3
+INFO:Detectors:
+Detector: reentrancy-events
+Reentrancy in SweeftDAO.execute(uint256,string) (src/SweeftDAO.sol#131-160):
+	External calls:
+	- (ok,result) = p.target.call(p.callData) (src/SweeftDAO.sol#149)
+	Event emitted after the call(s):
+	- ProposalExecuted(proposalId,result) (src/SweeftDAO.sol#159)
+Reentrancy in SweeftDisputeBoard.openDispute(uint256) (src/SweeftDisputeBoard.sol#314-337):
+	External calls:
+	- vault.raiseDispute(escrowId) (src/SweeftDisputeBoard.sol#322)
+	Event emitted after the call(s):
+	- DisputeOpened(disputeId,escrowId,msg.sender,d.joinEndsAt,d.votingEndsAt,msg.value) (src/SweeftDisputeBoard.sol#336)
+Reentrancy in SweeftMarketplace.purchase(uint256,uint64,uint256,bytes32) (src/SweeftMarketplace.sol#190-215):
+	External calls:
+	- escrowId = vault.createEscrowWithLogistics{value: msg.value}(msg.sender,listing.seller,listing.logisticsPartner,deliveryDeadline,msg.value,listing.logisticsFee) (src/SweeftMarketplace.sol#210-212)
+	Event emitted after the call(s):
+	- ListingPurchased(listingId,escrowId,msg.sender,listing.seller,listing.price) (src/SweeftMarketplace.sol#214)
+Reentrancy in SweeftOracleRegistry.slashVerifier(address,address) (src/SweeftOracleRegistry.sol#112-120):
+	External calls:
+	- (ok,None) = to.call{value: amount}() (src/SweeftOracleRegistry.sol#117)
+	Event emitted after the call(s):
+	- VerifierSlashed(verifier,to,amount) (src/SweeftOracleRegistry.sol#119)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities-4
+INFO:Detectors:
+Detector: timestamp
+SweeftDAO.castVote(uint256,uint8) (src/SweeftDAO.sol#110-127) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp >= p.votingEndsAt (src/SweeftDAO.sol#113)
+SweeftDAO.execute(uint256,string) (src/SweeftDAO.sol#131-160) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp < p.votingEndsAt (src/SweeftDAO.sol#134)
+SweeftDAO.isExecutable(uint256) (src/SweeftDAO.sol#167-170) uses timestamp for comparisons
+	Dangerous comparisons:
+	- p.state == ProposalState.Open && block.timestamp >= p.votingEndsAt (src/SweeftDAO.sol#169)
+SweeftDAO2.castVote(uint256,uint8) (src/SweeftDAO2.sol#268-288) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp >= p.votingEndsAt (src/SweeftDAO2.sol#271)
+SweeftDAO2.execute(uint256,string) (src/SweeftDAO2.sol#304-333) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp < p.executeAfter (src/SweeftDAO2.sol#307)
+SweeftDAO2.veto(uint256) (src/SweeftDAO2.sol#336-345) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp >= p.executeAfter (src/SweeftDAO2.sol#340)
+SweeftDAO2.cancel(uint256) (src/SweeftDAO2.sol#348-357) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp >= p.votingEndsAt (src/SweeftDAO2.sol#352)
+SweeftDAO2.expireProposal(uint256) (src/SweeftDAO2.sol#360-368) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp < uint256(p.executeAfter) + PROPOSAL_TTL (src/SweeftDAO2.sol#363)
+SweeftDAO2.isExecutable(uint256) (src/SweeftDAO2.sol#417-420) uses timestamp for comparisons
+	Dangerous comparisons:
+	- p.state == ProposalState.Open && block.timestamp >= p.executeAfter (src/SweeftDAO2.sol#419)
+SweeftDisputeBoard.requestUnstake() (src/SweeftDisputeBoard.sol#257-262) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp < lockedUntil[msg.sender] (src/SweeftDisputeBoard.sol#259)
+SweeftDisputeBoard.withdrawStake() (src/SweeftDisputeBoard.sol#264-278) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp < lockedUntil[msg.sender] (src/SweeftDisputeBoard.sol#267)
+	- unstakeAvailableAt[msg.sender] == 0 || block.timestamp < unstakeAvailableAt[msg.sender] (src/SweeftDisputeBoard.sol#268)
+SweeftDisputeBoard.selectPanel(uint256) (src/SweeftDisputeBoard.sol#343-356) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp < d.joinEndsAt (src/SweeftDisputeBoard.sol#348)
+	- block.timestamp >= d.votingEndsAt (src/SweeftDisputeBoard.sol#349)
+SweeftDisputeBoard.castVote(uint256,bool) (src/SweeftDisputeBoard.sol#360-383) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp >= d.votingEndsAt (src/SweeftDisputeBoard.sol#365)
+SweeftDisputeBoard.resolveExpired(uint256) (src/SweeftDisputeBoard.sol#390-399) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp < d.votingEndsAt (src/SweeftDisputeBoard.sol#393)
+SweeftDisputeBoard._recordFirstOutcome(uint256,SweeftDisputeBoard.Dispute,bool) (src/SweeftDisputeBoard.sol#401-419) uses timestamp for comparisons
+	Dangerous comparisons:
+	- i < d.memberCount (src/SweeftDisputeBoard.sol#410)
+SweeftDisputeBoard.finalize(uint256) (src/SweeftDisputeBoard.sol#423-432) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp < d.unlockAt (src/SweeftDisputeBoard.sol#426)
+SweeftDisputeBoard.appeal(uint256) (src/SweeftDisputeBoard.sol#437-467) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp >= d.unlockAt (src/SweeftDisputeBoard.sol#440)
+	- i < d.memberCount (src/SweeftDisputeBoard.sol#458)
+SweeftDisputeBoard.castAppealVote(uint256,bool) (src/SweeftDisputeBoard.sol#470-491) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp >= d.appealVotingEndsAt (src/SweeftDisputeBoard.sol#473)
+SweeftDisputeBoard.resolveAppealExpired(uint256) (src/SweeftDisputeBoard.sol#496-503) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp < d.appealVotingEndsAt (src/SweeftDisputeBoard.sol#499)
+SweeftDisputeBoard._extendLock(address,uint64) (src/SweeftDisputeBoard.sol#636-640) uses timestamp for comparisons
+	Dangerous comparisons:
+	- until > lockedUntil[member] (src/SweeftDisputeBoard.sol#637)
+SweeftVault.attestCarrierEvidence(uint256,string,string,uint64,bytes) (src/SweeftVault.sol#437-475) uses timestamp for comparisons
+	Dangerous comparisons:
+	- issuedAt > block.timestamp (src/SweeftVault.sol#452)
+	- block.timestamp - issuedAt > MAX_ATTEST_AGE (src/SweeftVault.sol#453)
+	- e.evidenceAttested = deliveredStatus || (e.verifierAttestations >= _verifierThreshold()) (src/SweeftVault.sol#472)
+SweeftVault.isReleaseEligible(uint256) (src/SweeftVault.sol#588-598) uses timestamp for comparisons
+	Dangerous comparisons:
+	- (e.carrierDelivered || e.evidenceAttested) && block.timestamp >= e.deliveryDeadline (src/SweeftVault.sol#594)
+SweeftVault.isRefundable(uint256) (src/SweeftVault.sol#600-609) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp >= e.deliveryDeadline (src/SweeftVault.sol#608)
+SweeftVault._validateDeadline(uint64) (src/SweeftVault.sol#615-619) uses timestamp for comparisons
+	Dangerous comparisons:
+	- deliveryDeadline < nowTs + MIN_WINDOW (src/SweeftVault.sol#617)
+	- deliveryDeadline > nowTs + MAX_WINDOW (src/SweeftVault.sol#618)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#block-timestamp
+INFO:Detectors:
+Detector: assembly
+SweeftDAO.execute(uint256,string) (src/SweeftDAO.sol#131-160) uses assembly
+	- INLINE ASM (src/SweeftDAO.sol#152-154)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#assembly-usage
+INFO:Detectors:
+Detector: low-level-calls
+Low level call in SweeftDAO.execute(uint256,string) (src/SweeftDAO.sol#131-160):
+	- (ok,result) = p.target.call(p.callData) (src/SweeftDAO.sol#149)
+Low level call in SweeftDAO2.withdrawVoteStake(uint256) (src/SweeftDAO2.sol#291-301):
+	- (ok,None) = msg.sender.call{value: amount}() (src/SweeftDAO2.sol#298)
+Low level call in SweeftDAO2.execute(uint256,string) (src/SweeftDAO2.sol#304-333):
+	- (ok,result) = p.target.call(p.callData) (src/SweeftDAO2.sol#321)
+Low level call in SweeftDAO2.withdrawReturn() (src/SweeftDAO2.sol#374-381):
+	- (ok,None) = msg.sender.call{value: amount}() (src/SweeftDAO2.sol#378)
+Low level call in SweeftDAO2.withdrawTreasuryCredits() (src/SweeftDAO2.sol#383-391):
+	- (ok,None) = treasury.call{value: amount}() (src/SweeftDAO2.sol#388)
+Low level call in SweeftDAO2._refundBond(address) (src/SweeftDAO2.sol#397-401):
+	- (ok,None) = to.call{value: PROPOSER_BOND}() (src/SweeftDAO2.sol#399)
+Low level call in SweeftDAO2._payTreasury(uint256) (src/SweeftDAO2.sol#403-407):
+	- (ok,None) = treasury.call{value: amount}() (src/SweeftDAO2.sol#405)
+Low level call in SweeftDisputeBoard.withdrawStake() (src/SweeftDisputeBoard.sol#264-278):
+	- (ok,None) = msg.sender.call{value: amount}() (src/SweeftDisputeBoard.sol#275)
+Low level call in SweeftDisputeBoard._send(address,uint256) (src/SweeftDisputeBoard.sol#642-646):
+	- (ok,None) = address(to).call{value: amount}() (src/SweeftDisputeBoard.sol#644)
+Low level call in SweeftOracleRegistry.withdrawStake() (src/SweeftOracleRegistry.sol#76-83):
+	- (ok,None) = msg.sender.call{value: amount}() (src/SweeftOracleRegistry.sol#81)
+Low level call in SweeftOracleRegistry.slashVerifier(address,address) (src/SweeftOracleRegistry.sol#112-120):
+	- (ok,None) = to.call{value: amount}() (src/SweeftOracleRegistry.sol#117)
+Low level call in SweeftVault.withdrawCredits() (src/SweeftVault.sol#525-532):
+	- (ok,None) = msg.sender.call{value: amount}() (src/SweeftVault.sol#529)
+Low level call in SweeftVault._pay(address,uint256) (src/SweeftVault.sol#633-639):
+	- (ok,None) = to.call{value: amount}() (src/SweeftVault.sol#635)
+Low level call in SweeftVault._payRelease(uint256,SweeftVault.Escrow) (src/SweeftVault.sol#641-683):
+	- (dOk,None) = disputeBoard.call{value: disputeShare}(abi.encodeWithSignature(receiveFeeShare())) (src/SweeftVault.sol#671-673)
+Low level call in SweeftVault._isVerifier(address) (src/SweeftVault.sol#685-691):
+	- (ok,data) = oracleRegistry.staticcall(abi.encodeWithSignature(isVerifier(address),account)) (src/SweeftVault.sol#686-688)
+Low level call in SweeftVault._verifierThreshold() (src/SweeftVault.sol#693-702):
+	- (ok,data) = oracleRegistry.staticcall(abi.encodeWithSignature(threshold())) (src/SweeftVault.sol#694-696)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#low-level-calls
+INFO:Detectors:
+Detector: unused-state
+SweeftDAO.CHOICE_ABSTAIN (src/SweeftDAO.sol#65) is never used in SweeftDAO (src/SweeftDAO.sol#11-171)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#unused-state-variable
+INFO:Slither:. analyzed (9 contracts with 102 detectors), 80 result(s) found

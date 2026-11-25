@@ -164,6 +164,11 @@ v5 remains recorded in `docs/deployments.md` as the superseded stack.
   those two addresses after deployment. Wired once in `DeployV6.s.sol`.
 - Panel randomness is `block.prevrandao` (testnet-grade; a validator can bias
   it). Commit-reveal/VRF is future work.
+- Money paths rely on the `nonReentrant` lock rather than strict
+  checks-effects-interactions ordering (Slither `reentrancy-eth` on
+  `finalize`/`_finalizeAppeal`/`_payRelease` and `reentrancy-no-eth` on
+  `DAO2.execute` — triaged in `docs/audit/stage-4/README.md`). Moving state
+  writes before external calls is a candidate v7 hardening.
 - v6 was deployed 24 November 2026 (see `docs/deployments.md`); the hosted
   demo and `.env` now point at the v6 addresses.
 

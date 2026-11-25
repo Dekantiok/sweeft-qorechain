@@ -9,6 +9,9 @@ qorechain-pqc==0.2.3
 
 # EVM interaction (read + event indexing; signing happens client-side)
 web3>=6.15,<7.0
+# Transitive via qorechain-sdk; pinned for PYSEC-2026-1448 / PYSEC-2026-3002
+# (pip-audit blocking in CI).
+PyNaCl>=1.6.2
 
 # AI — Meta Model API is OpenAI-SDK compatible
 openai>=1.40
