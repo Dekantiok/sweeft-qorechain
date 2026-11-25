@@ -4,7 +4,42 @@
 **Deployer:** `qor1etuzhk8tmpmrfmakzzhx8fau788r4jrapjkzlp` / `0xcaF82Bd8EBd87634eFb610aE63a7bCf1CE3ac87D`
 **Explorer:** https://explore.qore.network
 
-## v6 — hardening release (live; deployed 24 November 2026)
+## v7 — patched v6 (live; deployed 25 November 2026)
+
+Same contracts as v6 plus the Stage 4 patch (CEI ordering in
+`finalize`/`_finalizeAppeal`/`DAO2.execute`, bounded `_drawPanel`,
+`_feeForAmount` overflow guard). Deployed with
+`contracts/script/DeployV6.s.sol` (45 txs). Wiring verified on-chain via
+`eth_call` (owners, `feeBps`, `threshold`, board/marketplace wiring,
+`MAX_DRAW_ATTEMPTS_PER_POOL = 6`, verifier + carrier registration).
+
+| Contract | Address |
+|---|---|
+| **SweeftOracleRegistry (v7)** | `0x6926ebda01f5d0b1dDe95e9f84A4Ecf682348b8E` |
+| **SweeftVault (v7)** | `0xA575cbEe7f1a51A55bF45a743AF5ECf327bBd1c6` |
+| **SweeftMarketplace (v7)** | `0x721165Eb0Ed91027A1A7B4BC29E8e41930b85236` |
+| **SweeftDisputeBoard (v7)** | `0x62E3d8c118855492d35829daF2201715789b39d6` |
+| **SweeftDAO2 (v7)** | `0xA1235E3617738082D749AD81f0558eaB2E39ba29` |
+
+### v7 end-to-end evidence (25 November 2026)
+
+`tools/e2e_marketplace.py` against vault `0xA575…1c6` — full PQ-gated
+release on v7 (run twice, both PASS):
+
+| Step | Escrow #0 | Escrow #1 |
+|---|---|---|
+| release (ML-DSA-87 via `pqcVerify`) | `0x299fafea…` | `0x47f2cf76…` |
+
+Observed both runs: seller received 0.098 QOR (0.1 − 2% fee), escrow
+**Completed**, listing **Sold**.
+Fixtures: escrow #2 (Funded), escrow #3 (release-eligible). Playwright E2E
+**32/32** on v7. Indexer synced (0 handler failures).
+
+**Audit scope note:** v7 == patched v6 source; Stage 4 QCAI (72/100) findings
+are fixed/documented in `docs/AUDIT.md`, Stage 5 bundle in
+`docs/audit/stage-5/` (submission pending — see below).
+
+## v6 — hardening release (superseded by v7; 24 November 2026)
 
 Deployed with `contracts/script/DeployV6.s.sol` after the deployer was topped
 up via the faucet (100 QOR). Wiring verified on-chain via `eth_call` (owners,

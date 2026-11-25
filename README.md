@@ -14,13 +14,15 @@ comes only from verified outcomes, and a DAO governs who may attest.
 
 ## Deployment status
 
-- **Live on Diana: v6** — deployed 24 November 2026 (`docs/deployments.md`:
-  Vault `0x3F27…715f`, DAO2 `0x4Db7…97b2C`, …) with two verified PQ
-  releases (each: seller 0.098 of 0.1 QOR after the 2% fee, escrow
-  Completed). `.env` and the hosted demo point at v6.
-- **Superseded: v5** — the previous live stack. The Stage 3 audit (78/100)
-  covers v5 only; v6 has Foundry regression tests (131 passing) and live
-  release evidence but no external audit yet.
+- **Live on Diana: v7** — deployed 25 November 2026 (`docs/deployments.md`:
+  Vault `0xA575…1c6`, DAO2 `0xA123…eba29`, …) — the patched v6 source
+  (Stage 4 CEI/loop/overflow fixes). Two verified PQ releases (each: seller
+  0.098 of 0.1 QOR after the 2% fee, escrow Completed). `.env` and the hosted
+  demo point at v7.
+- **Superseded: v6** — previous live stack (same features, pre-patch
+  ordering; v6 escrows remain settleable on the v6 vault).
+- **Audit scope:** Stage 3 (78/100) covers v5; Stage 4 (72/100) covers v6;
+  v7 == patched v6 source (Stage 5 bundle in `docs/audit/stage-5/`).
 
 ## Architecture
 
