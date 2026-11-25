@@ -37,7 +37,10 @@ contract SweeftOracleRegistryTest is Test {
     }
 
     function test_RemoveVerifier() public {
+        // Two verifiers, threshold 1: removing one keeps the threshold reachable.
+        address v2 = address(0xACE2);
         registry.addVerifier(verifier);
+        registry.addVerifier(v2);
 
         vm.prank(stranger);
         vm.expectRevert(SweeftOracleRegistry.NotOwner.selector);
@@ -45,6 +48,13 @@ contract SweeftOracleRegistryTest is Test {
 
         registry.removeVerifier(verifier);
         assertFalse(registry.isVerifier(verifier));
+    }
+
+    function test_RemoveVerifier_BelowThresholdRejected() public {
+        // The last verifier cannot be removed while threshold == 1 (N-9).
+        registry.addVerifier(verifier);
+        vm.expectRevert(SweeftOracleRegistry.ThresholdUnreachable.selector);
+        registry.removeVerifier(verifier);
     }
 
     function test_RemoveVerifier_RejectsUnknown() public {

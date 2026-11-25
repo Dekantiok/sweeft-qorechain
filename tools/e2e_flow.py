@@ -93,7 +93,7 @@ class Runner:
             }
         )
         signed = self.account.sign_transaction(tx)
-        tx_hash = self.w3.eth.send_raw_transaction(signed.rawTransaction)
+        tx_hash = self.w3.eth.send_raw_transaction(getattr(signed, "raw_transaction", None) or signed.rawTransaction)
         receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)
         if receipt.status != 1:
             _die(f"transaction reverted: {tx_hash.hex()} — {EXPLORER}/tx/{tx_hash.hex()}")

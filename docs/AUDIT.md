@@ -1,10 +1,11 @@
 # Sweeft — QCAI Audit Record
 
 **Network:** QoreChain Diana testnet · **EVM chain ID 9800**
-**Contracts:** `contracts/src/` (6 contracts) · **Tests:** 121 Foundry + 15 Django
+**Contracts:** `contracts/src/` (6 contracts) · **Tests:** 131 Foundry + 28 Django
 **Auditors:** QoreChain dashboard Contract Auditor (EVM/Solidity setting) **and**
-Slither 0.11.6. Latest QCAI score **78/100** (Stage 3, on v5). Neither analyzer
-reports an open High/Medium issue on v5.
+Slither 0.11.6. Latest QCAI score **78/100** (Stage 3, on **v5 only** — the
+current v6 source has not been audited; see the v6 section below). Slither
+0.11.6 reported **0 High / 0 Medium on v5**; neither result covers v6.
 
 > Stage 1 report: [`docs/audit/stage-1/`](audit/stage-1/)
 > Stage 2 report: [`docs/audit/stage-2/`](audit/stage-2/)
@@ -122,8 +123,49 @@ Run independently of QCAI: `slither-analyzer 0.11.6`, 102 detectors, on
 | `low-level-calls` / `assembly` | checked `.call`s + revert bubbling | All low-level calls check `success` or use credits; assembly only re-raises the target's revert data. |
 
 **Conclusion:** two independent analyzers (QCAI + Slither) plus 121 Foundry +
-15 Django tests agree there are no open High/Medium issues. The v5 artifact is
-frozen; the only follow-ups are cosmetic.
+15 Django tests agree there are no open High/Medium issues on **v5**. The v5
+artifact is frozen; the only follow-ups are cosmetic. (Test counts in this
+document refer to the v5-era suites unless stated otherwise in the v6 section.)
+
+## v6 — post-audit hardening release (not audited, not yet deployed)
+
+v6 (`contracts/script/DeployV6.s.sol`), deployed 24 November 2026, is a
+hardening release addressing the
+**residual review** of the Django app and v5 contracts. It is **not covered by
+the Stage 3 audit (78/100) above** — that score applies to v5 only. v6 has
+Foundry regression coverage (131 tests) and two live PQ releases on Diana
+(see `docs/deployments.md`); it must not be described as audited.
+v5 remains recorded in `docs/deployments.md` as the superseded stack.
+
+### Contracts (v6 changes)
+
+| ID | Severity | Finding | Fix | Regression tests |
+|---|---|---|---|---|
+| N-1 | Critical | Vault `raiseDispute` callable directly by a party — escrow freezable without a bond or a resolvable path | Only the dispute board can call `raiseDispute` (`NotDisputeBoard`) | `test_RaiseDispute_OnlyBoard` |
+| N-2 | Critical | Seller's `markDelivered` claim alone made the escrow releasable after the deadline and blocked refunds | Separate `carrierDelivered` (proof) flag; `markDelivered` is only a claim; expiry default releases only on verifier-threshold or carrier-DELIVERED proof; carrier is paid only on proof | `test_Release_SellerClaimAloneNotEligible`, `test_MarkDelivered_AloneDoesNotReleaseOnExpiry`, `test_laterLostAttestationSupersedesDelivered`, `test_inTransitAttestationDoesNotPayCarrier` |
+| N-3 | High | First-come dispute seats capturable; stake trivial vs escrow; no real appeal | Random panel drawn from the staked pool after the join window; stake = 20 QOR + 100% of escrow; fixed resolver fee from the raiser bond for either outcome; real appeal to a 5-resolver panel (3-of-5 final) with a 50% first-panel slash on overturn and a 2× appeal bond | `SweeftDisputeBoard.t.sol` (panel draw, appeal overturn/uphold, expiry, claim) |
+| N-4 | High | Stranded reward-pool funds; slashed resolvers still claim; failed fee push strands credits | `sweep()` to treasury; slashed non-voters excluded from claims; `withdrawVaultCredits()` pulls Vault credits | `test_Sweep_OwnerOnly`, `test_WithdrawVaultCredits_NoCreditReverts` |
+| N-5 | High | DAO voting was one-wallet-one-vote; no veto/cancel/expire; quorum in wallet count | Stake-weighted voting (`castVote` payable, QOR escrowed per vote, locked until final); quorum in stake (0.03 QOR, critical 0.05 QOR); guardian veto during the timelock; cancel/expire/Failed states; treasury + pull-payment for stranded bonds | `SweeftDAO2.t.sol` (stake lock/withdraw, critical quorum, veto, cancel, expire, Sybil cost) |
+| N-6/N-7/N-8 | Med | Carrier nonce global (concurrent deliveries invalidate each other); unbounded carrier strings; older status could resurrect delivery | Per-(carrier, escrow) nonce; 32/128-byte caps; latest-status rule wins | `test_carrierNonceIsPerEscrow`, `test_carrierStatusAndTrackingAreBounded`, `test_laterLostAttestationSupersedesDelivered` |
+| N-9 | Med | Verifier threshold could fail open / self-governance with weak quorum | Fail-closed threshold; removal blocked below threshold; verifier stake/slash support; critical quorum for self-governance selectors | `SweeftGovernance.t.sol`, `SweeftDAO2.t.sol` critical-quorum test |
+
+### Backend (v6 changes)
+
+| ID | Finding | Fix |
+|---|---|---|
+| N-11 | AI mandate/wallet could be resolved from model-supplied input | `_active_mandate(None)` returns none; `execute_tool` drops model-supplied wallet and injects the session wallet server-side; `run_chat`/chat view pass the session wallet (`tests/test_security.py` `MandateWalletBindingTests`, `AutopilotWalletBindingTests`) |
+| N-12 | Token compare not constant-time; per-process rate limits; forgeable `X-Forwarded-For`; CSP `unsafe-inline` + CDN scripts | Constant-time compare; shared cache-backed rate limit (`config/ratelimit.py`, last-hop `X-Forwarded-For` only when `SWEEFT_TRUST_PROXY=1`); self-hosted htmx + built Tailwind CSS, Alpine removed; per-request CSP nonce (`script-src 'self' 'nonce-…'`, `object-src 'none'`); inline `hx-on`/handlers replaced with nonce-safe listeners. CI security scans (`pip-audit`, Slither `fail-on: medium`) are blocking. |
+| B-9/B-10/B-12/B-13 | Outstanding backend items | B-9/B-10 documented (key separation, simulated Demo Carrier); B-12 indexed DB state used where available; B-13 one unit per layer (wei on-chain, uqor in Django), round-trip tested in the indexer. Django upgraded to 5.2.19 (`requirements.txt`: `Django>=5.2,<5.3`). |
+
+### Known limitations (v6)
+
+- `SweeftVault.setDisputeBoard` / `setMarketplace` remain one-shot and
+  deployer-only (`AlreadyWired` on a second call) — the DAO cannot rewire
+  those two addresses after deployment. Wired once in `DeployV6.s.sol`.
+- Panel randomness is `block.prevrandao` (testnet-grade; a validator can bias
+  it). Commit-reveal/VRF is future work.
+- v6 was deployed 24 November 2026 (see `docs/deployments.md`); the hosted
+  demo and `.env` now point at the v6 addresses.
 
 ## External security review — response (v5 hardening)
 
@@ -181,4 +223,5 @@ the fixed behaviour; contracts and backend were revised together as "v5".
 
 **Definition of done (from the review):** a regression test exists for each
 Critical/High finding and the README makes only claims the code backs. Foundry
-**121 passing**, Django **13 passing**.
+**121 passing**, Django **13 passing** (v5 era; current counts — 131 Foundry +
+28 Django — are in the v6 section above).

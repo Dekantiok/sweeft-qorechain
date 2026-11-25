@@ -297,7 +297,7 @@ def send_evm(w3: Web3, unified, fn_call, *, value: int = 0, gas: int = 800_000) 
             }
         )
         signed = eth_account.sign_transaction(tx)
-        tx_hash = w3.eth.send_raw_transaction(signed.rawTransaction)
+        tx_hash = w3.eth.send_raw_transaction(getattr(signed, "raw_transaction", None) or signed.rawTransaction)
         last_hash = tx_hash.hex()
         try:
             receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=90)
@@ -329,7 +329,7 @@ def transfer_qor(w3: Web3, sender_unified, to_address: str, amount_uqor: int, *,
             "chainId": EVM_CHAIN_ID,
         }
         signed = eth_account.sign_transaction(tx)
-        tx_hash = w3.eth.send_raw_transaction(signed.rawTransaction)
+        tx_hash = w3.eth.send_raw_transaction(getattr(signed, "raw_transaction", None) or signed.rawTransaction)
         try:
             receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=90)
             if receipt.status != 1:

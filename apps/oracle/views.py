@@ -6,31 +6,46 @@ import logging
 
 from django.shortcuts import render
 
-from apps.blockchain.services.relayer import escrow_state, is_verifier
+from apps.blockchain.services.relayer import is_verifier
 
 from .models import FulfilmentEvidence
 
 logger = logging.getLogger(__name__)
 
+# Indexed (DB) escrow state -> on-chain status int (0 None, 1 Funded,
+# 2 Completed, 3 Cancelled, 4 Refunded, 5 Disputed). B-12: the page used to
+# do one live chain read per evidence row (N reads, 30s+); it now uses the
+# indexed mirror, which the indexer keeps in sync.
+_DB_TO_CHAIN_STATUS = {
+    "created": 0,
+    "funded": 1,
+    "fulfilled": 1,
+    "delivered": 1,
+    "release_eligible": 1,
+    "completed": 2,
+    "cancelled": 3,
+    "refunded": 4,
+    "disputed": 5,
+}
+
 
 def evidence_list(request):
     evidence = FulfilmentEvidence.objects.select_related(
         "escrow", "escrow__buyer", "escrow__seller", "submitted_by"
-    ).order_by("-submitted_at")
+    ).order_by("-submitted_at")[:50]
 
     wallet = (request.session.get("wallet_account") or {}).get("evm", "")
     verifier = is_verifier(wallet) if wallet else False
 
     import os
 
-    rows = []
-    for item in evidence:
-        state = None
-        try:
-            state = escrow_state(item.escrow.on_chain_id)
-        except Exception:
-            logger.exception("could not read escrow state for evidence %s", item.pk)
-        rows.append({"evidence": item, "state": state})
+    rows = [
+        {
+            "evidence": item,
+            "state": {"status": _DB_TO_CHAIN_STATUS.get(item.escrow.state, 0)},
+        }
+        for item in evidence
+    ]
 
     return render(
         request,

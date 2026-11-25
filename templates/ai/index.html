@@ -71,7 +71,7 @@
     {% endif %}
 </div>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 const chatForm = document.getElementById("chat-form");
 const chatInput = document.getElementById("chat-input");
 const chatLog = document.getElementById("chat-log");

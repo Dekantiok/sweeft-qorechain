@@ -250,19 +250,23 @@ contract SweeftVaultTest is Test {
     // 4. Release — delivered + inspection window (deadline) path
     // ------------------------------------------------------------------
 
-    function test_Release_AfterDeliveredAndDeadline() public {
+    function test_Release_SellerClaimAloneNotEligible() public {
         uint256 id = _createAndFund(1 ether, 7 days);
 
         vm.prank(seller);
         vault.markDelivered(id);
 
-        // Deadline not reached yet.
+        // The seller's claim is not proof of delivery (N-2), even after the
+        // deadline. Only buyer confirmation, a verifier threshold or a carrier
+        // DELIVERED attestation makes the escrow releasable.
+        vm.warp(block.timestamp + 7 days);
         assertFalse(vault.isReleaseEligible(id));
         vm.expectRevert(SweeftVault.NotReleaseEligible.selector);
         vault.release(id, dummySig);
 
-        // Inspection window passes.
-        vm.warp(block.timestamp + 7 days);
+        // The buyer can always confirm receipt and release.
+        vm.prank(buyer);
+        vault.confirmReceipt(id);
         assertTrue(vault.isReleaseEligible(id));
         vault.release(id, dummySig);
     }
@@ -467,16 +471,18 @@ contract SweeftVaultTest is Test {
         vault.createEscrow(buyer, seller, _deadline(7 days), 1 ether);
     }
 
-    function test_Refund_BlockedAfterDelivered() public {
+    function test_Refund_NotBlockedBySellerClaim() public {
         uint256 id = _createAndFund(1 ether, 7 days);
         vm.prank(seller);
         vault.markDelivered(id);
         vm.warp(block.timestamp + 7 days);
 
-        // Seller marked delivery: the buyer must dispute, not unilaterally refund.
-        assertFalse(vault.isRefundable(id));
-        vm.expectRevert(SweeftVault.NotRefundable.selector);
+        // A seller's markDelivered claim is not proof of delivery, so the buyer
+        // can still refund after the deadline (N-2).
+        assertTrue(vault.isRefundable(id));
+        uint256 buyerBefore = buyer.balance;
         vault.refundAfterDeadline(id, dummySig);
+        assertEq(buyer.balance, buyerBefore + 1 ether);
     }
 
     function test_FeeSnapshot_NotAffectedByLaterChange() public {

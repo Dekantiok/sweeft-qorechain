@@ -62,6 +62,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "apps.participants.context_processors.wallet",
+                "config.context_processors.csp_nonce",
             ],
         },
     },

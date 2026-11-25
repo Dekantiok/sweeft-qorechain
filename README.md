@@ -12,6 +12,16 @@ comes only from verified outcomes, and a DAO governs who may attest.
 > Built for **Build Before Q-Day** (QoreChain Developer Fest) — Post-Quantum dApp category.
 > Testnet only. Test tokens have no value.
 
+## Deployment status
+
+- **Live on Diana: v6** — deployed 24 November 2026 (`docs/deployments.md`:
+  Vault `0x3F27…715f`, DAO2 `0x4Db7…97b2C`, …) with two verified PQ
+  releases (each: seller 0.098 of 0.1 QOR after the 2% fee, escrow
+  Completed). `.env` and the hosted demo point at v6.
+- **Superseded: v5** — the previous live stack. The Stage 3 audit (78/100)
+  covers v5 only; v6 has Foundry regression tests (131 passing) and live
+  release evidence but no external audit yet.
+
 ## Architecture
 
 **Django coordinates the application. Smart contracts enforce financial rules.
@@ -30,7 +40,7 @@ AI assistant     ────────▶ apps/ai       (draft/execute w/ man
                            integrations/qorechain ──────────▶ SweeftMarketplace.sol
                                                               SweeftVault.sol
                                                               SweeftOracleRegistry.sol
-                                                              SweeftDAO.sol
+                                                              SweeftDAO2.sol
 ```
 
 - **On-chain source of truth**: listings, prices, purchase state, escrow state,
@@ -47,8 +57,8 @@ AI assistant     ────────▶ apps/ai       (draft/execute w/ man
 | **Sweeft Oracle** | Fulfilment evidence + verifier attestations | DAO-governed verifiers with a configurable M-of-N threshold |
 | **Sweeft Cred** | Reputation from verified outcomes only | scoring live from indexed completions |
 | **Sweeft AI** | Natural-language commerce, mandate-capped autonomous buying (Meta Model API) | chat wired; mandate enforced in code (per-tx + daily); Autopilot proven on testnet; negotiation against listing floors |
-| **Sweeft DAO** | Proposal registry; governs verifiers, fees and dispute parameters | DAO2: bounded voting periods, (target,selector) allowlist, quorum, timelock, proposer bond; owns registry/vault/board |
-| **Dispute Board** | Staked resolver panels (proportional stake, 3 members, 2-of-3) | v5: stake scales with escrow, minority/non-voter slashing, raiser bond, appeal window, deterministic expiry |
+| **Sweeft DAO** | Proposal registry; governs verifiers, fees and dispute parameters | v6 live: stake-weighted votes (QOR escrowed per vote, locked until final), bounded voting periods, (target,selector) allowlist, stake quorum (0.03 QOR, 0.05 critical for self-governance), 2-day timelock, proposer bond, guardian veto during the timelock, cancel/expire; owns registry/vault/board |
+| **Dispute Board** | Staked resolver panels | v6 live: random panel drawn from the staked pool (20 QOR + 100% of escrow), non-voter slashing, raiser bond, fixed resolver fee from the bond for either outcome, real appeal to a 5-resolver panel (3-of-5) that can overturn and slash the first panel, proof-based permissionless expiry |
 | **Logistics** | Verified physical delivery (carrier ML-DSA signatures on-chain) + digital goods | carrier attestation bound to (escrow, carrier, status, nonce); DELIVERED-only fulfilment; Demo Carrier is simulated |
 
 ## Quick start (development)
@@ -110,10 +120,16 @@ PQC precompiles (testnet): `pqcVerify` at `0x…0a01`, `pqcKeyStatus` at `0x…0
   are reentrancy-guarded.
 - **Governance is hard to capture**: DAO proposals need an allowlisted
   `(target, selector)`, a 3-day minimum voting period, quorum, a 2-day timelock
-  and a proposer bond; the DAO owns the registry, vault and board.
+  and a proposer bond; the DAO owns the registry, vault and board. In v6, votes
+  are stake-weighted (QOR escrowed with the vote and locked until the proposal
+  is final), self-governance calls need a higher stake quorum, and a guardian
+  may veto during the timelock.
 - **Disputes cost something**: resolvers stake proportionally to the escrow,
-  minority/non-voters are slashed, raisers post a bond, and expiry resolves by a
-  deterministic rule rather than owner discretion.
+  non-voters are slashed, raisers post a bond, and expiry resolves by a
+  deterministic rule rather than owner discretion. In v6 the panel is drawn
+  randomly from the staked pool, resolvers are paid a fixed fee from the bond
+  for either outcome, and either party can appeal the first decision to a
+  larger panel (a successful appeal slashes the first panel).
 - The AI agent acts only within an owner-granted mandate: Django enforces
   per-transaction and rolling daily caps **in code** (and refuses to spend with
   no active mandate), while the on-chain spending rule is the hard cap. The
@@ -122,7 +138,18 @@ PQC precompiles (testnet): `pqcVerify` at `0x…0a01`, `pqcKeyStatus` at `0x…0
   enforces its rules. Retrieved listing text is treated as untrusted data.
 
 See `docs/AUDIT.md` for the finding-by-finding mapping (including the external
-review response) and `contracts/test/` for the regression suites.
+review response and the v6 hardening notes) and `contracts/test/` for the
+regression suites (131 Foundry + 28 Django tests at the time of writing).
+
+### Known limitations
+
+- `SweeftVault.setDisputeBoard` / `setMarketplace` are one-shot and callable
+  only by the deployer — after deployment the DAO cannot rewire those two
+  addresses. They are wired once at deploy time in `DeployV6.s.sol`.
+- Dispute panel randomness uses `block.prevrandao` (testnet-grade; a validator
+  can bias it). A commit-reveal or VRF source is future work.
+- The Demo Carrier is simulated; real carriers sign with their own keys
+  (`docs/AUDIT.md` B-10).
 
 ## Wallets — QoreX and EVM wallets, and why both
 

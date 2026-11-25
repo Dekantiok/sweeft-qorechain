@@ -110,37 +110,80 @@ def submit_refund(escrow_id: int, signature: bytes) -> dict:
     return _send(w3, account, vault.functions.refundAfterDeadline(escrow_id, signature))
 
 
+def _escrow_dict(vault, w3, escrow_id: int) -> dict:
+    """Read an escrow as a name-keyed dict (robust to struct field order).
+
+    Uses the ABI output component names rather than fixed indices, so a future
+    struct change cannot silently misalign the mapping (N-12).
+    """
+    fn = vault.functions.getEscrow(escrow_id)
+    values = fn.call()
+    components = fn.abi["outputs"][0].get("components")
+    if components:
+        return {c["name"]: v for c, v in zip(components, values)}
+    # Fallback: positional (should not happen with the current ABI).
+    return {
+        "buyer": values[0],
+        "seller": values[1],
+        "amount": values[2],
+        "status": values[5],
+        "delivered": values[6],
+        "fulfilledConfirmed": values[7],
+        "evidenceAttested": values[8],
+        "released": values[9],
+        "verifier": values[10],
+        "logisticsPartner": values[11],
+        "logisticsAmount": values[12],
+        "carrierAttested": values[13],
+        "carrierStatus": values[19] if len(values) > 19 else "",
+        "verifierAttestations": values[21] if len(values) > 21 else 0,
+        "carrierDelivered": values[22] if len(values) > 22 else False,
+    }
+
+
 def escrow_state(escrow_id: int) -> dict:
     """Read one escrow directly from the chain (the source of truth)."""
     w3 = get_evm_client()
     vault = _vault_contract(w3)
-    escrow = vault.functions.getEscrow(escrow_id).call()
+    e = _escrow_dict(vault, w3, escrow_id)
     return {
         "escrow_id": escrow_id,
-        "buyer": escrow[0],
-        "seller": escrow[1],
-        "amount_wei": int(escrow[2]),
-        "delivery_deadline": int(escrow[3]),
-        "status": int(escrow[5]),
-        "delivered": escrow[6],
-        "confirmed": escrow[7],
-        "attested": escrow[8],
-        "released": escrow[9],
-        "verifier": escrow[10],
-        "logistics_partner": escrow[11],
-        "logistics_amount": int(escrow[12]),
-        "carrier_attested": escrow[13],
-        "carrier_status": escrow[19] if len(escrow) > 19 else "",
-        "verifier_attestations": int(escrow[21]) if len(escrow) > 21 else 0,
+        "buyer": e["buyer"],
+        "seller": e["seller"],
+        "amount_wei": int(e["amount"]),
+        "delivery_deadline": int(e["deliveryDeadline"]),
+        "status": int(e["status"]),
+        "delivered": e["delivered"],
+        "confirmed": e["fulfilledConfirmed"],
+        "attested": e["evidenceAttested"],
+        "released": e["released"],
+        "verifier": e["verifier"],
+        "logistics_partner": e["logisticsPartner"],
+        "logistics_amount": int(e["logisticsAmount"]),
+        "carrier_attested": e["carrierAttested"],
+        "carrier_delivered": e.get("carrierDelivered", False),
+        "carrier_status": e.get("carrierStatus", ""),
+        "verifier_attestations": int(e.get("verifierAttestations", 0)),
         "release_eligible": vault.functions.isReleaseEligible(escrow_id).call(),
         "refundable": vault.functions.isRefundable(escrow_id).call(),
-        # v5: nonce is per-escrow, so parallel escrows stay independent.
+        # v5/v6: nonce is per-escrow, so parallel escrows stay independent.
         "pqc_nonce": int(vault.functions.escrowNonce(escrow_id).call()),
     }
 
 
 def board_state() -> dict:
-    """Read the dispute board's parameters and pool directly from the chain."""
+    """Read the dispute board's parameters and pool directly from the chain.
+
+    Cached for 30s in Django's cache: the governor page calls this on every
+    render and 8 sequential eth_calls against the public RPC take >10s.
+    Board parameters change rarely (DAO proposals), so a short TTL is fine.
+    """
+    from django.core.cache import cache
+
+    cached = cache.get("sweeft:board_state")
+    if cached:
+        return cached
+
     import json
     import os
 
@@ -152,14 +195,19 @@ def board_state() -> dict:
         raise RelayerError("SWEEFT_DISPUTE_BOARD_ADDRESS is not configured")
     abi = load_abi(artifact_path("SweeftDisputeBoard"))
     board = make_contract(w3, address, abi)
-    return {
+    state = {
         "address": w3.to_checksum_address(address),
         "min_stake_wei": int(board.functions.minStake().call()),
         "reward_pool_wei": int(board.functions.rewardPool().call()),
+        "pool_size": int(board.functions.poolSize().call()),
+        "join_window": int(board.functions.joinWindow().call()),
         "voting_period": int(board.functions.votingPeriod().call()),
+        "appeal_window": int(board.functions.appealWindow().call()),
         "unstake_cooldown": int(board.functions.unstakeCooldown().call()),
         "dispute_count": int(board.functions.disputeCount().call()),
     }
+    cache.set("sweeft:board_state", state, 30)
+    return state
 
 
 def is_verifier(address: str) -> bool:
@@ -182,11 +230,11 @@ def is_verifier(address: str) -> bool:
         return False
 
 
-def carrier_nonce(carrier_evm: str) -> int:
-    """Current single-use nonce for a carrier (v5 attestation binding)."""
+def carrier_nonce(carrier_evm: str, escrow_id: int) -> int:
+    """Current per-(carrier, escrow) nonce for a v6 attestation binding (N-6)."""
     w3 = get_evm_client()
     vault = _vault_contract(w3)
-    return int(vault.functions.carrierNonce(w3.to_checksum_address(carrier_evm)).call())
+    return int(vault.functions.carrierNonce(w3.to_checksum_address(carrier_evm), int(escrow_id)).call())
 
 
 def attest_carrier_evidence(

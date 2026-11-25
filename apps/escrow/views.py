@@ -19,6 +19,7 @@ from django.views.decorators.http import require_GET, require_POST
 
 from apps.blockchain.services.relayer import RelayerError, escrow_state, is_verifier, submit_release
 from apps.oracle.models import FulfilmentEvidence
+from config.ratelimit import is_rate_limited
 from integrations.qorechain.client import get_network
 from integrations.qorechain.messages import release_message
 
@@ -48,6 +49,9 @@ def escrow_detail(request, escrow_id: int):
     shipment = Shipment.objects.filter(escrow=escrow).order_by("-created_at").first()
     verification = VerificationRequest.objects.filter(escrow=escrow).order_by("-created_at").first()
 
+    amount_wei = live_state.get("amount_wei") if live_state else int(escrow.amount_uqor) * 10**12
+    dispute_bond_wei = max(10**17, int(amount_wei) // 100)  # 1% with a 0.1 QOR floor
+
     return render(
         request,
         "escrow/detail.html",
@@ -56,6 +60,8 @@ def escrow_detail(request, escrow_id: int):
             "live": live_state,
             "network": get_network(),
             "dispute_board_address": os.getenv("SWEEFT_DISPUTE_BOARD_ADDRESS", ""),
+            "dispute_bond_wei": dispute_bond_wei,
+            "appeal_bond_wei": dispute_bond_wei * 2,
             "vault_address": os.getenv("SWEEFT_VAULT_ADDRESS", ""),
             "evidence": evidence,
             "shipment": shipment,
@@ -115,6 +121,9 @@ def release_request(request, escrow_id: int):
 @require_POST
 def release_submit(request, escrow_id: int):
     """Accept the wallet-produced ML-DSA-87 signature and relay the release."""
+    internal = _internal_token_ok(request)
+    if not internal and is_rate_limited("release-submit", request, 5):
+        return JsonResponse({"error": "slow down"}, status=429)
     try:
         payload = json.loads(request.body or b"{}")
     except json.JSONDecodeError:
@@ -176,12 +185,15 @@ def _require_buyer(request, escrow):
 
 
 def _internal_token_ok(request) -> bool:
+    import hmac
     import os
 
     expected = os.getenv("SWEEFT_INTERNAL_TOKEN", "")
     if not expected:
         return False
-    return request.headers.get("X-Internal-Token", "") == expected
+    provided = request.headers.get("X-Internal-Token", "")
+    # Constant-time comparison (N-12).
+    return hmac.compare_digest(provided, expected)
 
 
 @require_POST

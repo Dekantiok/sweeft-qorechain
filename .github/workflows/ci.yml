@@ -61,18 +61,17 @@ jobs:
   security-scans:
     name: Dependency + static analysis
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: pip-audit
+      - name: pip-audit (blocking)
         run: |
           python -m pip install pip-audit
-          pip-audit -r requirements.txt || true
-      - name: Slither
+          pip-audit -r requirements.txt
+      - name: Slither (blocking on High/Medium)
         uses: crytic/slither-action@v0.4.0
-        continue-on-error: true
         with:
           target: contracts/
+          fail-on: medium

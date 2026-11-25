@@ -13,7 +13,7 @@ from django.test import Client, TestCase
 from django.utils import timezone
 
 from apps.ai.models import Mandate
-from apps.ai.services.tools import tool_check_mandate
+from apps.ai.services.tools import _active_mandate, execute_tool, tool_check_mandate, tool_execute_autopilot
 from apps.commerce.models import Order
 from apps.escrow.models import Escrow
 from apps.participants.models import Participant
@@ -198,3 +198,191 @@ class MandateTests(TestCase):
         )
         result = tool_check_mandate("purchase", amount_qor=0.5, wallet=self.buyer.evm_address)
         self.assertFalse(result["within_caps"])
+
+
+class MandateWalletBindingTests(TestCase):
+    """N-11: a mandate must never be resolved for the wrong (or no) wallet."""
+
+    def setUp(self):
+        self.buyer = Participant.objects.create(
+            display_name="Buyer", evm_address="0xboundbuyer", qor_address="qor1bb"
+        )
+        self.other = Participant.objects.create(
+            display_name="Other", evm_address="0xboundother", qor_address="qor1bo"
+        )
+        Mandate.objects.create(
+            owner=self.buyer,
+            per_tx_limit_uqor=10_000_000,
+            daily_limit_uqor=10_000_000,
+            state=Mandate.State.ACTIVE,
+            expires_at=timezone.now() + timedelta(days=30),
+        )
+
+    def test_active_mandate_none_wallet_returns_none(self):
+        self.assertIsNone(_active_mandate(None))
+        self.assertIsNone(_active_mandate(""))
+
+    def test_active_mandate_does_not_leak_across_wallets(self):
+        self.assertIsNotNone(_active_mandate(self.buyer.evm_address))
+        self.assertIsNone(_active_mandate(self.other.evm_address))
+
+    def test_check_mandate_none_wallet_refuses(self):
+        result = tool_check_mandate("purchase", amount_qor=0.1, wallet=None)
+        self.assertFalse(result["within_caps"])
+        self.assertIn("no active mandate", result["reason"])
+
+    def test_check_mandate_other_wallet_refuses(self):
+        # The buyer has a mandate; the other wallet must not borrow it.
+        result = tool_check_mandate("purchase", amount_qor=0.1, wallet=self.other.evm_address)
+        self.assertFalse(result["within_caps"])
+
+    def test_execute_tool_ignores_model_supplied_wallet(self):
+        # Even if the model passes a victim wallet, the server-side wallet wins.
+        result = execute_tool(
+            "check_mandate",
+            wallet=self.other.evm_address,
+            action="purchase",
+            amount_qor=0.1,
+            wallet_supplied=self.buyer.evm_address,
+        )
+        # Server wallet is the other wallet, which has no mandate -> refused.
+        self.assertFalse(result["within_caps"])
+
+        result = execute_tool(
+            "check_mandate",
+            wallet=self.buyer.evm_address,
+            action="purchase",
+            amount_qor=0.1,
+            wallet_supplied=self.other.evm_address,
+        )
+        self.assertTrue(result["within_caps"])
+
+
+class AutopilotWalletBindingTests(TestCase):
+    def setUp(self):
+        self.buyer = Participant.objects.create(
+            display_name="Buyer", evm_address="0xapbuyer", qor_address="qor1apb"
+        )
+        self.seller = Participant.objects.create(
+            display_name="Seller", evm_address="0xapseller", qor_address="qor1aps"
+        )
+        self.order = Order.objects.create(
+            buyer=self.buyer, seller=self.seller, unit_price_uqor=100, total_uqor=100
+        )
+        self.escrow = Escrow.objects.create(
+            on_chain_id=7,
+            order=self.order,
+            buyer=self.buyer,
+            seller=self.seller,
+            amount_uqor=100,
+            delivery_deadline=timezone.now() + timedelta(days=7),
+            autopilot_enabled=True,
+            autopilot_release_signature_b64="AA==",
+        )
+
+    def test_execute_autopilot_no_wallet_rejected(self):
+        result = tool_execute_autopilot(7, wallet=None)
+        self.assertIn("error", result)
+        self.assertIn("not authorized", result["error"])
+
+    def test_execute_autopilot_seller_rejected(self):
+        result = tool_execute_autopilot(7, wallet=self.seller.evm_address)
+        self.assertIn("error", result)
+        self.assertIn("not authorized", result["error"])
+
+    def test_execute_autopilot_other_buyer_rejected(self):
+        stranger = Participant.objects.create(
+            display_name="Stranger", evm_address="0xapstranger", qor_address="qor1aps2"
+        )
+        result = tool_execute_autopilot(7, wallet=stranger.evm_address)
+        self.assertIn("error", result)
+        self.assertIn("not authorized", result["error"])
+
+
+class RateLimitHelperTests(TestCase):
+    def _request(self, remote="127.0.0.1", forwarded=None):
+        from django.test import RequestFactory
+
+        req = RequestFactory().get("/")
+        req.META["REMOTE_ADDR"] = remote
+        if forwarded is not None:
+            req.META["HTTP_X_FORWARDED_FOR"] = forwarded
+        return req
+
+    def test_client_ip_ignores_forwarded_by_default(self):
+        from config.ratelimit import client_ip
+
+        with self.settings():
+            import os
+
+            os.environ.pop("SWEEFT_TRUST_PROXY", None)
+            req = self._request(remote="10.0.0.9", forwarded="1.2.3.4")
+            self.assertEqual(client_ip(req), "10.0.0.9")
+
+    def test_client_ip_uses_last_hop_when_trust_proxy(self):
+        import os
+
+        from config.ratelimit import client_ip
+
+        old = os.environ.get("SWEEFT_TRUST_PROXY")
+        os.environ["SWEEFT_TRUST_PROXY"] = "1"
+        try:
+            req = self._request(remote="10.0.0.9", forwarded="1.2.3.4, 5.6.7.8")
+            # Last hop (appended by nearest trusted proxy), not the forgeable first.
+            self.assertEqual(client_ip(req), "5.6.7.8")
+        finally:
+            if old is None:
+                os.environ.pop("SWEEFT_TRUST_PROXY", None)
+            else:
+                os.environ["SWEEFT_TRUST_PROXY"] = old
+
+    def test_is_rate_limited_second_call_within_window(self):
+        from django.core.cache import cache
+
+        from config.ratelimit import is_rate_limited
+
+        cache.clear()
+        req = self._request(remote="192.0.2.55")
+        self.assertFalse(is_rate_limited("test-scope", req, 60))
+        self.assertTrue(is_rate_limited("test-scope", req, 60))
+        cache.clear()
+
+
+class CspNonceTests(TestCase):
+    def test_csp_nonce_exposed_and_header_substituted(self):
+        from django.test import RequestFactory, override_settings
+
+        from config.context_processors import csp_nonce
+        from config.middleware import ContentSecurityPolicyMiddleware
+
+        req = RequestFactory().get("/")
+        req.csp_nonce = "test-nonce-123"
+        self.assertEqual(csp_nonce(req)["csp_nonce"], "test-nonce-123")
+
+        policy = "default-src 'self'; script-src 'self' 'nonce-{nonce}'; object-src 'none'"
+        with override_settings(CONTENT_SECURITY_POLICY=policy):
+            mw = ContentSecurityPolicyMiddleware(lambda r: __import__("django.http", fromlist=["HttpResponse"]).HttpResponse("ok"))
+            mw.policy = policy
+            resp = mw(req)
+            header = resp["Content-Security-Policy"]
+            self.assertIn("'nonce-", header)
+            self.assertNotIn("{nonce}", header)
+            self.assertIn("object-src 'none'", header)
+            self.assertNotIn("'unsafe-inline'", header.split("script-src")[1].split(";")[0])
+
+    def test_homepage_renders_nonce_attribute(self):
+        import re
+
+        client = Client()
+        r = client.get("/")
+        self.assertEqual(r.status_code, 200)
+        # The middleware always sets a per-request nonce (prod CSP uses it).
+        m = re.search(r'<script nonce="([^"]+)">', r.content.decode())
+        self.assertIsNotNone(m)
+        self.assertTrue(len(m.group(1)) >= 16)
+        # No inline handlers / CDN scripts remain in the base template.
+        body = r.content.decode()
+        self.assertNotIn("cdn.tailwindcss.com", body)
+        self.assertNotIn("unpkg.com", body)
+        self.assertNotIn("alpinejs", body)
+        self.assertNotIn("onclick=", body)

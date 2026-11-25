@@ -1,0 +1,12 @@
+{
+  "name": "sweeft-qorechain",
+  "private": true,
+  "description": "Build tooling for the Sweeft Django frontend (Tailwind CSS only).",
+  "scripts": {
+    "build:css": "tailwindcss -i static/css/sweeft.src.css -o static/css/sweeft.css --minify",
+    "watch:css": "tailwindcss -i static/css/sweeft.src.css -o static/css/sweeft.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "3.4.16"
+  }
+}

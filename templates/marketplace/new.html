@@ -75,7 +75,7 @@
     </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 const MARKETPLACE = "{{ marketplace_address }}";
 const WALLET = "{{ wallet_account|escapejs }}";
 const CREATE_LISTING_SELECTOR = "0a4b8e27"; // createListing(uint256,uint64,string,bytes32)

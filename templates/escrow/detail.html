@@ -290,7 +290,7 @@
     </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 // Autopilot: pre-authorize the release once (QoreX ML-DSA), AI submits when attested.
 const preauthButton = document.getElementById("preauth-button");
 const preauthStatus = document.getElementById("preauth-status");
@@ -528,11 +528,12 @@ document.getElementById("carrier-attest")?.addEventListener("click", async () =>
 
 disputeButton?.addEventListener("click", async () => {
     try {
-        // openDispute(uint256 escrowId) — selector 0x27d00fb0
+        // openDispute(uint256 escrowId) — selector 0x27d00fb0. The raiser bond
+        // is 1% of escrow value with a 0.1 QOR floor (computed server-side).
         const data = "0x27d00fb0" + ESCROW_ID.toString(16).padStart(64, "0");
         disputeStatus.textContent = "Confirm in your wallet…";
-        const txHash = await window.SweeftWallet.sendTx({ to: BOARD, data });
-        disputeStatus.textContent = "Dispute opened — resolvers can now join.";
+        const txHash = await window.SweeftWallet.sendTx({ to: BOARD, data, value: BigInt({{ dispute_bond_wei }}) });
+        disputeStatus.textContent = "Dispute opened — a staked panel can now be drawn.";
         console.log("dispute tx", txHash);
         setTimeout(() => location.reload(), 6000);
     } catch (err) {

@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Sweeft — custom styles beyond Tailwind */
+
+/* HTMX request indicator */
+.htmx-indicator {
+    opacity: 0;
+    transition: opacity 200ms ease-in;
+}
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator {
+    opacity: 1;
+}
+
+/* Escrow status colors */
+.status-created  { @apply text-slate-400; }
+.status-funded   { @apply text-amber-400; }
+.status-completed { @apply text-teal-400; }
+.status-refunded { @apply text-blue-400; }
+.status-cancelled { @apply text-slate-500; }
+
+/* Monospace hashes */
+.hash {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 0.8em;
+    word-break: break-all;
+}

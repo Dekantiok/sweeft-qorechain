@@ -7,6 +7,7 @@ the APIs, and lands the same records. Tools NEVER sign or move money.
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
 import logging
 import time
@@ -152,10 +153,15 @@ def _decimal(value) -> Decimal:
 def _active_mandate(wallet: str | None):
     from apps.ai.models import Mandate
 
-    qs = Mandate.objects.filter(state=Mandate.State.ACTIVE)
-    if wallet:
-        qs = qs.filter(owner__evm_address__iexact=wallet)
-    return qs.order_by("-created_at").first()
+    # Never resolve a mandate without an explicit wallet — otherwise one user's
+    # mandate could be applied to another user's request (N-11).
+    if not wallet:
+        return None
+    return (
+        Mandate.objects.filter(state=Mandate.State.ACTIVE, owner__evm_address__iexact=wallet)
+        .order_by("-created_at")
+        .first()
+    )
 
 
 def _daily_spend_uqor(mandate) -> int:
@@ -233,12 +239,13 @@ def tool_check_mandate(action: str = "purchase", amount_qor: float = 0, wallet: 
     }
 
 
-def tool_execute_autopilot(escrow_id: int) -> dict:
+def tool_execute_autopilot(escrow_id: int, wallet: str | None = None) -> dict:
     """Submit a stored pre-signed release if the escrow is eligible.
 
     This is the autopilot moment: the AI executes the exact authorization the
     buyer signed once. It cannot alter recipient/amount/nonce — the contract
-    checks them. Mandate caps are re-checked first.
+    checks them. Mandate caps are re-checked first. The caller's wallet is
+    resolved server-side and must be the escrow's buyer (N-11).
     """
     from apps.blockchain.services.relayer import escrow_state, submit_release as relayer_release
     from apps.escrow.models import Escrow
@@ -246,12 +253,13 @@ def tool_execute_autopilot(escrow_id: int) -> dict:
     escrow = Escrow.objects.filter(on_chain_id=int(escrow_id)).first()
     if not escrow:
         return {"error": f"escrow {escrow_id} not found"}
+    if not wallet or (escrow.buyer and escrow.buyer.evm_address.lower() != wallet.lower()):
+        return {"error": "not authorized for this escrow"}
     if not escrow.autopilot_enabled or not escrow.autopilot_release_signature_b64:
         return {"error": "no pre-authorization stored — the buyer must sign once in QoreX first (Autopilot on the escrow page)"}
 
     # Django-side mandate check (the chain rule is the hard cap)
     amount_qor = float(escrow.amount_uqor) / 1e12
-    wallet = escrow.buyer.evm_address if escrow.buyer else None
     caps = tool_check_mandate("release", amount_qor, wallet=wallet)
     if not caps.get("within_caps"):
         from apps.ai.models import AgentAction, Mandate
@@ -306,7 +314,7 @@ def tool_execute_autopilot(escrow_id: int) -> dict:
     return {"ok": True, "tx_hash": result["tx_hash"], "escrow_id": int(escrow_id), "actor": "AI autopilot (pre-signed release)"}
 
 
-def tool_negotiate(listing_id: int, offered_qor: float = 0, details: str = "") -> dict:
+def tool_negotiate(listing_id: int, offered_qor: float = 0, details: str = "", wallet: str | None = None) -> dict:
     """Bargain against a listing's floor without revealing it.
 
     The seller's floor number is never returned. Outcomes:
@@ -333,7 +341,7 @@ def tool_negotiate(listing_id: int, offered_qor: float = 0, details: str = "") -
     # Mandate check first — the AI can never bargain above caps
     from .tools import tool_check_mandate
 
-    caps = tool_check_mandate("purchase", float(offered_qor) if offered_qor else 0)
+    caps = tool_check_mandate("purchase", float(offered_qor) if offered_qor else 0, wallet=wallet)
     if not caps.get("within_caps"):
         return {"error": "offer outside mandate caps — refusing to negotiate"}
 
@@ -412,12 +420,21 @@ TOOLS_REGISTRY = {
 }
 
 
-def execute_tool(name: str, **kwargs) -> dict:
+def execute_tool(name: str, wallet: str | None = None, **kwargs) -> dict:
+    """Dispatch a model-chosen tool with schema-checked arguments.
+
+    Arguments not in the tool's signature are dropped, and `wallet` is injected
+    server-side only — a model can never supply or spoof a wallet (N-11).
+    """
     fn = TOOLS_REGISTRY.get(name)
     if not fn:
         return {"error": f"unknown tool {name}"}
+    params = inspect.signature(fn).parameters
+    args = {k: v for k, v in kwargs.items() if k in params and k != "wallet"}
+    if "wallet" in params:
+        args["wallet"] = wallet
     try:
-        return fn(**kwargs)
+        return fn(**args)
     except Exception as exc:  # pragma: no cover
         logger.exception("tool %s failed", name)
         return {"error": str(exc)[:300]}

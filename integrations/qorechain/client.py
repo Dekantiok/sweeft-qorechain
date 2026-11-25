@@ -67,4 +67,6 @@ def get_evm_client():
     from web3 import Web3
 
     network = get_network()
-    return Web3(Web3.HTTPProvider(network.evm_rpc_url))
+    # Explicit timeout so a slow public RPC fails fast instead of hanging a
+    # page render (views fall back to indexed DB state on error).
+    return Web3(Web3.HTTPProvider(network.evm_rpc_url, request_kwargs={"timeout": 10}))

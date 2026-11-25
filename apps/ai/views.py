@@ -59,6 +59,7 @@ def chat(request):
     if len(user_message) > 2000:
         return JsonResponse({"error": "message too long (max 2000 chars)"}, status=400)
 
+    wallet = (request.session.get("wallet_account") or {}).get("evm", "")
     participant = _participant_for(request)
 
     conversation = None
@@ -79,7 +80,7 @@ def chat(request):
         Message.objects.create(conversation=conversation, role=Message.Role.USER, content=user_message)
 
     try:
-        result = run_chat(user_message, history=history)
+        result = run_chat(user_message, wallet=(wallet or None), history=history)
     except Exception as exc:  # pragma: no cover
         logger.exception("AI chat failed")
         return JsonResponse({"error": f"AI service error: {exc}"}, status=502)

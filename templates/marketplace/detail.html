@@ -61,7 +61,7 @@
     </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 // Buy flow: EVM wallet purchase inside an open scoped EVM window.
 // purchase(uint256 listingId, uint64 deliveryDeadline) payable — selector 0xb79bd650
 const buyButton = document.getElementById("buy-button");

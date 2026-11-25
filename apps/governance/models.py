@@ -1,6 +1,6 @@
 """Governance — Sweeft-specific proposals.
 
-One wallet, one vote. The MVP's executable power: oracle verifier approval
+Stake-weighted voting. The MVP's executable power: oracle verifier approval
 (executed on-chain against SweeftOracleRegistry). All other proposal types are
 recorded and read by Django as parameters.
 """
@@ -27,6 +27,9 @@ class Proposal(models.Model):
         EXECUTED = "executed", "Executed"
         REJECTED = "rejected", "Rejected"
         CANCELLED = "cancelled", "Cancelled"
+        EXPIRED = "expired", "Expired"
+        FAILED = "failed", "Failed"
+        VETOED = "vetoed", "Vetoed"
 
     on_chain_id = models.PositiveBigIntegerField(unique=True, null=True, blank=True)
     proposer = models.ForeignKey(Participant, on_delete=models.PROTECT, related_name="proposals")
@@ -85,8 +88,10 @@ class Dispute(models.Model):
     """A staked-resolver dispute over a frozen escrow (SweeftDisputeBoard)."""
 
     class State(models.TextChoices):
-        OPEN = "open", "Open"
-        RESOLVED = "resolved", "Resolved"
+        OPEN = "open", "Open"  # first panel voting
+        RESOLVED = "resolved", "Decision pending appeal"
+        APPEALED = "appealed", "Appealed"
+        FINAL = "final", "Final"
 
     on_chain_id = models.PositiveBigIntegerField(unique=True)
     escrow = models.ForeignKey("escrow.Escrow", on_delete=models.PROTECT, related_name="disputes")
@@ -94,13 +99,22 @@ class Dispute(models.Model):
 
     state = models.CharField(max_length=16, choices=State.choices, default=State.OPEN)
     release_to_seller = models.BooleanField(null=True, blank=True)
+    panel_selected = models.BooleanField(default=False)
 
     votes_for_release = models.PositiveSmallIntegerField(default=0)
     votes_for_refund = models.PositiveSmallIntegerField(default=0)
+    appeal_votes_for_release = models.PositiveSmallIntegerField(default=0)
+    appeal_votes_for_refund = models.PositiveSmallIntegerField(default=0)
+
+    appeal_bond_wei = models.BigIntegerField(default=0)
+    appeal_ends_at = models.DateTimeField(null=True, blank=True)
+    appeal_voting_ends_at = models.DateTimeField(null=True, blank=True)
 
     opened_tx = models.CharField(max_length=80, blank=True)
     settled_tx = models.CharField(max_length=80, blank=True)
+    joining_ends_at = models.DateTimeField(null=True, blank=True)
     voting_ends_at = models.DateTimeField(null=True, blank=True)
+    decision_tx = models.CharField(max_length=80, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -118,6 +132,11 @@ class DisputeMember(models.Model):
     position = models.PositiveSmallIntegerField()
     vote_release = models.BooleanField(null=True, blank=True)
     claimed = models.BooleanField(default=False)
+
+    @property
+    def panel(self) -> str:
+        return "appeal" if self.position >= 10 else "first"
+
     claimed_uqor = models.DecimalField(max_digits=30, decimal_places=0, default=0)
     joined_at = models.DateTimeField(auto_now_add=True)
 

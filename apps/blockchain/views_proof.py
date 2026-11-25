@@ -167,14 +167,14 @@ def security_page(request):
             "action": "Release escrow to seller",
             "who": "Buyer (guardian) — ML-DSA-87 signature",
             "mechanism": "SweeftVault.release() verifies the buyer's signature against the key registered on chain (pqcKeyStatus → pqcVerify).",
-            "anti_replay": "Per-buyer nonce in the signed message (qorechain-msg-v1|…|nonce=…) — a used signature can never settle twice.",
+            "anti_replay": "Per-escrow nonce in the signed message (qorechain-msg-v1|…|nonce=…) — a used signature can never settle twice.",
             "evidence": "testnet attack sims: wrong-key and tampered-amount signatures both revert",
         },
         {
             "action": "Refund after deadline",
             "who": "Buyer — same ML-DSA-87 gate",
             "mechanism": "refundAfterDeadline() with the refund-tagged message; blocked once a verifier attests.",
-            "anti_replay": "Same per-buyer nonce.",
+            "anti_replay": "Same per-escrow nonce.",
             "evidence": "deadline path tested in Foundry (deadline, attest-blocked refund)",
         },
         {
@@ -194,13 +194,13 @@ def security_page(request):
         {
             "action": "Dispute settlement",
             "who": "Board contract (staked resolvers)",
-            "mechanism": "Only the board may call resolveDispute; it needs a 2-of-3 resolver majority. Stakes (≥20 QOR) lock while serving.",
+            "mechanism": "Only the board may call resolveDispute; it needs a 2-of-3 resolver majority (v6: random panel from the staked pool, 5-resolver appeal). Stakes (≥20 QOR, v6: +100% of escrow) lock while serving.",
             "anti_replay": "Disputed status is terminal for the normal paths.",
-            "evidence": "dispute E2E settled on Diana; resolvers claimed their 10%-of-fee rewards",
+            "evidence": "v5 dispute E2E settled on Diana; resolvers claimed their 10%-of-fee rewards (v6 pays a fixed bond fee — v6 live with two PQ releases, no dispute run yet)",
         },
         {
             "action": "Governance changes",
-            "who": "SweeftDAO2 — one wallet, one vote, allowlisted targets",
+            "who": "SweeftDAO2 — stake-weighted (v6: QOR escrowed per vote, locked until final; v5 live: one wallet, one vote), allowlisted targets",
             "mechanism": "Calls are restricted to the oracle registry, vault and dispute board; params cannot be smuggled to arbitrary addresses.",
             "anti_replay": "Proposals are single-execution; description hash binds the call.",
             "evidence": "registry ownership migrated from DAO v1 by executed proposal",

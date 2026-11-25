@@ -4,7 +4,58 @@
 **Deployer:** `qor1etuzhk8tmpmrfmakzzhx8fau788r4jrapjkzlp` / `0xcaF82Bd8EBd87634eFb610aE63a7bCf1CE3ac87D`
 **Explorer:** https://explore.qore.network
 
-## v5 — hardened stack (current; 24 November 2026)
+## v6 — hardening release (live; deployed 24 November 2026)
+
+Deployed with `contracts/script/DeployV6.s.sol` after the deployer was topped
+up via the faucet (100 QOR). Wiring verified on-chain via `eth_call` (owners,
+`feeBps`, `threshold`, board/marketplace wiring, verifier + carrier
+registration, DAO allowlist + critical self-governance).
+
+| Contract | Address | Notes |
+|---|---|---|
+| **SweeftOracleRegistry (v6)** | `0x8f02e5c7A12677B8E264Ec3F1eC01a25E93E9734` | M-of-N threshold (1 on testnet); owner = DAO2 |
+| **SweeftVault (v6)** | `0x3F27405766e9c820eCCC650e5b8c48D3AeE6715f` | board-only `raiseDispute`; proof-based expiry (`carrierDelivered`); per-escrow nonce |
+| **SweeftMarketplace (v6)** | `0x95ee5565911dC8c99037B9654370438E78678594` | purchase pins price + metadata hash |
+| **SweeftDisputeBoard (v6)** | `0xbbbED3653Fb3aAD8a4E803ab34B506DfFF4b20a5` | random staked panels (20 QOR + 100% escrow), real 5-resolver appeal, fixed bond fee |
+| **SweeftDAO2 (v6)** | `0x4Db7cC7Bf39c9F1eB93D1727Bc5074284f397b2C` | stake-weighted votes (0.01 min, 0.03 quorum, 0.05 critical), guardian veto, cancel/expire; owns itself + the stack |
+
+Verified constants: `feeBps = 200`, `MIN_VOTING_PERIOD = 3 days`,
+`TIMELOCK = 2 days`, `PROPOSER_BOND = 0.05 QOR`, `minVoteStake = 0.01 QOR`,
+`quorumStake = 0.03 QOR`, `criticalQuorumStake = 0.05 QOR`, board
+`minStake = 20 QOR`, `joinWindow = 6h`, `votingPeriod = 48h`,
+`appealWindow = 2d`, registry `threshold = 1`.
+Verifier: `0x9E9745aABd5706291C0D4CA2FD2022B832a875c8`. Carrier (Demo,
+`LOG-DEMO-001`): `0xd2908Fd85fc5D5141AD2Bdd3913394245236Ec41`.
+
+### v6 end-to-end evidence (24 November 2026)
+
+`tools/e2e_marketplace.py` against vault `0x3F27…715f` — full PQ-gated
+release on v6 (run twice, both PASS):
+
+| Step | Escrow #0 | Escrow #1 |
+|---|---|---|
+| createEscrow (funded atomically) | `0x12334733…` | `0x71e8cea…` |
+| attestEvidence (verifier) | `0xf57a9012…` | `0xe19ca74a…` |
+| confirmReceipt | `0x4ea84b2d…` | `0x5d830e94…` |
+| release (ML-DSA-87 via `pqcVerify`) | `0x598b50c2…` | `0x6f11f4b2…` |
+
+Observed both runs: seller received 0.098 QOR (0.1 − 2% fee), escrow
+**Completed**, listing **Sold**; dispute reward pool holds 0.0012 QOR
+(30% fee share × 2 releases). Django relayer reads confirmed against v6
+(`escrow_state`, `board_state`, `isVerifier`). The indexer was synced to the
+v6 tip (`sync_all`, 0 handler failures).
+
+**Demo/E2E fixtures (24 November 2026):** escrow #2 (Funded, via
+`tools/create_funded_escrow.py`) and escrow #3 (release-eligible, via
+`tools/create_eligible_escrow.py`). Playwright E2E against the local app:
+**32/32 checks passed** (pages, wallet sessions, role-gated escrow actions,
+evidence, verifier attest, disputes, release-request for escrow #3).
+
+**Audit scope note:** the Stage 3 QCAI audit (78/100) covers **v5 only**
+(see `docs/AUDIT.md`). v6 is deployed but has not been externally audited;
+its evidence is the 131-test Foundry suite plus the live release above.
+
+## v5 — hardened stack (superseded by v6; 24 November 2026)
 
 Deployed with `contracts/script/DeployV5.s.sol` after the external security
 review (see `docs/AUDIT.md`). Wiring verified on-chain via `eth_call`

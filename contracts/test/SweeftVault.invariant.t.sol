@@ -25,7 +25,7 @@ contract SweeftVaultInvariantTest is Test {
     function setUp() public {
         registry = new SweeftOracleRegistry(address(this));
         vault = new SweeftVault(address(registry), "qorechain-diana", FEE_BPS, treasury);
-        board = new SweeftDisputeBoard(address(vault));
+        board = new SweeftDisputeBoard(address(vault), treasury);
         vault.setDisputeBoard(address(board));
         market = new SweeftMarketplace(address(vault));
         vault.setMarketplace(address(market));

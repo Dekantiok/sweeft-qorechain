@@ -39,7 +39,13 @@ import qor_lib as lib  # noqa: E402
 
 PRICE = 10**17  # 0.1 QOR in wei (EVM lane is 18 decimals)
 DELIVERY_WINDOW = 120  # seconds until release eligibility
-VOTING_PERIOD = 90  # seconds for the DAO vote
+# v6 DAO2: 3-day minimum voting period + 2-day timelock, 0.05 QOR proposer
+# bond, stake-weighted votes (0.03 QOR quorum). The script polls until the
+# proposal is executable — budget days, or rely on the idempotent skip below
+# once the verifier is already authorized.
+VOTING_PERIOD = 3 * 24 * 3600
+PROPOSER_BOND = 5 * 10**16  # 0.05 QOR
+VOTE_STAKE = 3 * 10**16  # 0.03 QOR — meets quorum in a single vote
 START_FUNDS = 10**18  # 1 QOR in wei for each new account
 
 
@@ -56,7 +62,7 @@ def main() -> None:
     vault = lib.contract(w3, "SweeftVault")
     market = lib.contract(w3, "SweeftMarketplace")
     registry = lib.contract(w3, "SweeftOracleRegistry")
-    dao = lib.contract(w3, "SweeftDAO")
+    dao = lib.contract(w3, "SweeftDAO2")
 
     print("=" * 70)
     print("SWEEFT — COMPLETE MARKET SCENARIO (Diana testnet)")
@@ -93,16 +99,29 @@ def main() -> None:
         description = "Adds the Sweeft e2e demo verifier account to the oracle registry"
         proposal_id = dao.functions.proposalCount().call()
         result = lib.send_evm_expect_success(
-            w3, buyer, dao.functions.propose(call_data, title, description, VOTING_PERIOD), gas=500_000
+            w3,
+            buyer,
+            dao.functions.propose(
+                w3.to_checksum_address(lib.contract_address("SweeftOracleRegistry")),
+                call_data,
+                title,
+                description,
+                VOTING_PERIOD,
+            ),
+            value=PROPOSER_BOND,
+            gas=500_000,
         )
         print(f"      proposal #{proposal_id} — tx {result['hash']}")
 
-        print("[dao] casting vote (1 wallet, 1 vote)")
-        result = lib.send_evm_expect_success(w3, buyer, dao.functions.castVote(proposal_id, 1), gas=200_000)
+        print("[dao] casting stake-weighted vote (0.03 QOR locked as voting power)")
+        result = lib.send_evm_expect_success(
+            w3, buyer, dao.functions.castVote(proposal_id, 1), value=VOTE_STAKE, gas=200_000
+        )
         print(f"      vote tx {result['hash']}")
 
-        print(f"[dao] waiting {VOTING_PERIOD}s for voting to close")
-        time.sleep(VOTING_PERIOD + 5)
+        print("[dao] waiting for voting period + timelock (polling isExecutable)")
+        while not dao.functions.isExecutable(proposal_id).call():
+            time.sleep(3600)
 
         print("[dao] executing proposal (calls the oracle registry)")
         result = lib.send_evm_expect_success(
@@ -194,7 +213,8 @@ def main() -> None:
     print(f"reputation hook : escrow #{escrow_id} completed — evidence attested by verifier")
     print()
 
-    if delta != PRICE or escrow[5] != 2:
+    fee = (PRICE * 200) // 10_000  # 2% on release
+    if delta != PRICE - fee or escrow[5] != 2:
         lib.die("final assertions failed")
     print("COMPLETE MARKET SCENARIO: PASS")
 

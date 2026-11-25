@@ -52,15 +52,30 @@ EVENTS = {
     ],
     "SweeftOracleRegistry": ["VerifierAdded", "VerifierRemoved"],
     "SweeftDAO": ["ProposalCreated", "VoteCast", "ProposalExecuted", "ProposalRejected"],
-    "SweeftDAO2": ["ProposalCreated", "VoteCast", "ProposalExecuted", "ProposalRejected"],
+    "SweeftDAO2": [
+        "ProposalCreated",
+        "VoteCast",
+        "ProposalExecuted",
+        "ProposalRejected",
+        "ProposalCancelled",
+        "ProposalExpired",
+        "ProposalFailed",
+        "ProposalVetoed",
+    ],
     "SweeftDisputeBoard": [
         "Staked",
         "StakeWithdrawn",
         "DisputeOpened",
-        "ResolverJoined",
+        "PanelSelected",
         "ResolverVoted",
+        "DisputeDecisionRecorded",
+        "AppealOpened",
+        "AppealPanelSelected",
+        "AppealResolverVoted",
+        "AppealResolved",
         "DisputeSettled",
         "RewardClaimed",
+        "Slashed",
     ],
 }
 
@@ -302,7 +317,8 @@ def _handle_funds_released(event) -> dict:
     if escrow:
         escrow.state = Escrow.State.COMPLETED
         escrow.release_tx = event.tx_hash
-        escrow.pqc_nonce = int(args["pqcNonce"]) + 1
+        # v5 emitted `pqcNonce`, v6 emits `nonce` (the nonce just consumed).
+        escrow.pqc_nonce = int(args.get("pqcNonce", args.get("nonce", 0))) + 1
         escrow.save(update_fields=["state", "release_tx", "pqc_nonce", "updated_at"])
         escrow.order.state = Order.State.COMPLETED
         escrow.order.save(update_fields=["state", "updated_at"])
@@ -324,7 +340,8 @@ def _handle_escrow_refunded(event) -> dict:
     if escrow:
         escrow.state = Escrow.State.REFUNDED
         escrow.refund_tx = event.tx_hash
-        escrow.pqc_nonce = int(args["pqcNonce"]) + 1
+        # v5 emitted `pqcNonce`, v6 emits `nonce` (the nonce just consumed).
+        escrow.pqc_nonce = int(args.get("pqcNonce", args.get("nonce", 0))) + 1
         escrow.save(update_fields=["state", "refund_tx", "pqc_nonce", "updated_at"])
         escrow.order.state = Order.State.CANCELLED
         escrow.order.save(update_fields=["state", "updated_at"])
@@ -449,6 +466,7 @@ def _handle_dispute_opened(event) -> dict:
         defaults={
             "escrow": escrow,
             "raiser": _participant_for(args["raiser"]),
+            "joining_ends_at": datetime.fromtimestamp(int(args["joinEndsAt"]), tz=dt_timezone.utc),
             "voting_ends_at": datetime.fromtimestamp(int(args["votingEndsAt"]), tz=dt_timezone.utc),
             "opened_tx": event.tx_hash,
         },
@@ -459,17 +477,123 @@ def _handle_dispute_opened(event) -> dict:
     return {"dispute_id": dispute.on_chain_id}
 
 
-def _handle_resolver_joined(event) -> dict:
+def _add_panel_members(dispute, members, offset: int) -> None:
+    from apps.governance.models import DisputeMember
+
+    zero = "0x" + "0" * 40
+    for position, resolver in enumerate(members):
+        if not resolver or resolver.lower() == zero:
+            continue
+        DisputeMember.objects.get_or_create(
+            dispute=dispute,
+            participant=_participant_for(resolver),
+            defaults={"position": offset + position},
+        )
+
+
+def _handle_panel_selected(event) -> dict:
+    from apps.governance.models import Dispute
+
+    args = event.args
+    dispute = Dispute.objects.filter(on_chain_id=int(args["disputeId"])).first()
+    if dispute:
+        dispute.panel_selected = True
+        dispute.save(update_fields=["panel_selected", "updated_at"])
+        _add_panel_members(dispute, args["members"], 0)
+    return {"dispute_id": args["disputeId"]}
+
+
+def _handle_dispute_decision_recorded(event) -> dict:
+    from datetime import datetime, timezone as dt_timezone
+
+    from apps.governance.models import Dispute
+
+    args = event.args
+    dispute = Dispute.objects.filter(on_chain_id=int(args["disputeId"])).first()
+    if dispute:
+        dispute.state = Dispute.State.RESOLVED
+        dispute.release_to_seller = bool(args["releaseToSeller"])
+        dispute.appeal_ends_at = datetime.fromtimestamp(int(args["finalizeAfter"]), tz=dt_timezone.utc)
+        dispute.decision_tx = event.tx_hash
+        dispute.save(
+            update_fields=["state", "release_to_seller", "appeal_ends_at", "decision_tx", "updated_at"]
+        )
+    return {"dispute_id": args["disputeId"]}
+
+
+def _handle_appeal_opened(event) -> dict:
+    from datetime import datetime, timezone as dt_timezone
+
+    from apps.governance.models import Dispute
+
+    args = event.args
+    dispute = Dispute.objects.filter(on_chain_id=int(args["disputeId"])).first()
+    if dispute:
+        dispute.state = Dispute.State.APPEALED
+        dispute.appeal_bond_wei = int(args["bond"])
+        dispute.appeal_voting_ends_at = datetime.fromtimestamp(
+            int(args["votingEndsAt"]), tz=dt_timezone.utc
+        )
+        dispute.save(
+            update_fields=[
+                "state",
+                "appeal_bond_wei",
+                "appeal_voting_ends_at",
+                "updated_at",
+            ]
+        )
+    return {"dispute_id": args["disputeId"]}
+
+
+def _handle_appeal_panel_selected(event) -> dict:
+    from apps.governance.models import Dispute
+
+    args = event.args
+    dispute = Dispute.objects.filter(on_chain_id=int(args["disputeId"])).first()
+    if dispute:
+        _add_panel_members(dispute, args["members"], 10)
+    return {"dispute_id": args["disputeId"]}
+
+
+def _handle_appeal_voted(event) -> dict:
     from apps.governance.models import Dispute, DisputeMember
 
     args = event.args
     dispute = Dispute.objects.filter(on_chain_id=int(args["disputeId"])).first()
     if dispute:
-        DisputeMember.objects.get_or_create(
+        member = DisputeMember.objects.filter(
             dispute=dispute,
-            participant=_participant_for(args["resolver"]),
-            defaults={"position": int(args["position"])},
+            participant__evm_address__iexact=args["resolver"].lower(),
+            position__gte=10,
+        ).first()
+        if member:
+            member.vote_release = bool(args["releaseToSeller"])
+            member.save(update_fields=["vote_release"])
+        # Recount for replay safety.
+        dispute.appeal_votes_for_release = dispute.members.filter(
+            position__gte=10, vote_release=True
+        ).count()
+        dispute.appeal_votes_for_refund = dispute.members.filter(
+            position__gte=10, vote_release=False
+        ).count()
+        dispute.save(
+            update_fields=[
+                "appeal_votes_for_release",
+                "appeal_votes_for_refund",
+                "updated_at",
+            ]
         )
+    return {"dispute_id": args["disputeId"]}
+
+
+def _handle_appeal_resolved(event) -> dict:
+    from apps.governance.models import Dispute
+
+    args = event.args
+    dispute = Dispute.objects.filter(on_chain_id=int(args["disputeId"])).first()
+    if dispute:
+        dispute.release_to_seller = bool(args["releaseToSeller"])
+        dispute.save(update_fields=["release_to_seller", "updated_at"])
     return {"dispute_id": args["disputeId"]}
 
 
@@ -480,14 +604,17 @@ def _handle_resolver_voted(event) -> dict:
     dispute = Dispute.objects.filter(on_chain_id=int(args["disputeId"])).first()
     if dispute:
         member = DisputeMember.objects.filter(
-            dispute=dispute, participant__evm_address__iexact=args["resolver"].lower()
+            dispute=dispute,
+            participant__evm_address__iexact=args["resolver"].lower(),
+            position__lt=10,
         ).first()
         if member:
             member.vote_release = bool(args["releaseToSeller"])
             member.save(update_fields=["vote_release"])
         # Recount instead of incrementing — handlers must be replay-safe.
-        dispute.votes_for_release = dispute.members.filter(vote_release=True).count()
-        dispute.votes_for_refund = dispute.members.filter(vote_release=False).count()
+        first_panel = dispute.members.filter(position__lt=10)
+        dispute.votes_for_release = first_panel.filter(vote_release=True).count()
+        dispute.votes_for_refund = first_panel.filter(vote_release=False).count()
         dispute.save(update_fields=["votes_for_release", "votes_for_refund", "updated_at"])
     return {"dispute_id": args["disputeId"]}
 
@@ -498,7 +625,7 @@ def _handle_dispute_settled(event) -> dict:
     args = event.args
     dispute = Dispute.objects.filter(on_chain_id=int(args["disputeId"])).first()
     if dispute:
-        dispute.state = Dispute.State.RESOLVED
+        dispute.state = Dispute.State.FINAL
         dispute.release_to_seller = bool(args["releaseToSeller"])
         dispute.settled_tx = event.tx_hash
         dispute.save(update_fields=["state", "release_to_seller", "settled_tx", "updated_at"])
@@ -620,6 +747,21 @@ def _handle_proposal_rejected(event) -> dict:
     return {"proposal_id": event.args["proposalId"]}
 
 
+def _handle_proposal_terminal(state):
+    """Build a replay-safe handler that marks a proposal in a terminal state."""
+
+    def _handle(event) -> dict:
+        from apps.governance.models import Proposal
+
+        proposal = Proposal.objects.filter(on_chain_id=int(event.args["proposalId"])).first()
+        if proposal:
+            proposal.state = state
+            proposal.save(update_fields=["state"])
+        return {"proposal_id": event.args["proposalId"]}
+
+    return _handle
+
+
 def _handle_carrier_attested(event) -> dict:
     args = event.args
     escrow = Escrow.objects.filter(on_chain_id=int(args["escrowId"])).first()
@@ -667,8 +809,13 @@ HANDLERS = {
     ("SweeftDisputeBoard", "Staked"): _handle_staked,
     ("SweeftDisputeBoard", "StakeWithdrawn"): _handle_stake_withdrawn,
     ("SweeftDisputeBoard", "DisputeOpened"): _handle_dispute_opened,
-    ("SweeftDisputeBoard", "ResolverJoined"): _handle_resolver_joined,
+    ("SweeftDisputeBoard", "PanelSelected"): _handle_panel_selected,
     ("SweeftDisputeBoard", "ResolverVoted"): _handle_resolver_voted,
+    ("SweeftDisputeBoard", "DisputeDecisionRecorded"): _handle_dispute_decision_recorded,
+    ("SweeftDisputeBoard", "AppealOpened"): _handle_appeal_opened,
+    ("SweeftDisputeBoard", "AppealPanelSelected"): _handle_appeal_panel_selected,
+    ("SweeftDisputeBoard", "AppealResolverVoted"): _handle_appeal_voted,
+    ("SweeftDisputeBoard", "AppealResolved"): _handle_appeal_resolved,
     ("SweeftDisputeBoard", "DisputeSettled"): _handle_dispute_settled,
     ("SweeftDisputeBoard", "RewardClaimed"): _handle_reward_claimed,
     ("SweeftDAO", "ProposalCreated"): lambda e: _handle_proposal_created(e, has_target=False),
@@ -679,6 +826,10 @@ HANDLERS = {
     ("SweeftDAO2", "VoteCast"): _handle_proposal_voted,
     ("SweeftDAO2", "ProposalExecuted"): _handle_proposal_executed,
     ("SweeftDAO2", "ProposalRejected"): _handle_proposal_rejected,
+    ("SweeftDAO2", "ProposalCancelled"): _handle_proposal_terminal("cancelled"),
+    ("SweeftDAO2", "ProposalExpired"): _handle_proposal_terminal("expired"),
+    ("SweeftDAO2", "ProposalFailed"): _handle_proposal_terminal("failed"),
+    ("SweeftDAO2", "ProposalVetoed"): _handle_proposal_terminal("vetoed"),
 }
 
 

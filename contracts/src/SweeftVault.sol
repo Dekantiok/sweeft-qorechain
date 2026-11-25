@@ -50,15 +50,15 @@ contract SweeftVault {
         uint64 deliveryDeadline; // unix seconds
         uint64 createdAt; // unix seconds
         EscrowStatus status;
-        bool delivered; // seller marked delivered or buyer confirmed receipt
+        bool delivered; // SELLER CLAIM: starts the buyer inspection window (not proof)
         bool fulfilledConfirmed; // buyer confirmed receipt (full release path)
-        bool evidenceAttested; // oracle/carrier threshold met
+        bool evidenceAttested; // verifier threshold OR carrier DELIVERED (proof)
         bool released;
         address verifier; // the verifier/carrier that pushed attestation over threshold
         // --- logistics (v4, appended for ABI compatibility) ---
         address logisticsPartner; // zero = physical-less / digital default
         uint256 logisticsAmount; // paid to partner, separate from seller goods
-        bool carrierAttested; // signed carrier payload verified on-chain
+        bool carrierAttested; // signed carrier payload verified on-chain (any status)
         uint64 carrierAttestedAt;
         bytes32 carrierPayloadHash; // keccak256(canonical tracking payload)
         address carrierSigner;
@@ -68,6 +68,8 @@ contract SweeftVault {
         string carrierStatus; // last carrier status (e.g. DELIVERED, LOST)
         uint64 carrierIssuedAt; // carrier-claimed issue time (ms or s, opaque)
         uint8 verifierAttestations; // distinct verifier attestations recorded
+        // --- v6 appended fields ---
+        bool carrierDelivered; // PROOF: latest carrier status was DELIVERED (N-2)
     }
 
     // ------------------------------------------------------------------
@@ -129,6 +131,8 @@ contract SweeftVault {
     error BadTimestamp();
     error StaleAttestation();
     error AlreadyWired();
+    error BadStatus();
+    error RegistryUnavailable();
 
     // ------------------------------------------------------------------
     // QoreChain PQC precompiles (testnet-only; addresses must be lowercase)
@@ -176,6 +180,10 @@ contract SweeftVault {
     /// @notice A carrier payload may be at most this old when attested.
     uint64 public constant MAX_ATTEST_AGE = 7 days;
 
+    /// @notice Bounds on carrier-supplied strings stored in the escrow struct.
+    uint256 public constant MAX_STATUS_LEN = 32;
+    uint256 public constant MAX_TRACKING_LEN = 128;
+
     uint256 public immutable deployedAt;
 
     uint256 public escrowCount;
@@ -189,8 +197,10 @@ contract SweeftVault {
     /// @notice Authorized logistics carriers, by QoreChain account address.
     mapping(address => bool) public isCarrier;
     mapping(address => string) public carrierProviderId;
-    /// @notice Per-carrier nonce to make carrier attestations single-use.
-    mapping(address => uint256) public carrierNonce;
+    /// @notice Per-(carrier, escrow) nonce — single-use per shipment, so a
+    ///         carrier's concurrent deliveries don't invalidate each other
+    ///         (mirrors the per-escrow release nonce fix, C-9/N-6).
+    mapping(address => mapping(uint256 => uint256)) public carrierNonce;
 
     /// @notice Distinct verifier attestations per escrow (M-of-N threshold).
     mapping(uint256 => mapping(address => bool)) public verifierAttested;
@@ -420,9 +430,10 @@ contract SweeftVault {
 
     /// @notice Verify the carrier's ML-DSA-87 signature over a canonical
     ///         tracking payload built on-chain, binding the attestation to this
-    ///         escrow, carrier, status and a single-use nonce. Only a
-    ///         `DELIVERED` status counts as fulfilment; any other status is
-    ///         recorded but leaves the buyer's refund path open.
+    ///         escrow, carrier, status and a per-shipment nonce. Only a
+    ///         `DELIVERED` status counts as proof of delivery; any other status
+    ///         is recorded (latest-status rule) and leaves the buyer's refund
+    ///         path open.
     function attestCarrierEvidence(
         uint256 escrowId,
         string calldata trackingNumber,
@@ -433,15 +444,18 @@ contract SweeftVault {
         Escrow storage e = escrows[escrowId];
         if (e.buyer == address(0)) revert InvalidEscrow();
         if (e.status != EscrowStatus.Funded) revert InvalidStatus();
+        // Bound carrier-supplied strings so they cannot bloat getEscrow() gas (N-7).
+        if (bytes(status).length == 0 || bytes(status).length > MAX_STATUS_LEN) revert BadStatus();
+        if (bytes(trackingNumber).length == 0 || bytes(trackingNumber).length > MAX_TRACKING_LEN) revert BadStatus();
         // Only the escrow's assigned logistics partner may attest for it.
         if (e.logisticsPartner == address(0) || msg.sender != e.logisticsPartner) revert NotCarrier();
         if (issuedAt > block.timestamp) revert BadTimestamp();
         if (block.timestamp - issuedAt > MAX_ATTEST_AGE) revert StaleAttestation();
 
-        uint256 nonce = carrierNonce[msg.sender];
+        uint256 nonce = carrierNonce[msg.sender][escrowId];
         bytes memory message = _carrierMessage(msg.sender, escrowId, trackingNumber, status, issuedAt, nonce);
         _requireCarrierSignature(msg.sender, message, signature);
-        carrierNonce[msg.sender] = nonce + 1;
+        carrierNonce[msg.sender][escrowId] = nonce + 1;
 
         bool deliveredStatus = keccak256(bytes(status)) == keccak256(bytes("DELIVERED"));
 
@@ -451,12 +465,11 @@ contract SweeftVault {
         e.carrierSigner = msg.sender;
         e.carrierStatus = status;
         e.carrierIssuedAt = issuedAt;
-
-        if (deliveredStatus) {
-            e.delivered = true;
-            e.evidenceAttested = true;
-            e.verifier = msg.sender; // excluded from dispute board like a verifier
-        }
+        // Latest-status rule (N-8): a DELIVERED attestation can be superseded by
+        // a later LOST/RETURNED one, and vice-versa. Only DELIVERED is proof of
+        // delivery — the seller's markDelivered claim is tracked separately.
+        e.carrierDelivered = deliveredStatus;
+        e.evidenceAttested = deliveredStatus || (e.verifierAttestations >= _verifierThreshold());
 
         emit CarrierAttested(escrowId, msg.sender, e.carrierPayloadHash, status, trackingNumber);
     }
@@ -522,14 +535,16 @@ contract SweeftVault {
     // Disputes
     // ------------------------------------------------------------------
 
-    /// @notice Freeze a funded escrow for dispute resolution.
+    /// @notice Freeze a funded escrow for dispute resolution. Only the dispute
+    ///         board may call this — it validates the raiser (buyer/seller),
+    ///         collects the raiser bond, and is the only party that can settle.
+    ///         A direct buyer/seller call is rejected so a party can never
+    ///         freeze an escrow without a bond or a resolvable path (N-1).
     function raiseDispute(uint256 escrowId) external {
+        if (msg.sender != disputeBoard) revert NotDisputeBoard();
         Escrow storage e = escrows[escrowId];
         if (e.buyer == address(0)) revert InvalidEscrow();
         if (e.status != EscrowStatus.Funded) revert NotDisputable();
-        if (msg.sender != e.buyer && msg.sender != e.seller && msg.sender != disputeBoard) {
-            revert InvalidParties();
-        }
 
         e.status = EscrowStatus.Disputed;
         emit DisputeRaised(escrowId, msg.sender);
@@ -574,7 +589,9 @@ contract SweeftVault {
         Escrow storage e = escrows[escrowId];
         if (e.status != EscrowStatus.Funded) return false;
         if (e.fulfilledConfirmed) return true;
-        if ((e.delivered || e.evidenceAttested) && block.timestamp >= e.deliveryDeadline) {
+        // PROOF only: a seller's markDelivered claim is not enough to make the
+        // escrow releasable (N-2). The buyer can always confirm receipt.
+        if ((e.carrierDelivered || e.evidenceAttested) && block.timestamp >= e.deliveryDeadline) {
             return true;
         }
         return false;
@@ -583,10 +600,11 @@ contract SweeftVault {
     function isRefundable(uint256 escrowId) public view returns (bool) {
         Escrow storage e = escrows[escrowId];
         if (e.status != EscrowStatus.Funded) return false;
-        // Once fulfilment is claimed (seller delivery mark, verifier threshold
-        // or a carrier DELIVERED attestation), the buyer cannot unilaterally
-        // refund — disagreement must go through the dispute board.
-        if (e.evidenceAttested || e.delivered) return false;
+        // Only PROOF of delivery (verifier threshold or a carrier DELIVERED
+        // attestation) blocks a refund. The seller's markDelivered claim alone
+        // does NOT — otherwise a seller could freeze the buyer's escape hatch
+        // and let a no-show dispute default to release (N-2).
+        if (e.evidenceAttested || e.carrierDelivered) return false;
         return block.timestamp >= e.deliveryDeadline;
     }
 
@@ -624,9 +642,9 @@ contract SweeftVault {
         uint256 goodsAmount = e.amount - e.logisticsAmount;
 
         if (e.logisticsAmount > 0 && e.logisticsPartner != address(0)) {
-            // The carrier is paid only when it attested delivery for this
-            // escrow; otherwise the logistics share is held for the buyer.
-            if (e.carrierAttested && e.delivered) {
+            // The carrier is paid only on PROVEN delivery (a DELIVERED
+            // attestation), never on a mere in-transit status (N-2).
+            if (e.carrierDelivered) {
                 _pay(e.logisticsPartner, e.logisticsAmount);
                 emit LogisticsPaid(escrowId, e.logisticsPartner, e.logisticsAmount);
             } else {
@@ -676,7 +694,9 @@ contract SweeftVault {
         (bool ok, bytes memory data) = oracleRegistry.staticcall(
             abi.encodeWithSignature("threshold()")
         );
-        if (!ok || data.length < 32) return 1;
+        // Fail closed (N-9): if the registry cannot be read, do not silently
+        // treat a single attestation as satisfying the threshold.
+        if (!ok || data.length < 32) revert RegistryUnavailable();
         uint8 t = abi.decode(data, (uint8));
         return t == 0 ? 1 : t;
     }

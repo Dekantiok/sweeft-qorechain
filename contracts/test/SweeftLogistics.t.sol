@@ -43,7 +43,7 @@ contract SweeftLogisticsTest is Test {
     function setUp() public {
         registry = new SweeftOracleRegistry(address(this));
         vault = new SweeftVault(address(registry), "qorechain-diana", FEE_BPS, treasury);
-        board = new SweeftDisputeBoard(address(vault));
+        board = new SweeftDisputeBoard(address(vault), treasury);
         vault.setDisputeBoard(address(board));
         market = new SweeftMarketplace(address(vault));
         vault.setMarketplace(address(market));
@@ -88,7 +88,7 @@ contract SweeftLogisticsTest is Test {
         assertTrue(e.carrierAttested);
         assertEq(e.carrierSigner, carrier);
         assertTrue(e.evidenceAttested);
-        assertTrue(e.delivered);
+        assertTrue(e.carrierDelivered);
         assertEq(e.carrierStatus, "DELIVERED");
     }
 
@@ -203,15 +203,86 @@ contract SweeftLogisticsTest is Test {
         assertEq(uint8(e.status), uint8(SweeftVault.EscrowStatus.Funded));
     }
 
-    function test_dispute_refund_includesLogistics() public {
+    function test_refund_includesLogistics() public {
         uint256 total = 1.1 ether;
         uint256 id = _fundedLogisticsEscrow(total, 0.1 ether);
-        vm.prank(buyer);
-        vault.raiseDispute(id);
-        vm.prank(address(board));
+        // No carrier DELIVERED proof, so after the deadline the buyer refunds
+        // the full amount (goods + logistics).
+        vm.warp(block.timestamp + 7 days + 1);
         uint256 buyerBefore = buyer.balance;
-        vault.resolveDispute(id, false);
+        vault.refundAfterDeadline(id, hex"c0ffee");
         assertEq(buyer.balance, buyerBefore + total);
         assertEq(uint8(vault.getEscrow(id).status), uint8(SweeftVault.EscrowStatus.Refunded));
+    }
+
+    // ------------------------------------------------------------------
+    // Residual-review regressions (N-6, N-7, N-8)
+    // ------------------------------------------------------------------
+
+    function test_carrierStatusAndTrackingAreBounded() public {
+        uint256 id = _fundedLogisticsEscrow(1 ether, 0.1 ether);
+
+        // 33-byte status exceeds MAX_STATUS_LEN (32).
+        vm.prank(carrier);
+        vm.expectRevert(SweeftVault.BadStatus.selector);
+        vault.attestCarrierEvidence(id, "DEMO-123", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", uint64(block.timestamp), hex"");
+
+        // 129-byte tracking exceeds MAX_TRACKING_LEN (128).
+        bytes memory longTracking = new bytes(129);
+        for (uint256 i = 0; i < 129; i++) longTracking[i] = "A";
+        vm.prank(carrier);
+        vm.expectRevert(SweeftVault.BadStatus.selector);
+        vault.attestCarrierEvidence(id, string(longTracking), "DELIVERED", uint64(block.timestamp), hex"");
+    }
+
+    function test_carrierNonceIsPerEscrow() public {
+        uint256 a = _fundedLogisticsEscrow(1 ether, 0.1 ether);
+        uint256 b = _fundedLogisticsEscrow(1 ether, 0);
+        _attestDelivered(a);
+        _attestDelivered(b);
+
+        // Each shipment has its own nonce, so concurrent deliveries do not
+        // invalidate each other (N-6).
+        assertEq(vault.carrierNonce(carrier, a), 1);
+        assertEq(vault.carrierNonce(carrier, b), 1);
+    }
+
+    function test_laterLostAttestationSupersedesDelivered() public {
+        uint256 id = _fundedLogisticsEscrow(1 ether, 0.1 ether);
+        _attestDelivered(id);
+        assertTrue(vault.getEscrow(id).carrierDelivered);
+
+        // The same shipment is later reported LOST: the latest-status rule
+        // clears the delivery proof (N-8) and reopens the refund path.
+        vm.prank(carrier);
+        vault.attestCarrierEvidence(id, "DEMO-123", "LOST", uint64(block.timestamp), hex"deadbeef");
+
+        SweeftVault.Escrow memory e = vault.getEscrow(id);
+        assertTrue(e.carrierAttested);
+        assertFalse(e.carrierDelivered);
+        assertFalse(e.evidenceAttested);
+        assertEq(e.carrierStatus, "LOST");
+
+        vm.warp(block.timestamp + 7 days + 1);
+        assertTrue(vault.isRefundable(id));
+    }
+
+    function test_inTransitAttestationDoesNotPayCarrier() public {
+        uint256 total = 1.1 ether;
+        uint256 log = 0.1 ether;
+        uint256 id = _fundedLogisticsEscrow(total, log);
+        _attestDelivered(id);
+        vm.prank(carrier);
+        vault.attestCarrierEvidence(id, "DEMO-123", "IN_TRANSIT", uint64(block.timestamp), hex"deadbeef");
+        assertFalse(vault.getEscrow(id).carrierDelivered);
+
+        vm.prank(buyer);
+        vault.confirmReceipt(id);
+        uint256 carrierBefore = carrier.balance;
+        vault.release(id, hex"deadbeef");
+
+        // No DELIVERED proof, so the logistics share is held for the buyer.
+        assertEq(carrier.balance, carrierBefore);
+        assertEq(vault.credits(buyer), log);
     }
 }

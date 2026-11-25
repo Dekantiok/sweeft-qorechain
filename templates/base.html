@@ -7,11 +7,9 @@
     <meta name="csrf-token" content="{{ csrf_token }}">
     <title>{% block title %}Sweeft — Post-Quantum Commerce on QoreChain{% endblock %}</title>
     <meta name="description" content="Decentralized commerce and trust ecosystem on QoreChain. Escrow protected by ML-DSA-87 post-quantum signatures.">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
-    <script defer src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js"></script>
+    <script src="{% static 'js/htmx.min.js' %}" defer></script>
     <script src="{% static 'js/sweeft-wallet.js' %}"></script>
-    <script>window.SWEEFT_WALLET_EVM = "{{ wallet_account|escapejs }}";</script>
+    <script nonce="{{ csp_nonce }}">window.SWEEFT_WALLET_EVM = "{{ wallet_account|escapejs }}";</script>
     <link rel="stylesheet" href="{% static 'css/sweeft.css' %}">
     {% block extra_head %}{% endblock %}
 </head>
@@ -43,7 +41,7 @@
 
                     {% if wallet_account %}
                     <div class="relative">
-                        <button onclick="document.getElementById('account-menu').classList.toggle('hidden')"
+                        <button id="account-menu-button" data-toggle-target="account-menu"
                                 class="flex items-center gap-2 rounded-full border border-teal-500/40 px-3 py-1.5 text-xs text-teal-300 hover:border-teal-400 transition-colors">
                             <span class="h-1.5 w-1.5 rounded-full bg-teal-400"></span>
                             <span id="wallet-short" class="max-w-[9rem] truncate">{{ wallet_short }}</span>
@@ -59,13 +57,13 @@
                             <div class="grid grid-cols-2 gap-2 text-xs">
                                 <a href="/dashboard/?address={{ wallet_account }}" class="rounded-lg border border-slate-700 px-3 py-2 text-center hover:border-teal-500/50 hover:text-teal-300 transition-colors">My activity</a>
                                 <a href="https://explore.qore.network/account/{{ wallet_qor }}" target="_blank" class="rounded-lg border border-slate-700 px-3 py-2 text-center hover:border-teal-500/50 hover:text-teal-300 transition-colors">Explorer ↗</a>
-                                <button onclick="SweeftWallet.copyAddress()" class="rounded-lg border border-slate-700 px-3 py-2 hover:border-teal-500/50 hover:text-teal-300 transition-colors">Copy address</button>
-                                <button onclick="SweeftWallet.disconnect()" class="rounded-lg border border-red-500/30 px-3 py-2 text-red-300 hover:border-red-400 hover:text-red-200 transition-colors">Disconnect</button>
+                                <button id="copy-address" class="rounded-lg border border-slate-700 px-3 py-2 hover:border-teal-500/50 hover:text-teal-300 transition-colors">Copy address</button>
+                                <button id="disconnect-wallet" class="rounded-lg border border-red-500/30 px-3 py-2 text-red-300 hover:border-red-400 hover:text-red-200 transition-colors">Disconnect</button>
                             </div>
                         </div>
                     </div>
                     {% else %}
-                    <button onclick="SweeftWallet.openModal()"
+                    <button id="connect-wallet"
                             class="inline-flex h-9 items-center rounded-lg bg-teal-500 px-3.5 text-sm font-semibold text-slate-950 hover:bg-teal-400 transition-colors">
                         Connect wallet
                     </button>
@@ -101,5 +99,39 @@
     </footer>
 
     {% block extra_scripts %}{% endblock %}
+    <script nonce="{{ csp_nonce }}">
+    (function () {
+        document.querySelectorAll("[data-toggle-target]").forEach(function (button) {
+            button.addEventListener("click", function () {
+                var el = document.getElementById(button.dataset.toggleTarget);
+                if (!el) return;
+                var hiddenNow = el.classList.contains("hidden") || el.style.display === "none";
+                if (button.hasAttribute("data-toggle-display")) {
+                    el.style.display = hiddenNow ? "block" : "none";
+                } else {
+                    el.classList.toggle("hidden");
+                }
+            });
+        });
+        var connect = document.getElementById("connect-wallet");
+        if (connect && window.SweeftWallet) connect.addEventListener("click", function () { SweeftWallet.openModal(); });
+        var copy = document.getElementById("copy-address");
+        if (copy && window.SweeftWallet) copy.addEventListener("click", function () { SweeftWallet.copyAddress(); });
+        var disconnect = document.getElementById("disconnect-wallet");
+        if (disconnect && window.SweeftWallet) disconnect.addEventListener("click", function () { SweeftWallet.disconnect(); });
+
+        // Replace hx-on (which needs eval) with plain listeners.
+        document.body.addEventListener("htmx:afterRequest", function (event) {
+            var elt = event.detail && event.detail.elt;
+            if (!elt) return;
+            if (event.detail.successful && elt.hasAttribute("data-reload-on-success")) {
+                location.reload();
+            }
+            if (elt.hasAttribute("data-alert-response")) {
+                alert(event.detail.xhr.responseText);
+            }
+        });
+    })();
+    </script>
 </body>
 </html>

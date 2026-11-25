@@ -224,7 +224,7 @@ def api_carrier_attest(request, escrow_id: int):
 
     try:
         _, _, carrier_evm = carriers.demo_carrier_keypair()
-        nonce = carrier_nonce(carrier_evm)
+        nonce = carrier_nonce(carrier_evm, escrow_id)
         issued_at = int(time.time())
         signed = carriers.sign_carrier_attestation(
             escrow_id, shipment.tracking_number, "DELIVERED", nonce, issued_at

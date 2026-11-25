@@ -151,7 +151,7 @@ TOOLS = [
 ]
 
 
-def run_chat(user_message: str, *, history: list[dict] | None = None) -> dict:
+def run_chat(user_message: str, *, wallet: str | None = None, history: list[dict] | None = None) -> dict:
     """Run one turn: model → tool calls (if any) → final answer.
 
     Returns {"text": ..., "tool_calls": [...]}
@@ -181,7 +181,9 @@ def run_chat(user_message: str, *, history: list[dict] | None = None) -> dict:
                 args = json.loads(call.function.arguments or "{}")
             except json.JSONDecodeError:
                 args = {}
-            result = execute_tool(name, **args)
+            # Never let the model supply a wallet; it is injected server-side.
+            args.pop("wallet", None)
+            result = execute_tool(name, wallet=wallet, **args)
             tool_calls_out.append({"name": name, "args": args})
             tool_results.append(
                 {"role": "tool", "tool_call_id": call.id, "content": json.dumps(result)[:2000]}

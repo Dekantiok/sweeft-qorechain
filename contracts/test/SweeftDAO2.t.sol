@@ -5,10 +5,11 @@ import { Test } from "forge-std/Test.sol";
 import { SweeftDAO2 } from "../src/SweeftDAO2.sol";
 import { SweeftOracleRegistry } from "../src/SweeftOracleRegistry.sol";
 
-/// @notice C-1 regression suite: governance cannot be seized by a short-window,
-///         throwaway-wallet proposal. Voting periods are bounded, only
-///         allowlisted (target, selector) pairs may be called, a quorum and a
-///         timelock are enforced, and proposers post a bond.
+/// @notice DAO governance regression suite. Voting periods are bounded, only
+///         allowlisted (target, selector) pairs may be called, quorum is
+///         measured in escrowed stake, a timelock and proposer bond apply, a
+///         guardian may veto during the timelock, and vote stake is locked
+///         until the proposal is final.
 contract SweeftDAO2Test is Test {
     SweeftOracleRegistry internal registry;
     SweeftDAO2 internal dao;
@@ -17,10 +18,13 @@ contract SweeftDAO2Test is Test {
     address internal voterA = address(0xA1);
     address internal voterB = address(0xB2);
     address internal voterC = address(0xC3);
+    address internal voterD = address(0xD4);
     address internal attacker = address(0xBAD);
     address internal newVerifier = address(0xACE);
+    address internal treasury = address(0x7EA5);
 
     uint64 internal constant PERIOD = 3 days; // == MIN_VOTING_PERIOD
+    uint256 internal constant VOTE = 0.01 ether;
     bytes4 internal constant ADD_VERIFIER = bytes4(keccak256("addVerifier(address)"));
 
     function setUp() public {
@@ -30,12 +34,14 @@ contract SweeftDAO2Test is Test {
         dao = new SweeftDAO2(targets);
         // Allow only the specific privileged call; everything else is denied.
         dao.setAllowedCall(address(registry), ADD_VERIFIER, true);
+        dao.setTreasury(treasury);
         registry.transferOwnership(address(dao));
 
         vm.deal(proposer, 10 ether);
         vm.deal(voterA, 10 ether);
         vm.deal(voterB, 10 ether);
         vm.deal(voterC, 10 ether);
+        vm.deal(voterD, 10 ether);
         vm.deal(attacker, 10 ether);
     }
 
@@ -48,6 +54,17 @@ contract SweeftDAO2Test is Test {
         return dao.propose{ value: 0.05 ether }(
             address(registry), _callData(), "Approve verifier 0xACE", "Adds 0xACE as an oracle verifier", period
         );
+    }
+
+    function _vote(address voter, uint256 id, uint8 choice, uint256 stake) internal {
+        vm.prank(voter);
+        dao.castVote{ value: stake }(id, choice);
+    }
+
+    function _threeForVotes(uint256 id) internal {
+        _vote(voterA, id, 1, VOTE);
+        _vote(voterB, id, 1, VOTE);
+        _vote(voterC, id, 1, VOTE);
     }
 
     // ------------------------------------------------------------------
@@ -95,12 +112,7 @@ contract SweeftDAO2Test is Test {
 
     function test_Execute_RequiresTimelock() public {
         uint256 id = _propose(PERIOD);
-        vm.prank(voterA);
-        dao.castVote(id, 1);
-        vm.prank(voterB);
-        dao.castVote(id, 1);
-        vm.prank(voterC);
-        dao.castVote(id, 1);
+        _threeForVotes(id);
 
         // Voting closed, but the timelock has not elapsed.
         vm.warp(block.timestamp + PERIOD + 1);
@@ -110,9 +122,8 @@ contract SweeftDAO2Test is Test {
 
     function test_Execute_QuorumNotMet_Rejects() public {
         uint256 id = _propose(PERIOD);
-        // Only one vote — below quorum (3).
-        vm.prank(attacker);
-        dao.castVote(id, 1);
+        // Only one minimum stake — below the 0.03 QOR quorum.
+        _vote(attacker, id, 1, VOTE);
 
         vm.warp(block.timestamp + PERIOD + 2 days + 1);
         dao.execute(id, "Adds 0xACE as an oracle verifier");
@@ -123,12 +134,7 @@ contract SweeftDAO2Test is Test {
 
     function test_Execute_WithQuorumAndTimelock_Succeeds() public {
         uint256 id = _propose(PERIOD);
-        vm.prank(voterA);
-        dao.castVote(id, 1);
-        vm.prank(voterB);
-        dao.castVote(id, 1);
-        vm.prank(voterC);
-        dao.castVote(id, 1);
+        _threeForVotes(id);
 
         uint256 proposerBefore = proposer.balance;
         vm.warp(block.timestamp + PERIOD + 2 days + 1);
@@ -139,42 +145,141 @@ contract SweeftDAO2Test is Test {
         assertEq(proposer.balance, proposerBefore + 0.05 ether);
     }
 
+    function test_CriticalQuorum_RequiresMoreStake() public {
+        // Mark the registry call critical: it now needs 0.05 QOR, not 0.03.
+        dao.setCriticalCall(address(registry), ADD_VERIFIER, true);
+
+        uint256 id = _propose(PERIOD);
+        _threeForVotes(id); // 0.03 < critical 0.05
+        vm.warp(block.timestamp + PERIOD + 2 days + 1);
+        dao.execute(id, "Adds 0xACE as an oracle verifier");
+        assertFalse(registry.isVerifier(newVerifier));
+        assertEq(uint8(dao.getProposal(id).state), uint8(SweeftDAO2.ProposalState.Rejected));
+
+        // A second proposal with 0.05 of stake passes.
+        uint256 id2 = _propose(PERIOD);
+        _vote(voterA, id2, 1, 0.05 ether);
+        vm.warp(block.timestamp + PERIOD + 2 days + 1);
+        dao.execute(id2, "Adds 0xACE as an oracle verifier");
+        assertTrue(registry.isVerifier(newVerifier));
+    }
+
     function test_ShortWindowTakeover_NowImpossible() public {
         // The attack the review described: a 1-second window with throwaway
         // voters. It now reverts at propose().
-        address[] memory sockPuppets = new address[](3);
-        sockPuppets[0] = address(0x1001);
-        sockPuppets[1] = address(0x1002);
-        sockPuppets[2] = address(0x1003);
-
         vm.prank(attacker);
         vm.expectRevert(SweeftDAO2.BadVotingPeriod.selector);
         dao.propose{ value: 0.05 ether }(address(registry), _callData(), "seize", "seize", 1);
     }
 
     // ------------------------------------------------------------------
-    // Vote hygiene
+    // Vote stake (Sybil cost)
+    // ------------------------------------------------------------------
+
+    function test_CastVote_RequiresStake() public {
+        uint256 id = _propose(PERIOD);
+        vm.prank(voterA);
+        vm.expectRevert(SweeftDAO2.VoteStakeTooLow.selector);
+        dao.castVote(id, 1);
+    }
+
+    function test_VoteStake_LockedUntilFinal_ThenWithdrawable() public {
+        uint256 id = _propose(PERIOD);
+        _vote(voterA, id, 1, VOTE);
+        _vote(voterB, id, 1, VOTE);
+        _vote(voterC, id, 1, VOTE);
+
+        vm.prank(voterA);
+        vm.expectRevert(SweeftDAO2.VoteStakeLocked.selector);
+        dao.withdrawVoteStake(id);
+
+        vm.warp(block.timestamp + PERIOD + 2 days + 1);
+        dao.execute(id, "Adds 0xACE as an oracle verifier");
+
+        uint256 before = voterA.balance;
+        vm.prank(voterA);
+        dao.withdrawVoteStake(id);
+        assertEq(voterA.balance, before + VOTE);
+    }
+
+    function test_SybilVotersMustLockCapital() public {
+        uint256 id = _propose(PERIOD);
+        address[3] memory sybils = [address(0x1001), address(0x1002), address(0x1003)];
+        for (uint256 i = 0; i < sybils.length; i++) {
+            vm.deal(sybils[i], VOTE);
+            _vote(sybils[i], id, 1, VOTE);
+            // The full stake is held by the DAO, not refunded on success.
+            assertEq(sybils[i].balance, 0);
+        }
+        assertEq(address(dao).balance, 3 * VOTE + 0.05 ether);
+    }
+
+    // ------------------------------------------------------------------
+    // Vote hygiene / lifecycle
     // ------------------------------------------------------------------
 
     function test_CastVote_RejectsBadChoice() public {
         uint256 id = _propose(PERIOD);
         vm.prank(voterA);
         vm.expectRevert(SweeftDAO2.BadChoice.selector);
-        dao.castVote(id, 9);
+        dao.castVote{ value: VOTE }(id, 9);
     }
 
-    function test_MinVoterBalance_Enforced() public {
-        dao.setMinVoterBalance(5 ether);
+    function test_MinVoteStake_Enforced() public {
+        dao.setMinVoteStake(0.02 ether);
         uint256 id = _propose(PERIOD);
 
-        address broke = address(0x0B0B);
-        vm.deal(broke, 1 ether); // below the 5 QOR gate
-        vm.prank(broke);
-        vm.expectRevert(SweeftDAO2.VoterBelowMinimum.selector);
-        dao.castVote(id, 1);
+        vm.prank(voterA);
+        vm.expectRevert(SweeftDAO2.VoteStakeTooLow.selector);
+        dao.castVote{ value: 0.01 ether }(id, 1);
 
-        // A funded voter passes the gate.
-        vm.prank(voterB);
-        dao.castVote(id, 1);
+        // A vote at the new minimum passes the gate.
+        _vote(voterB, id, 1, 0.02 ether);
+        assertTrue(dao.hasVoted(id, voterB));
+    }
+
+    function test_GuardianVeto_DuringTimelock() public {
+        uint256 id = _propose(PERIOD);
+        _threeForVotes(id);
+        vm.warp(block.timestamp + PERIOD + 1);
+
+        uint256 treasuryBefore = treasury.balance;
+        // The test contract is the initial guardian.
+        dao.veto(id);
+
+        assertEq(uint8(dao.getProposal(id).state), uint8(SweeftDAO2.ProposalState.Vetoed));
+        assertEq(treasury.balance, treasuryBefore + 0.05 ether);
+    }
+
+    function test_Cancel_RefundsBond_AndUnlocksVoters() public {
+        uint256 id = _propose(PERIOD);
+        _vote(voterA, id, 1, VOTE);
+
+        uint256 proposerBefore = proposer.balance;
+        vm.prank(proposer);
+        dao.cancel(id);
+
+        assertEq(uint8(dao.getProposal(id).state), uint8(SweeftDAO2.ProposalState.Cancelled));
+        assertEq(proposer.balance, proposerBefore + 0.05 ether);
+
+        // Vote stake is unlocked by cancellation.
+        uint256 voterBefore = voterA.balance;
+        vm.prank(voterA);
+        dao.withdrawVoteStake(id);
+        assertEq(voterA.balance, voterBefore + VOTE);
+    }
+
+    function test_Expire_AfterTTL_UnlocksVoters() public {
+        uint256 id = _propose(PERIOD);
+        _vote(voterA, id, 1, VOTE);
+
+        vm.warp(block.timestamp + PERIOD + 2 days + 30 days + 1);
+        dao.expireProposal(id);
+        assertEq(uint8(dao.getProposal(id).state), uint8(SweeftDAO2.ProposalState.Expired));
+
+        uint256 voterBefore = voterA.balance;
+        vm.prank(voterA);
+        dao.withdrawVoteStake(id);
+        assertEq(voterA.balance, voterBefore + VOTE);
     }
 }
