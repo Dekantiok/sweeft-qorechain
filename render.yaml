@@ -1,7 +1,6 @@
 # Sweeft demo on Render (native Python env).
-# Dashboard alternative: create a Web Service from this repo, a Postgres
-# database, then set the env vars below. Render injects DATABASE_URL and
-# RENDER_EXTERNAL_HOSTNAME automatically.
+# Dashboard alternative: create a Web Service from this repo, then set the
+# sync:false vars below. All contract addresses point at the live v8 stack.
 services:
   - type: web
     name: sweeft
