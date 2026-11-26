@@ -15,11 +15,11 @@
 }
 
 /* Escrow status colors */
-.status-created  { @apply text-slate-400; }
+.status-created  { @apply text-neutral-500; }
 .status-funded   { @apply text-amber-400; }
-.status-completed { @apply text-teal-400; }
+.status-completed { @apply text-red-400; }
 .status-refunded { @apply text-blue-400; }
-.status-cancelled { @apply text-slate-500; }
+.status-cancelled { @apply text-neutral-600; }
 
 /* Monospace hashes */
 .hash {

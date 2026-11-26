@@ -5,7 +5,7 @@
 {% block content %}
 <div>
     <h1 class="text-2xl font-bold">Sweeft DAO</h1>
-    <p class="mt-1 max-w-3xl text-sm text-slate-400">
+    <p class="mt-1 max-w-3xl text-sm text-neutral-500">
         Stake-weighted voting. A voter escrows QOR with their vote (minimum 0.01 QOR) and that
         amount is their voting power; the stake is locked until the proposal is final and can be
         withdrawn afterwards. Passed proposals execute on-chain after a 2-day timelock — the DAO
@@ -15,34 +15,34 @@
 
 <div class="mt-8 space-y-4">
     {% for proposal in proposals %}
-    <div class="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
+    <div class="rounded-xl border border-neutral-900 bg-neutral-950/50 p-5">
         <div class="flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <span class="text-xs text-slate-500">#{{ proposal.pk }}</span>
+                <span class="text-xs text-neutral-600">#{{ proposal.pk }}</span>
                 <span class="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider
-                    {% if proposal.state == 'executed' %}bg-teal-500/10 text-teal-400
+                    {% if proposal.state == 'executed' %}bg-red-500/10 text-red-400
                     {% elif proposal.state == 'open' %}bg-amber-500/10 text-amber-400
                     {% elif proposal.state == 'vetoed' %}bg-red-500/10 text-red-400
-                    {% else %}bg-slate-700/50 text-slate-400{% endif %}">{{ proposal.state }}</span>
-                <span class="rounded-full bg-slate-800 px-2 py-0.5 text-[10px] text-slate-400">{{ proposal.get_kind_display }}</span>
+                    {% else %}bg-neutral-800/50 text-neutral-500{% endif %}">{{ proposal.state }}</span>
+                <span class="rounded-full bg-neutral-900 px-2 py-0.5 text-[10px] text-neutral-500">{{ proposal.get_kind_display }}</span>
             </div>
-            <span class="text-xs text-slate-500">{{ proposal.created_at|date:"M d, H:i" }}</span>
+            <span class="text-xs text-neutral-600">{{ proposal.created_at|date:"M d, H:i" }}</span>
         </div>
         <h3 class="mt-3 font-semibold">{{ proposal.title }}</h3>
-        <p class="mt-1 text-sm text-slate-400">{{ proposal.description }}</p>
-        <div class="mt-4 flex flex-wrap items-center gap-6 text-xs text-slate-400">
-            <span>For: <span class="text-teal-400">{{ proposal.votes_for }}</span> voter{{ proposal.votes_for|pluralize }}</span>
+        <p class="mt-1 text-sm text-neutral-500">{{ proposal.description }}</p>
+        <div class="mt-4 flex flex-wrap items-center gap-6 text-xs text-neutral-500">
+            <span>For: <span class="text-red-400">{{ proposal.votes_for }}</span> voter{{ proposal.votes_for|pluralize }}</span>
             <span>Against: <span class="text-red-400">{{ proposal.votes_against }}</span> voter{{ proposal.votes_against|pluralize }}</span>
             {% if proposal.target_verifier %}<span>Verifier: <span class="hash">{{ proposal.target_verifier.evm_address }}</span></span>{% endif %}
-            {% if proposal.execution_tx %}<span class="hash text-teal-400">executed: {{ proposal.execution_tx|truncatechars:24 }}</span>{% endif %}
+            {% if proposal.execution_tx %}<span class="hash text-red-400">executed: {{ proposal.execution_tx|truncatechars:24 }}</span>{% endif %}
             {% if proposal.on_chain_id != None and proposal.state != 'open' %}
-            <button class="withdraw-vote-stake rounded border border-slate-700 px-3 py-1.5 text-xs text-slate-300 hover:border-teal-500/50 transition-colors"
+            <button class="withdraw-vote-stake rounded border border-neutral-800 px-3 py-1.5 text-xs text-neutral-400 hover:border-red-500/50 transition-colors"
                     data-proposal="{{ proposal.on_chain_id }}">Withdraw my vote stake</button>
             {% endif %}
         </div>
     </div>
     {% empty %}
-    <div class="rounded-xl border border-dashed border-slate-700 p-12 text-center text-slate-500">
+    <div class="rounded-xl border border-dashed border-neutral-800 p-12 text-center text-neutral-600">
         No proposals yet. Verifier approvals are proposed through the DAO contract and appear
         here after the indexer syncs.
     </div>

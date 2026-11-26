@@ -8,102 +8,102 @@
         <div class="flex items-center gap-3">
             <h1 class="text-2xl font-bold">Escrow #{{ escrow.on_chain_id }}</h1>
             <span class="rounded-full px-3 py-1 text-xs uppercase tracking-wider
-                {% if escrow.state == 'completed' %}bg-teal-500/10 text-teal-400
+                {% if escrow.state == 'completed' %}bg-red-500/10 text-red-400
                 {% elif escrow.state == 'release_eligible' %}bg-amber-500/10 text-amber-400
                 {% elif escrow.state == 'refunded' %}bg-blue-500/10 text-blue-400
-                {% else %}bg-slate-700/50 text-slate-300{% endif %}">
+                {% else %}bg-neutral-800/50 text-neutral-400{% endif %}">
                 {{ escrow.get_state_display }}
             </span>
         </div>
-        <p class="mt-1 text-sm text-slate-400">Order {{ escrow.order.reference }} — {{ escrow.order.listing.title|default:"direct escrow" }}</p>
+        <p class="mt-1 text-sm text-neutral-500">Order {{ escrow.order.reference }} — {{ escrow.order.listing.title|default:"direct escrow" }}</p>
     </div>
-    <a href="{{ network.explorer_url }}" target="_blank" class="text-xs text-slate-500 hover:text-teal-400 transition-colors">Explorer ↗</a>
+    <a href="{{ network.explorer_url }}" target="_blank" class="text-xs text-neutral-600 hover:text-red-400 transition-colors">Explorer ↗</a>
 </div>
 
 <div class="mt-8 grid gap-8 lg:grid-cols-3">
     <div class="lg:col-span-2 space-y-6">
         <!-- Terms -->
-        <div class="rounded-xl border border-slate-800 bg-slate-900/50 p-6">
-            <h2 class="text-sm font-semibold text-slate-300">Agreed terms (on-chain, immutable)</h2>
+        <div class="rounded-xl border border-neutral-900 bg-neutral-950/50 p-6">
+            <h2 class="text-sm font-semibold text-neutral-400">Agreed terms (on-chain, immutable)</h2>
             <dl class="mt-4 grid gap-x-8 gap-y-3 text-sm sm:grid-cols-2">
-                <dt class="text-slate-500">Buyer (PQ guardian)</dt>
-                <dd class="hash text-slate-300">{{ escrow.buyer.evm_address }}</dd>
-                <dt class="text-slate-500">Seller</dt>
-                <dd class="hash text-slate-300">{{ escrow.seller.evm_address }}</dd>
-                <dt class="text-slate-500">Amount held</dt>
-                <dd class="text-teal-400 font-semibold">{{ escrow.amount_qor }} QOR</dd>
-                <dt class="text-slate-500">Platform fee (2% on release)</dt>
-                <dd class="text-slate-400">
+                <dt class="text-neutral-600">Buyer (PQ guardian)</dt>
+                <dd class="hash text-neutral-400">{{ escrow.buyer.evm_address }}</dd>
+                <dt class="text-neutral-600">Seller</dt>
+                <dd class="hash text-neutral-400">{{ escrow.seller.evm_address }}</dd>
+                <dt class="text-neutral-600">Amount held</dt>
+                <dd class="text-red-400 font-semibold">{{ escrow.amount_qor }} QOR</dd>
+                <dt class="text-neutral-600">Platform fee (2% on release)</dt>
+                <dd class="text-neutral-500">
                     currently {% if escrow.fee_treasury_uqor or escrow.fee_dispute_uqor %}
                     {{ escrow.fee_treasury_uqor|floatformat:0 }} uqor treasury / {{ escrow.fee_dispute_uqor|floatformat:0 }} uqor dispute pool
                     {% else %}70% DAO treasury · 30% dispute reward pool{% endif %}
                 </dd>
-                <dt class="text-slate-500">Delivery deadline</dt>
-                <dd class="text-slate-300">{{ escrow.delivery_deadline|date:"Y-m-d H:i" }} UTC</dd>
+                <dt class="text-neutral-600">Delivery deadline</dt>
+                <dd class="text-neutral-400">{{ escrow.delivery_deadline|date:"Y-m-d H:i" }} UTC</dd>
             </dl>
         </div>
 
         <!-- Timeline -->
-        <div class="rounded-xl border border-slate-800 bg-slate-900/50 p-6">
-            <h2 class="text-sm font-semibold text-slate-300">Lifecycle</h2>
+        <div class="rounded-xl border border-neutral-900 bg-neutral-950/50 p-6">
+            <h2 class="text-sm font-semibold text-neutral-400">Lifecycle</h2>
             <ol class="mt-4 space-y-3 text-sm">
                 {% with current=escrow.state %}
                 <li class="flex items-center gap-3">
-                    <span class="h-2.5 w-2.5 rounded-full bg-teal-400"></span>
-                    <span class="text-slate-300">Created &amp; funded</span>
+                    <span class="h-2.5 w-2.5 rounded-full bg-red-400"></span>
+                    <span class="text-neutral-400">Created &amp; funded</span>
                 </li>
                 <li class="flex items-center gap-3">
-                    <span class="h-2.5 w-2.5 rounded-full {% if current == 'delivered' or current == 'release_eligible' or current == 'completed' or live.delivered %}bg-teal-400{% else %}bg-slate-700{% endif %}"></span>
-                    <span class="text-slate-300">Delivered {% if live.delivered %}<span class="text-teal-400 text-xs">✓ on-chain</span>{% endif %}</span>
+                    <span class="h-2.5 w-2.5 rounded-full {% if current == 'delivered' or current == 'release_eligible' or current == 'completed' or live.delivered %}bg-red-400{% else %}bg-neutral-800{% endif %}"></span>
+                    <span class="text-neutral-400">Delivered {% if live.delivered %}<span class="text-red-400 text-xs">✓ on-chain</span>{% endif %}</span>
                 </li>
                 <li class="flex items-center gap-3">
-                    <span class="h-2.5 w-2.5 rounded-full {% if current == 'release_eligible' or current == 'completed' or live.attested or live.confirmed %}bg-teal-400{% else %}bg-slate-700{% endif %}"></span>
-                    <span class="text-slate-300">Verified / receipt confirmed {% if live.attested %}<span class="text-teal-400 text-xs">✓ verifier attestation</span>{% endif %}{% if live.confirmed %}<span class="text-teal-400 text-xs">✓ buyer confirmation</span>{% endif %}</span>
+                    <span class="h-2.5 w-2.5 rounded-full {% if current == 'release_eligible' or current == 'completed' or live.attested or live.confirmed %}bg-red-400{% else %}bg-neutral-800{% endif %}"></span>
+                    <span class="text-neutral-400">Verified / receipt confirmed {% if live.attested %}<span class="text-red-400 text-xs">✓ verifier attestation</span>{% endif %}{% if live.confirmed %}<span class="text-red-400 text-xs">✓ buyer confirmation</span>{% endif %}</span>
                 </li>
                 <li class="flex items-center gap-3">
-                    <span class="h-2.5 w-2.5 rounded-full {% if current == 'completed' %}bg-teal-400{% else %}bg-slate-700{% endif %}"></span>
-                    <span class="text-slate-300">Released (PQ-signed) {% if current == 'completed' %}<span class="text-teal-400 text-xs">✓ seller paid</span>{% endif %}</span>
+                    <span class="h-2.5 w-2.5 rounded-full {% if current == 'completed' %}bg-red-400{% else %}bg-neutral-800{% endif %}"></span>
+                    <span class="text-neutral-400">Released (PQ-signed) {% if current == 'completed' %}<span class="text-red-400 text-xs">✓ seller paid</span>{% endif %}</span>
                 </li>
                 {% endwith %}
             </ol>
             {% if live %}
             <div class="mt-5 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
-                <div class="rounded-lg bg-slate-800/50 p-3">
-                    <div class="text-slate-500">Delivered</div>
-                    <div class="{% if live.delivered %}text-teal-400{% else %}text-slate-400{% endif %}">{{ live.delivered|yesno:"yes,no" }}</div>
+                <div class="rounded-lg bg-neutral-900/50 p-3">
+                    <div class="text-neutral-600">Delivered</div>
+                    <div class="{% if live.delivered %}text-red-400{% else %}text-neutral-500{% endif %}">{{ live.delivered|yesno:"yes,no" }}</div>
                 </div>
-                <div class="rounded-lg bg-slate-800/50 p-3">
-                    <div class="text-slate-500">Receipt confirmed</div>
-                    <div class="{% if live.confirmed %}text-teal-400{% else %}text-slate-400{% endif %}">{{ live.confirmed|yesno:"yes,no" }}</div>
+                <div class="rounded-lg bg-neutral-900/50 p-3">
+                    <div class="text-neutral-600">Receipt confirmed</div>
+                    <div class="{% if live.confirmed %}text-red-400{% else %}text-neutral-500{% endif %}">{{ live.confirmed|yesno:"yes,no" }}</div>
                 </div>
-                <div class="rounded-lg bg-slate-800/50 p-3">
-                    <div class="text-slate-500">Attested</div>
-                    <div class="{% if live.attested %}text-teal-400{% else %}text-slate-400{% endif %}">{{ live.attested|yesno:"yes,no" }}</div>
+                <div class="rounded-lg bg-neutral-900/50 p-3">
+                    <div class="text-neutral-600">Attested</div>
+                    <div class="{% if live.attested %}text-red-400{% else %}text-neutral-500{% endif %}">{{ live.attested|yesno:"yes,no" }}</div>
                 </div>
-                <div class="rounded-lg bg-slate-800/50 p-3">
-                    <div class="text-slate-500">PQ nonce</div>
-                    <div class="text-slate-400">{{ live.pqc_nonce }}</div>
+                <div class="rounded-lg bg-neutral-900/50 p-3">
+                    <div class="text-neutral-600">PQ nonce</div>
+                    <div class="text-neutral-500">{{ live.pqc_nonce }}</div>
                 </div>
             </div>
             {% endif %}
         </div>
 
         <!-- Transaction trail -->
-        <div class="rounded-xl border border-slate-800 bg-slate-900/50 p-6">
-            <h2 class="text-sm font-semibold text-slate-300">Transactions</h2>
+        <div class="rounded-xl border border-neutral-900 bg-neutral-950/50 p-6">
+            <h2 class="text-sm font-semibold text-neutral-400">Transactions</h2>
             <dl class="mt-4 space-y-2 text-xs">
-                {% if escrow.create_tx %}<dt class="text-slate-500">created</dt><dd class="hash text-slate-400">{{ escrow.create_tx }}</dd>{% endif %}
-                {% if escrow.fund_tx %}<dt class="text-slate-500">funded</dt><dd class="hash text-slate-400">{{ escrow.fund_tx }}</dd>{% endif %}
-                {% if escrow.release_tx %}<dt class="text-slate-500">released</dt><dd class="hash text-teal-400">{{ escrow.release_tx }}</dd>{% endif %}
-                {% if escrow.refund_tx %}<dt class="text-slate-500">refunded</dt><dd class="hash text-blue-400">{{ escrow.refund_tx }}</dd>{% endif %}
+                {% if escrow.create_tx %}<dt class="text-neutral-600">created</dt><dd class="hash text-neutral-500">{{ escrow.create_tx }}</dd>{% endif %}
+                {% if escrow.fund_tx %}<dt class="text-neutral-600">funded</dt><dd class="hash text-neutral-500">{{ escrow.fund_tx }}</dd>{% endif %}
+                {% if escrow.release_tx %}<dt class="text-neutral-600">released</dt><dd class="hash text-red-400">{{ escrow.release_tx }}</dd>{% endif %}
+                {% if escrow.refund_tx %}<dt class="text-neutral-600">refunded</dt><dd class="hash text-blue-400">{{ escrow.refund_tx }}</dd>{% endif %}
             </dl>
         </div>
     </div>
 
     <!-- Action panel -->
     <div class="lg:col-span-1 space-y-4">
-        <div class="rounded-xl border border-teal-500/30 bg-teal-500/5 p-5">
-            <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-teal-400">
+        <div class="rounded-xl border border-red-500/30 bg-red-500/5 p-5">
+            <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-red-400">
                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
                 </svg>
@@ -111,116 +111,116 @@
             </div>
 
             {% if escrow.state == 'completed' %}
-            <p class="mt-3 text-sm text-teal-300">Settled — the seller's share was credited against your ML-DSA-87 signature (credits-only settlement: no funds move during release).</p>
-            <a href="{{ network.explorer_url }}" target="_blank" class="mt-2 block text-xs text-slate-400 hover:text-teal-400 break-all">tx: {{ escrow.release_tx }}</a>
+            <p class="mt-3 text-sm text-red-300">Settled — the seller's share was credited against your ML-DSA-87 signature (credits-only settlement: no funds move during release).</p>
+            <a href="{{ network.explorer_url }}" target="_blank" class="mt-2 block text-xs text-neutral-500 hover:text-red-400 break-all">tx: {{ escrow.release_tx }}</a>
             {% if my_credits_wei > 0 %}
-            <p class="mt-3 text-xs text-slate-300">You have <strong class="text-teal-300">{{ my_credits_qor|floatformat:6 }} QOR</strong> in withdrawable credits.</p>
-            <button id="withdraw-button" class="mt-2 w-full rounded-lg bg-teal-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-teal-400 transition-colors">
+            <p class="mt-3 text-xs text-neutral-400">You have <strong class="text-red-300">{{ my_credits_qor|floatformat:6 }} QOR</strong> in withdrawable credits.</p>
+            <button id="withdraw-button" class="mt-2 w-full rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-black hover:bg-red-400 transition-colors">
                 Withdraw {{ my_credits_qor|floatformat:4 }} QOR
             </button>
-            <p id="withdraw-status" class="mt-2 text-[11px] text-slate-400"></p>
+            <p id="withdraw-status" class="mt-2 text-[11px] text-neutral-500"></p>
             {% endif %}
             {% elif live.release_eligible %}
-            <p class="mt-3 text-xs leading-relaxed text-slate-300">
+            <p class="mt-3 text-xs leading-relaxed text-neutral-400">
                 The escrow is release-eligible. Signing the release in QoreX sends the
                 seller their {{ escrow.amount_qor }} QOR. Your wallet will display the exact terms.
             </p>
-            <button id="release-button" class="mt-4 w-full rounded-lg bg-teal-500 px-4 py-3 font-semibold text-slate-950 hover:bg-teal-400 transition-colors">
+            <button id="release-button" class="mt-4 w-full rounded-lg bg-red-500 px-4 py-3 font-semibold text-black hover:bg-red-400 transition-colors">
                 Sign release in QoreX
             </button>
-            <p id="release-status" class="mt-3 text-xs text-slate-400"></p>
+            <p id="release-status" class="mt-3 text-xs text-neutral-500"></p>
             {% else %}
-            <p class="mt-3 text-xs leading-relaxed text-slate-400">
+            <p class="mt-3 text-xs leading-relaxed text-neutral-500">
                 Release becomes eligible when you confirm receipt, or after the inspection
                 window closes following delivery + verifier attestation.
             </p>
             {% endif %}
 
             {% if is_buyer and live.status == 1 %}
-            <div class="mt-4 rounded-lg border border-teal-500/20 bg-slate-900/50 p-3">
+            <div class="mt-4 rounded-lg border border-red-500/20 bg-neutral-950/50 p-3">
                 {% if escrow.autopilot_enabled %}
-                <div class="text-xs font-semibold text-teal-300">Autopilot enabled</div>
-                <p class="mt-1 text-[11px] text-slate-400">You pre-signed a release of <strong class="text-slate-200">{{ escrow.amount_qor }} QOR</strong>. The AI submits exactly that signature when the verifier attests — nothing more.</p>
+                <div class="text-xs font-semibold text-red-300">Autopilot enabled</div>
+                <p class="mt-1 text-[11px] text-neutral-500">You pre-signed a release of <strong class="text-neutral-300">{{ escrow.amount_qor }} QOR</strong>. The AI submits exactly that signature when the verifier attests — nothing more.</p>
                 <button id="autopilot-revoke" class="mt-2 rounded border border-red-500/40 px-3 py-1 text-xs text-red-300 hover:bg-red-500/10 transition-colors">Revoke pre-authorization</button>
-                <p id="autopilot-status" class="mt-2 text-[11px] text-slate-400"></p>
+                <p id="autopilot-status" class="mt-2 text-[11px] text-neutral-500"></p>
                 {% else %}
-                <button id="preauth-button" class="w-full rounded-lg bg-teal-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-teal-400 transition-colors">Pre-authorize release (Autopilot)</button>
-                <p id="preauth-status" class="mt-2 text-[11px] text-slate-400"></p>
-                <p class="mt-1 text-[11px] text-slate-500">Sign once in QoreX; the AI executes when attested. Revoke anytime.</p>
+                <button id="preauth-button" class="w-full rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-black hover:bg-red-400 transition-colors">Pre-authorize release (Autopilot)</button>
+                <p id="preauth-status" class="mt-2 text-[11px] text-neutral-500"></p>
+                <p class="mt-1 text-[11px] text-neutral-600">Sign once in QoreX; the AI executes when attested. Revoke anytime.</p>
                 {% endif %}
             </div>
             {% endif %}
         </div>
 
-        <div class="rounded-xl border border-slate-800 bg-slate-900/50 p-5 text-xs text-slate-400 leading-relaxed">
-            <div class="font-semibold text-slate-300 mb-2">What the contract enforces</div>
+        <div class="rounded-xl border border-neutral-900 bg-neutral-950/50 p-5 text-xs text-neutral-500 leading-relaxed">
+            <div class="font-semibold text-neutral-400 mb-2">What the contract enforces</div>
             <ul class="list-disc list-inside space-y-1">
                 <li>Your registered ML-DSA-87 key signs the release — a leaked EVM key alone moves nothing</li>
                 <li>Only this escrow's exact terms (recipient, amount, nonce) are signed</li>
                 <li>The signature is verified on-chain by the pqcVerify precompile</li>
                 <li>A used signature can never be replayed</li>
             </ul>
-            <a href="{% url 'blockchain:escrow_proof' escrow.on_chain_id %}" class="mt-3 inline-block text-teal-400 hover:text-teal-300">
+            <a href="{% url 'blockchain:escrow_proof' escrow.on_chain_id %}" class="mt-3 inline-block text-red-400 hover:text-red-300">
                 Verify this escrow in your browser →
             </a>
-            <p id="browser-proof" class="mt-2 text-slate-500">PDF: the proof page reads the buyer's registered key and this escrow's live state from chain — no trust in this page needed.</p>
+            <p id="browser-proof" class="mt-2 text-neutral-600">PDF: the proof page reads the buyer's registered key and this escrow's live state from chain — no trust in this page needed.</p>
         </div>
 
         {% if live.status == 1 %}
-        <div class="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
-            <div class="text-xs font-semibold uppercase tracking-wider text-slate-400">Order actions</div>
+        <div class="rounded-xl border border-neutral-900 bg-neutral-950/50 p-5">
+            <div class="text-xs font-semibold uppercase tracking-wider text-neutral-500">Order actions</div>
 
             {% if is_seller %}
-            <button id="deliver-button" class="mt-3 w-full rounded-lg border border-teal-500/40 px-4 py-2 text-sm text-teal-300 hover:bg-teal-500/10 transition-colors">
+            <button id="deliver-button" class="mt-3 w-full rounded-lg border border-red-500/40 px-4 py-2 text-sm text-red-300 hover:bg-red-500/10 transition-colors">
                 Mark delivered
             </button>
-            <p class="mt-2 text-[11px] text-slate-500">Tells the contract the goods are on their way. After the delivery deadline (or the buyer's confirmation), release becomes eligible.</p>
+            <p class="mt-2 text-[11px] text-neutral-600">Tells the contract the goods are on their way. After the delivery deadline (or the buyer's confirmation), release becomes eligible.</p>
             {% elif is_buyer %}
-            <button id="confirm-button" class="mt-3 w-full rounded-lg border border-teal-500/40 px-4 py-2 text-sm text-teal-300 hover:bg-teal-500/10 transition-colors">
+            <button id="confirm-button" class="mt-3 w-full rounded-lg border border-red-500/40 px-4 py-2 text-sm text-red-300 hover:bg-red-500/10 transition-colors">
                 Confirm receipt
             </button>
-            <p class="mt-2 text-[11px] text-slate-500">Satisfies the inspection condition immediately — the seller can then be paid against your PQ release signature.</p>
+            <p class="mt-2 text-[11px] text-neutral-600">Satisfies the inspection condition immediately — the seller can then be paid against your PQ release signature.</p>
             {% else %}
-            <p class="mt-3 text-[11px] text-slate-500">
+            <p class="mt-3 text-[11px] text-neutral-600">
                 Connect with the buyer or seller wallet to act on this escrow.
             </p>
             {% endif %}
         </div>
 
-        <div class="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
-            <div class="text-xs font-semibold uppercase tracking-wider text-slate-400">Carrier delivery</div>
+        <div class="rounded-xl border border-neutral-900 bg-neutral-950/50 p-5">
+            <div class="text-xs font-semibold uppercase tracking-wider text-neutral-500">Carrier delivery</div>
             {% if shipment %}
             <div class="mt-3 space-y-2 text-xs">
                 <div class="flex items-center justify-between">
-                    <span class="font-mono text-slate-300">{{ shipment.tracking_number }}</span>
-                    <span class="rounded-full bg-teal-500/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-teal-400">{{ shipment.status }}</span>
+                    <span class="font-mono text-neutral-400">{{ shipment.tracking_number }}</span>
+                    <span class="rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-red-400">{{ shipment.status }}</span>
                 </div>
-                <div class="text-slate-500">provider: {{ shipment.provider.provider_id|default:"LOG-DEMO-001" }} · simulated: {{ shipment.simulated|yesno:"yes,no" }}</div>
+                <div class="text-neutral-600">provider: {{ shipment.provider.provider_id|default:"LOG-DEMO-001" }} · simulated: {{ shipment.simulated|yesno:"yes,no" }}</div>
                 <ul class="mt-2 space-y-1">
                     {% for ev in shipment.events.all %}
-                    <li class="flex justify-between rounded bg-slate-800/50 px-2 py-1">
-                        <span class="text-slate-400">{{ ev.status }}</span>
-                        <span class="text-slate-500">{{ ev.created_at|date:"M d H:i" }}</span>
+                    <li class="flex justify-between rounded bg-neutral-900/50 px-2 py-1">
+                        <span class="text-neutral-500">{{ ev.status }}</span>
+                        <span class="text-neutral-600">{{ ev.created_at|date:"M d H:i" }}</span>
                     </li>
                     {% endfor %}
                 </ul>
                 {% if escrow.carrier_attested %}
-                <div class="rounded-lg bg-teal-500/10 px-2 py-1 text-teal-300">✓ carrier-attested on-chain <span class="hash">{{ escrow.carrier_payload_hash|truncatechars:18 }}</span></div>
+                <div class="rounded-lg bg-red-500/10 px-2 py-1 text-red-300">✓ carrier-attested on-chain <span class="hash">{{ escrow.carrier_payload_hash|truncatechars:18 }}</span></div>
                 {% endif %}
             </div>
             {% if is_seller or is_buyer %}
             <div class="mt-3 flex gap-2">
-                <button id="ship-advance" class="flex-1 rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700 transition-colors" data-shipment="{{ shipment.id }}">
+                <button id="ship-advance" class="flex-1 rounded bg-neutral-900 px-3 py-1.5 text-xs hover:bg-neutral-800 transition-colors" data-shipment="{{ shipment.id }}">
                     Advance scan (Demo Carrier)
                 </button>
-                <button id="carrier-attest" class="flex-1 rounded bg-teal-500/90 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-teal-400 transition-colors" data-shipment="{{ shipment.id }}">
+                <button id="carrier-attest" class="flex-1 rounded bg-red-500/90 px-3 py-1.5 text-xs font-semibold text-black hover:bg-red-400 transition-colors" data-shipment="{{ shipment.id }}">
                     Verify with carrier signature
                 </button>
             </div>
-            <p id="carrier-status" class="mt-2 text-[11px] text-slate-500"></p>
+            <p id="carrier-status" class="mt-2 text-[11px] text-neutral-600"></p>
             {% endif %}
             {% else %}
-            <div class="mt-3 text-xs text-slate-500">
+            <div class="mt-3 text-xs text-neutral-600">
                 {% if escrow.delivery_type == "digital" %}
                 Digital delivery — no carrier. The seller sends the files and the buyer confirms receipt.
                 {% else %}
@@ -228,19 +228,19 @@
                 {% endif %}
             </div>
             {% if is_seller or is_buyer %}
-            <button id="ship-create" class="mt-3 w-full rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700 transition-colors">
+            <button id="ship-create" class="mt-3 w-full rounded bg-neutral-900 px-3 py-1.5 text-xs hover:bg-neutral-800 transition-colors">
                 Register Demo Carrier shipment
             </button>
-            <p id="carrier-status" class="mt-2 text-[11px] text-slate-500"></p>
+            <p id="carrier-status" class="mt-2 text-[11px] text-neutral-600"></p>
             {% endif %}
             {% endif %}
         </div>
 
-        <div class="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
-            <div class="text-xs font-semibold uppercase tracking-wider text-slate-400">Fulfilment evidence</div>
+        <div class="rounded-xl border border-neutral-900 bg-neutral-950/50 p-5">
+            <div class="text-xs font-semibold uppercase tracking-wider text-neutral-500">Fulfilment evidence</div>
             {% if is_seller or is_buyer %}
             <div class="mt-3 space-y-2">
-                <select id="evidence-type" class="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs">
+                <select id="evidence-type" class="w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-xs">
                     <option value="delivery_photo">Delivery photo</option>
                     <option value="carrier_receipt">Carrier receipt</option>
                     <option value="signature">Recipient signature</option>
@@ -248,32 +248,32 @@
                     <option value="other">Other</option>
                 </select>
                 <input id="evidence-reference" type="text" placeholder="Reference / link (e.g. carrier tracking)"
-                       class="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs focus:border-teal-500 focus:outline-none">
+                       class="w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-xs focus:border-red-500 focus:outline-none">
                 <textarea id="evidence-description" rows="2" placeholder="What was delivered, to whom, when…"
-                          class="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs focus:border-teal-500 focus:outline-none"></textarea>
-                <button id="evidence-button" class="w-full rounded-lg bg-slate-800 px-4 py-2 text-sm hover:bg-slate-700 transition-colors">
+                          class="w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-xs focus:border-red-500 focus:outline-none"></textarea>
+                <button id="evidence-button" class="w-full rounded-lg bg-neutral-900 px-4 py-2 text-sm hover:bg-neutral-800 transition-colors">
                     Submit evidence
                 </button>
-                <p id="evidence-status" class="text-[11px] text-slate-500"></p>
+                <p id="evidence-status" class="text-[11px] text-neutral-600"></p>
             </div>
             {% else %}
-            <p class="mt-3 text-[11px] text-slate-500">The buyer or seller submits delivery evidence here; verifiers review it on the Oracle page.</p>
+            <p class="mt-3 text-[11px] text-neutral-600">The buyer or seller submits delivery evidence here; verifiers review it on the Oracle page.</p>
             {% endif %}
 
             {% if evidence %}
             <ul class="mt-4 space-y-2">
                 {% for item in evidence %}
-                <li class="rounded-lg bg-slate-800/50 px-3 py-2 text-xs">
+                <li class="rounded-lg bg-neutral-900/50 px-3 py-2 text-xs">
                     <div class="flex items-center justify-between">
-                        <span class="text-slate-400">{{ item.get_evidence_type_display }}</span>
+                        <span class="text-neutral-500">{{ item.get_evidence_type_display }}</span>
                         <span class="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider
-                            {% if item.verification_status == 'verified' %}bg-teal-500/10 text-teal-400{% else %}bg-amber-500/10 text-amber-400{% endif %}">
+                            {% if item.verification_status == 'verified' %}bg-red-500/10 text-red-400{% else %}bg-amber-500/10 text-amber-400{% endif %}">
                             {{ item.verification_status }}
                         </span>
                     </div>
-                    {% if item.description %}<div class="mt-1 text-slate-400">{{ item.description }}</div>{% endif %}
-                    {% if item.evidence_reference %}<div class="hash mt-1 text-[10px] text-slate-500">{{ item.evidence_reference }}</div>{% endif %}
-                    {% if item.attestation_tx %}<div class="hash mt-1 text-[10px] text-teal-400">{{ item.attestation_tx|truncatechars:30 }}</div>{% endif %}
+                    {% if item.description %}<div class="mt-1 text-neutral-500">{{ item.description }}</div>{% endif %}
+                    {% if item.evidence_reference %}<div class="hash mt-1 text-[10px] text-neutral-600">{{ item.evidence_reference }}</div>{% endif %}
+                    {% if item.attestation_tx %}<div class="hash mt-1 text-[10px] text-red-400">{{ item.attestation_tx|truncatechars:30 }}</div>{% endif %}
                 </li>
                 {% endfor %}
             </ul>
@@ -284,14 +284,14 @@
         {% if live.status == 1 %}
         <div class="rounded-xl border border-amber-500/30 bg-amber-500/5 p-5">
             <div class="text-xs font-semibold uppercase tracking-wider text-amber-400">Something wrong?</div>
-            <p class="mt-2 text-xs leading-relaxed text-slate-300">
+            <p class="mt-2 text-xs leading-relaxed text-neutral-400">
                 Buyer or seller can freeze this escrow and open a dispute. A board of three staked
                 resolvers decides release or refund by 2-of-3 majority.
             </p>
             <button id="dispute-button" class="mt-3 w-full rounded-lg border border-amber-500/40 px-4 py-2 text-sm text-amber-300 hover:bg-amber-500/10 transition-colors">
                 Raise dispute
             </button>
-            <p id="dispute-status" class="mt-2 text-xs text-slate-400"></p>
+            <p id="dispute-status" class="mt-2 text-xs text-neutral-500"></p>
         </div>
         {% endif %}
     </div>
