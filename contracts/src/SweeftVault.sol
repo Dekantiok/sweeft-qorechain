@@ -97,6 +97,7 @@ contract SweeftVault {
     event CarrierAttested(uint256 indexed escrowId, address indexed carrier, bytes32 payloadHash, string status, string trackingNumber);
     event LogisticsPaid(uint256 indexed escrowId, address indexed partner, uint256 amount);
     event LogisticsHeld(uint256 indexed escrowId, address indexed buyer, uint256 amount);
+    event CreditsAccrued(address indexed account, uint256 amount);
     event CreditsWithdrawn(address indexed account, uint256 amount);
 
     // ------------------------------------------------------------------
@@ -231,6 +232,19 @@ contract SweeftVault {
         _;
     }
 
+    /// @notice Only the deploying account (one-shot wiring, Stage 4 QC4-2 made
+    ///         explicit as a named modifier).
+    modifier onlyDeployer() {
+        if (msg.sender != deployer) revert NotDeployer();
+        _;
+    }
+
+    /// @notice Only the dispute board (N-1 made explicit as a named modifier).
+    modifier onlyDisputeBoard() {
+        if (msg.sender != disputeBoard) revert NotDisputeBoard();
+        _;
+    }
+
     modifier nonReentrant() {
         if (_lock != 1) revert InvalidStatus();
         _lock = 2;
@@ -262,16 +276,14 @@ contract SweeftVault {
     }
 
     /// @notice Wire the dispute board. Callable once by the deployer.
-    function setDisputeBoard(address board) external {
-        if (msg.sender != deployer) revert NotDeployer();
+    function setDisputeBoard(address board) external onlyDeployer {
         if (disputeBoard != address(0)) revert AlreadyWired();
         if (board == address(0)) revert InvalidParties();
         disputeBoard = board;
     }
 
     /// @notice Wire the Marketplace contract. Callable once by the deployer.
-    function setMarketplace(address marketplaceAddress) external {
-        if (msg.sender != deployer) revert NotDeployer();
+    function setMarketplace(address marketplaceAddress) external onlyDeployer {
         if (marketplace != address(0)) revert AlreadyWired();
         if (marketplaceAddress == address(0)) revert InvalidParties();
         marketplace = marketplaceAddress;
@@ -475,6 +487,10 @@ contract SweeftVault {
     }
 
     /// @notice Release escrowed funds to the seller, charging the platform fee.
+    ///         Settlement is credits-only (Stage 5 QC4-1): the vault makes NO
+    ///         external calls while settling — every share is credited and
+    ///         withdrawn later via `withdrawCredits`, so there is no
+    ///         re-entrancy surface in the money path at all.
     function release(uint256 escrowId, bytes calldata signature) external nonReentrant {
         if (!isReleaseEligible(escrowId)) revert NotReleaseEligible();
 
@@ -489,11 +505,12 @@ contract SweeftVault {
 
         emit FundsReleased(escrowId, e.seller, e.amount, nonce);
 
-        _payRelease(escrowId, e);
+        _settleRelease(escrowId, e);
     }
 
     /// @notice Refund the buyer when the seller never delivered and no verifier
-    ///         or carrier confirmed fulfilment.
+    ///         or carrier confirmed fulfilment. Credited, not pushed (see
+    ///         `release` for the credits-only settlement note).
     function refundAfterDeadline(uint256 escrowId, bytes calldata signature) external nonReentrant {
         if (!isRefundable(escrowId)) revert NotRefundable();
 
@@ -507,7 +524,7 @@ contract SweeftVault {
 
         emit EscrowRefunded(escrowId, e.buyer, e.amount, nonce);
 
-        _pay(e.buyer, e.amount);
+        _credit(e.buyer, e.amount);
     }
 
     /// @notice Cancel an unfunded escrow. Either party may cancel.
@@ -540,8 +557,7 @@ contract SweeftVault {
     ///         collects the raiser bond, and is the only party that can settle.
     ///         A direct buyer/seller call is rejected so a party can never
     ///         freeze an escrow without a bond or a resolvable path (N-1).
-    function raiseDispute(uint256 escrowId) external {
-        if (msg.sender != disputeBoard) revert NotDisputeBoard();
+    function raiseDispute(uint256 escrowId) external onlyDisputeBoard {
         Escrow storage e = escrows[escrowId];
         if (e.buyer == address(0)) revert InvalidEscrow();
         if (e.status != EscrowStatus.Funded) revert NotDisputable();
@@ -552,9 +568,7 @@ contract SweeftVault {
 
     /// @notice Settle a disputed escrow. Only the dispute board contract may
     ///         call this; the board reaches a 2-of-3 resolver majority.
-    function resolveDispute(uint256 escrowId, bool releaseToSeller) external nonReentrant {
-        if (msg.sender != disputeBoard) revert NotDisputeBoard();
-
+    function resolveDispute(uint256 escrowId, bool releaseToSeller) external nonReentrant onlyDisputeBoard {
         Escrow storage e = escrows[escrowId];
         if (e.status != EscrowStatus.Disputed) revert InvalidStatus();
 
@@ -563,10 +577,10 @@ contract SweeftVault {
             e.released = true;
             e.status = EscrowStatus.Completed;
             fee = _feeForAmount(e.amount - e.logisticsAmount, e.feeBpsSnapshot);
-            _payRelease(escrowId, e);
+            _settleRelease(escrowId, e);
         } else {
             e.status = EscrowStatus.Refunded;
-            _pay(e.buyer, e.amount);
+            _credit(e.buyer, e.amount);
         }
 
         emit DisputeResolved(escrowId, releaseToSeller, fee);
@@ -625,82 +639,75 @@ contract SweeftVault {
     }
 
     function _feeForAmount(uint256 amount, uint256 bps) internal pure returns (uint256) {
-        // Explicit overflow guard (QC4-3): Solidity >=0.8 would revert, but
-        // the check makes the bound visible to auditors and static tools.
+        // Explicit bounds (QC4-3): bps is capped at MAX_FEE_BPS and the
+        // product is overflow-checked, so amount * bps can never wrap.
+        if (bps > MAX_FEE_BPS) revert FeeTooHigh();
         if (bps > 0 && amount > type(uint256).max / bps) revert InvalidAmount();
         return (amount * bps) / 10_000;
     }
 
-    /// @dev Push a payment; if the recipient rejects it, accrue a credit so the
-    ///      escrow can still settle.
-    function _pay(address to, uint256 amount) internal {
+    /// @dev Credits-only settlement (Stage 5 QC4-1): no external calls while
+    ///      settling, so the money path has no re-entrancy surface. Every
+    ///      recipient withdraws later via `withdrawCredits` (checks-effects-
+    ///      interactions, zeroed before the single call there).
+    function _credit(address to, uint256 amount) internal {
         if (amount == 0) return;
-        (bool ok,) = to.call{ value: amount }("");
-        if (!ok) {
-            credits[to] += amount;
-        }
+        credits[to] += amount;
+        emit CreditsAccrued(to, amount);
     }
 
-    function _payRelease(uint256 escrowId, Escrow storage e) internal {
+    function _settleRelease(uint256 escrowId, Escrow storage e) internal {
         uint256 goodsAmount = e.amount - e.logisticsAmount;
 
-        if (e.logisticsAmount > 0 && e.logisticsPartner != address(0)) {
-            // The carrier is paid only on PROVEN delivery (a DELIVERED
-            // attestation), never on a mere in-transit status (N-2).
-            if (e.carrierDelivered) {
-                _pay(e.logisticsPartner, e.logisticsAmount);
-                emit LogisticsPaid(escrowId, e.logisticsPartner, e.logisticsAmount);
-            } else {
-                credits[e.buyer] += e.logisticsAmount;
-                emit LogisticsHeld(escrowId, e.buyer, e.logisticsAmount);
-            }
-        }
+        _creditCarrier(escrowId, e);
 
         uint256 fee = _feeForAmount(goodsAmount, e.feeBpsSnapshot);
-        uint256 sellerAmount = goodsAmount - fee;
+        _creditFees(escrowId, e, fee);
 
-        if (fee > 0) {
-            uint256 treasuryShare = (fee * TREASURY_SHARE_BPS) / 10_000;
-            uint256 disputeShare = fee - treasuryShare;
-
-            if (disputeBoard == address(0)) {
-                treasuryShare = fee;
-                disputeShare = 0;
-            }
-
-            _pay(e.treasurySnapshot, treasuryShare);
-
-            if (disputeShare > 0) {
-                (bool dOk,) = disputeBoard.call{ value: disputeShare }(
-                    abi.encodeWithSignature("receiveFeeShare()")
-                );
-                if (!dOk) {
-                    credits[disputeBoard] += disputeShare;
-                }
-            }
-
-            emit FeeCollected(escrowId, treasuryShare, disputeShare);
-        }
-
-        _pay(e.seller, sellerAmount);
+        _credit(e.seller, goodsAmount - fee);
     }
 
+    function _creditCarrier(uint256 escrowId, Escrow storage e) internal {
+        if (e.logisticsAmount == 0 || e.logisticsPartner == address(0)) return;
+        // The carrier is paid only on PROVEN delivery (a DELIVERED
+        // attestation), never on a mere in-transit status (N-2).
+        if (e.carrierDelivered) {
+            _credit(e.logisticsPartner, e.logisticsAmount);
+            emit LogisticsPaid(escrowId, e.logisticsPartner, e.logisticsAmount);
+        } else {
+            _credit(e.buyer, e.logisticsAmount);
+            emit LogisticsHeld(escrowId, e.buyer, e.logisticsAmount);
+        }
+    }
+
+    function _creditFees(uint256 escrowId, Escrow storage e, uint256 fee) internal {
+        if (fee == 0) return;
+        uint256 treasuryShare = (fee * TREASURY_SHARE_BPS) / 10_000;
+        uint256 disputeShare = fee - treasuryShare;
+
+        if (disputeBoard == address(0)) {
+            treasuryShare = fee;
+            disputeShare = 0;
+        }
+
+        _credit(e.treasurySnapshot, treasuryShare);
+        _credit(disputeBoard, disputeShare);
+
+        emit FeeCollected(escrowId, treasuryShare, disputeShare);
+    }
+
+    /// @notice Typed registry reads (Stage 5 QC4-5): the low-level
+    ///         `staticcall` pattern is gone; calls go through an interface and
+    ///         fail closed if the registry cannot be read.
     function _isVerifier(address account) internal view returns (bool) {
-        (bool ok, bytes memory data) = oracleRegistry.staticcall(
-            abi.encodeWithSignature("isVerifier(address)", account)
-        );
-        if (!ok || data.length < 32) return false;
-        return abi.decode(data, (bool));
+        // Typed call (Stage 5 QC4-5): a registry failure reverts the
+        // attestation instead of silently treating it as valid (fail closed).
+        return IExcaliburOracleRegistry(oracleRegistry).isVerifier(account);
     }
 
     function _verifierThreshold() internal view returns (uint8) {
-        (bool ok, bytes memory data) = oracleRegistry.staticcall(
-            abi.encodeWithSignature("threshold()")
-        );
-        // Fail closed (N-9): if the registry cannot be read, do not silently
-        // treat a single attestation as satisfying the threshold.
-        if (!ok || data.length < 32) revert RegistryUnavailable();
-        uint8 t = abi.decode(data, (uint8));
+        uint8 t = IExcaliburOracleRegistry(oracleRegistry).threshold();
+        // Fail closed (N-9): a registry reporting 0 means "any".
         return t == 0 ? 1 : t;
     }
 
@@ -826,6 +833,13 @@ contract SweeftVault {
 // ----------------------------------------------------------------------
 // Precompile interfaces
 // ----------------------------------------------------------------------
+
+/// @notice Typed view of the verifier registry (Stage 5 QC4-5: replaces the
+///         low-level `staticcall` pattern with checked interface calls).
+interface IExcaliburOracleRegistry {
+    function isVerifier(address account) external view returns (bool);
+    function threshold() external view returns (uint8);
+}
 
 interface IPQCVerify {
     function pqcVerify(bytes calldata pubkey, bytes calldata signature, bytes calldata message)

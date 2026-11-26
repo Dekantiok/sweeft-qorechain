@@ -49,6 +49,8 @@ EVENTS = {
         "CarrierRegistered",
         "CarrierRemoved",
         "LogisticsPaid",
+        "CreditsAccrued",
+        "CreditsWithdrawn",
     ],
     "SweeftOracleRegistry": ["VerifierAdded", "VerifierRemoved"],
     "SweeftDAO": ["ProposalCreated", "VoteCast", "ProposalExecuted", "ProposalRejected"],

@@ -17,7 +17,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.views.decorators.http import require_GET, require_POST
 
-from apps.blockchain.services.relayer import RelayerError, escrow_state, is_verifier, submit_release
+from apps.blockchain.services.relayer import RelayerError, escrow_state, is_verifier, submit_release, vault_credits
 from apps.oracle.models import FulfilmentEvidence
 from config.ratelimit import is_rate_limited
 from integrations.qorechain.client import get_network
@@ -52,6 +52,13 @@ def escrow_detail(request, escrow_id: int):
     amount_wei = live_state.get("amount_wei") if live_state else int(escrow.amount_uqor) * 10**12
     dispute_bond_wei = max(10**17, int(amount_wei) // 100)  # 1% with a 0.1 QOR floor
 
+    my_credits_wei = 0
+    if wallet:
+        try:
+            my_credits_wei = vault_credits(wallet)
+        except Exception:
+            logger.exception("could not read vault credits")
+
     return render(
         request,
         "escrow/detail.html",
@@ -69,6 +76,8 @@ def escrow_detail(request, escrow_id: int):
             "is_buyer": bool(wallet) and wallet == escrow.buyer.evm_address.lower(),
             "is_seller": bool(wallet) and wallet == escrow.seller.evm_address.lower(),
             "wallet_attached": bool(wallet),
+            "my_credits_wei": my_credits_wei,
+            "my_credits_qor": my_credits_wei / 10**18,
         },
     )
 

@@ -595,6 +595,8 @@ contract SweeftDisputeBoard {
     /// @notice Upper bound on panel-draw attempts per dispute, as a multiple
     ///         of the pool size (QC4-6: explicitly bounded loop).
     uint256 public constant MAX_DRAW_ATTEMPTS_PER_POOL = 6;
+    /// @notice Absolute attempt cap so gas stays bounded even for huge pools.
+    uint256 public constant MAX_DRAW_ATTEMPTS = 128;
 
     function _drawPanel(
         Dispute storage d,
@@ -606,9 +608,11 @@ contract SweeftDisputeBoard {
         uint256 n = resolverPool.length;
         if (n == 0) return 0;
 
-        // Bounded for-loop: at most n * MAX_DRAW_ATTEMPTS_PER_POOL iterations,
-        // whatever the pool contains (parties/verifier/carrier are skipped).
+        // Bounded for-loop: at most min(n * MAX_DRAW_ATTEMPTS_PER_POOL,
+        // MAX_DRAW_ATTEMPTS) iterations, whatever the pool contains
+        // (parties/verifier/carrier are skipped).
         uint256 maxAttempts = n * MAX_DRAW_ATTEMPTS_PER_POOL;
+        if (maxAttempts > MAX_DRAW_ATTEMPTS) maxAttempts = MAX_DRAW_ATTEMPTS;
         for (uint256 attempts; attempts < maxAttempts && chosen < size; attempts++) {
             uint256 idx = uint256(
                 keccak256(abi.encode(block.prevrandao, d.escrowId, round, chosen, attempts))
@@ -693,12 +697,14 @@ contract SweeftDisputeBoard {
         emit Swept(treasury, amount);
     }
 
-    /// @notice Pull a credit the Vault accrued for the board on a failed fee
-    ///         push (N-4). The Vault sends the withdrawal to the caller.
+    /// @notice Pull a credit the Vault accrued for the board (the Vault's
+    ///         credits-only settlement credits the board's fee share instead
+    ///         of pushing it) into the reward pool (N-4).
     function withdrawVaultCredits() external nonReentrant {
         uint256 amount = vault.credits(address(this));
         if (amount == 0) revert ZeroAmount();
         vault.withdrawCredits();
+        rewardPool += amount;
         emit Swept(address(this), amount);
     }
 

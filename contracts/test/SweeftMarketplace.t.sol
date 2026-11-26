@@ -217,13 +217,13 @@ contract SweeftMarketplaceTest is Test {
         vm.prank(buyer);
         vault.confirmReceipt(escrowId);
 
-        uint256 sellerBefore = seller.balance;
         vm.prank(stranger);
         vault.release(escrowId, hex"c0ffee");
 
-        uint256 fee = (1 ether * 200) / 10_000;
-        assertEq(seller.balance, sellerBefore + 1 ether - fee);
-        assertEq(address(vault).balance, 0);
+        // Credits-only settlement: seller is credited 1 - fee, then withdraws.
+        assertEq(vault.credits(seller), (1 ether * 9800) / 10_000);
+        assertEq(address(vault).balance, 1 ether);
+        _withdrawAll(seller);
         assertEq(uint8(vault.getEscrow(escrowId).status), uint8(SweeftVault.EscrowStatus.Completed));
     }
 
@@ -234,11 +234,20 @@ contract SweeftMarketplaceTest is Test {
         uint256 escrowId = _buy(listingId, 1 ether);
 
         vm.warp(block.timestamp + 7 days + 1);
-        uint256 buyerBefore = buyer.balance;
         vault.refundAfterDeadline(escrowId, hex"c0ffee");
 
-        assertEq(buyer.balance, buyerBefore + 1 ether);
+        assertEq(vault.credits(buyer), 1 ether);
+        _withdrawAll(buyer);
         assertEq(uint8(vault.getEscrow(escrowId).status), uint8(SweeftVault.EscrowStatus.Refunded));
+    }
+
+    function _withdrawAll(address who) internal {
+        uint256 creditsBefore = vault.credits(who);
+        uint256 balBefore = who.balance;
+        vm.prank(who);
+        vault.withdrawCredits();
+        assertEq(who.balance, balBefore + creditsBefore);
+        assertEq(vault.credits(who), 0);
     }
 
     // ------------------------------------------------------------------

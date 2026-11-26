@@ -210,6 +210,9 @@ contract SweeftDisputeBoardTest is Test {
         _finalizeAfterWindow(disputeId);
 
         uint256 fee = (AMOUNT * FEE_BPS) / 10_000;
+        assertEq(vault.credits(seller), AMOUNT - fee);
+        vm.prank(seller);
+        vault.withdrawCredits();
         assertEq(seller.balance, sellerBefore + AMOUNT - fee);
         assertEq(uint8(vault.getEscrow(escrowId).status), uint8(SweeftVault.EscrowStatus.Completed));
     }
@@ -223,6 +226,8 @@ contract SweeftDisputeBoardTest is Test {
         // Full refund plus the unspent part of the raiser bond (resolvers are
         // paid a fixed fee from the bond for either outcome).
         uint256 resolverFee = (BOND * 2000) / 10_000;
+        vm.prank(buyer);
+        vault.withdrawCredits();
         assertEq(buyer.balance, buyerBefore + AMOUNT + (BOND - resolverFee));
         assertEq(uint8(vault.getEscrow(escrowId).status), uint8(SweeftVault.EscrowStatus.Refunded));
     }
@@ -256,6 +261,8 @@ contract SweeftDisputeBoardTest is Test {
 
         uint256 buyerBefore = buyer.balance;
         _finalizeAfterWindow(disputeId);
+        vm.prank(buyer);
+        vault.withdrawCredits();
         assertEq(buyer.balance, buyerBefore + AMOUNT);
         assertEq(uint8(vault.getEscrow(escrowId).status), uint8(SweeftVault.EscrowStatus.Refunded));
     }
@@ -290,6 +297,8 @@ contract SweeftDisputeBoardTest is Test {
         board.resolveExpired(disputeId);
         uint256 buyerBefore = buyer.balance;
         _finalizeAfterWindow(disputeId);
+        vm.prank(buyer);
+        vault.withdrawCredits();
         assertEq(buyer.balance, buyerBefore + AMOUNT); // refunded, not released
     }
 
@@ -452,6 +461,23 @@ contract SweeftDisputeBoardTest is Test {
     function test_WithdrawVaultCredits_NoCreditReverts() public {
         vm.expectRevert(SweeftDisputeBoard.ZeroAmount.selector);
         board.withdrawVaultCredits();
+    }
+
+    function test_WithdrawVaultCredits_PullsIntoRewardPool() public {
+        // After a release, the Vault credits the board's fee share (credits-
+        // only settlement). Pulling via withdrawVaultCredits moves it into the
+        // claimable rewardPool.
+        (uint256 escrowId, uint256 disputeId) = _openPanel();
+        _decide(disputeId, true);
+        _finalizeAfterWindow(disputeId);
+        escrowId;
+
+        uint256 credited = vault.credits(address(board));
+        assertGt(credited, 0);
+        uint256 poolBefore = board.rewardPool();
+        board.withdrawVaultCredits();
+        assertEq(board.rewardPool(), poolBefore + credited);
+        assertEq(vault.credits(address(board)), 0);
     }
 
     // ------------------------------------------------------------------

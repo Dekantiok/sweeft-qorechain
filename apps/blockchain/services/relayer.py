@@ -171,6 +171,15 @@ def escrow_state(escrow_id: int) -> dict:
     }
 
 
+def vault_credits(address: str) -> int:
+    """Withdrawable credits held by one account in the Vault (wei)."""
+    if not address:
+        return 0
+    w3 = get_evm_client()
+    vault = _vault_contract(w3)
+    return int(vault.functions.credits(w3.to_checksum_address(address)).call())
+
+
 def board_state() -> dict:
     """Read the dispute board's parameters and pool directly from the chain.
 

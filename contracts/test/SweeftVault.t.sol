@@ -222,8 +222,15 @@ contract SweeftVaultTest is Test {
         uint256 treasuryBefore = treasury.balance;
         vault.release(id, dummySig);
 
-        // 2% fee: seller gets 0.98, treasury the full fee (no dispute board set).
+        // 2% fee: credits-only settlement (Stage 5 QC4-1) — seller gets 0.98
+        // and treasury the full fee (no dispute board set) as credits.
         uint256 fee = (1 ether * FEE_BPS) / 10_000;
+        assertEq(vault.credits(seller), 1 ether - fee);
+        assertEq(vault.credits(treasury), fee);
+        vm.prank(seller);
+        vault.withdrawCredits();
+        vm.prank(treasury);
+        vault.withdrawCredits();
         assertEq(seller.balance, sellerBefore + 1 ether - fee);
         assertEq(treasury.balance, treasuryBefore + fee);
         SweeftVault.Escrow memory e = vault.getEscrow(id);
@@ -345,6 +352,9 @@ contract SweeftVaultTest is Test {
         vault.release(id, dummySig);
 
         uint256 fee = (1 ether * FEE_BPS) / 10_000;
+        assertEq(vault.credits(seller), 1 ether - fee);
+        vm.prank(seller);
+        vault.withdrawCredits();
         assertEq(seller.balance, sellerBefore + 1 ether - fee);
     }
 
@@ -365,6 +375,10 @@ contract SweeftVaultTest is Test {
 
         vault.refundAfterDeadline(id, dummySig);
 
+        // Credits-only: refund accrues a credit; withdrawal pays out.
+        assertEq(vault.credits(buyer), 1 ether);
+        vm.prank(buyer);
+        vault.withdrawCredits();
         assertEq(buyer.balance, buyerBefore + 1 ether);
         assertEq(uint8(vault.getEscrow(id).status), uint8(SweeftVault.EscrowStatus.Refunded));
     }
@@ -482,6 +496,9 @@ contract SweeftVaultTest is Test {
         assertTrue(vault.isRefundable(id));
         uint256 buyerBefore = buyer.balance;
         vault.refundAfterDeadline(id, dummySig);
+        assertEq(vault.credits(buyer), 1 ether);
+        vm.prank(buyer);
+        vault.withdrawCredits();
         assertEq(buyer.balance, buyerBefore + 1 ether);
     }
 
@@ -497,6 +514,9 @@ contract SweeftVaultTest is Test {
         vault.release(id, dummySig);
 
         uint256 snapshottedFee = (1 ether * FEE_BPS) / 10_000; // original 2%
+        assertEq(vault.credits(seller), 1 ether - snapshottedFee);
+        vm.prank(seller);
+        vault.withdrawCredits();
         assertEq(seller.balance, sellerBefore + 1 ether - snapshottedFee);
     }
 
@@ -532,5 +552,39 @@ contract SweeftVaultTest is Test {
 
         vault.release(idB, dummySig);
         assertEq(vault.escrowNonce(idB), 1);
+    }
+
+    function test_Release_CreditsOnly_NoBalanceMovementUntilWithdraw() public {
+        // Stage 5 QC4-1: settlement makes no external calls — balances move
+        // only when the recipient explicitly withdraws.
+        uint256 id = _createAndFund(1 ether, 7 days);
+        vm.prank(buyer);
+        vault.confirmReceipt(id);
+
+        uint256 sellerBefore = seller.balance;
+        uint256 feeBefore = treasury.balance;
+        vault.release(id, dummySig);
+
+        assertEq(seller.balance, sellerBefore);
+        assertEq(treasury.balance, feeBefore);
+        assertGt(vault.credits(seller), 0);
+        assertGt(vault.credits(treasury), 0);
+
+        vm.prank(seller);
+        vault.withdrawCredits();
+        assertEq(vault.credits(seller), 0);
+        assertGt(seller.balance, sellerBefore);
+    }
+
+    function test_FeeBound_BpsAboveCapReverts() public {
+        // QC4-3: _feeForAmount rejects an out-of-range bps at the source.
+        uint256 id = _createAndFund(1 ether, 7 days);
+        // owner can only set <= MAX_FEE_BPS; snapshots therefore stay bounded.
+        vault.setFeeBps(1000); // max allowed
+        vm.prank(buyer);
+        vault.confirmReceipt(id);
+        vault.release(id, dummySig);
+        // 10% fee snapshot at 1000 bps? No: snapshot was 2% at creation.
+        assertEq(vault.credits(seller), 1 ether - ((1 ether * 200) / 10_000));
     }
 }

@@ -163,6 +163,18 @@ contract SweeftLogisticsTest is Test {
         uint256 treasuryShare = (fee * 7000) / 10000;
         uint256 disputeShare = fee - treasuryShare;
 
+        // Credits-only settlement: shares accrue, then each party withdraws.
+        assertEq(vault.credits(seller), sellerAmt);
+        assertEq(vault.credits(carrier), log);
+        assertEq(vault.credits(treasury), treasuryShare);
+        assertEq(vault.credits(address(board)), disputeShare);
+        vm.prank(seller);
+        vault.withdrawCredits();
+        vm.prank(carrier);
+        vault.withdrawCredits();
+        vm.prank(treasury);
+        vault.withdrawCredits();
+        board.withdrawVaultCredits(); // board pulls its credit into rewardPool
         assertEq(seller.balance, sellerBefore + sellerAmt);
         assertEq(carrier.balance, carrierBefore + log);
         assertEq(treasury.balance, treasuryBefore + treasuryShare);
@@ -211,6 +223,9 @@ contract SweeftLogisticsTest is Test {
         vm.warp(block.timestamp + 7 days + 1);
         uint256 buyerBefore = buyer.balance;
         vault.refundAfterDeadline(id, hex"c0ffee");
+        assertEq(vault.credits(buyer), total);
+        vm.prank(buyer);
+        vault.withdrawCredits();
         assertEq(buyer.balance, buyerBefore + total);
         assertEq(uint8(vault.getEscrow(id).status), uint8(SweeftVault.EscrowStatus.Refunded));
     }
