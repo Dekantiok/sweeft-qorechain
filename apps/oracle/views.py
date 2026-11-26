@@ -6,7 +6,7 @@ import logging
 
 from django.shortcuts import render
 
-from apps.blockchain.services.relayer import is_verifier
+from apps.blockchain.services.reads import is_verifier
 
 from .models import FulfilmentEvidence
 

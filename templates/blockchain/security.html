@@ -44,6 +44,31 @@
     </div>
 </div>
 
+<div class="mt-4 rounded-xl border border-neutral-900 bg-black/50 p-5">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="text-xs uppercase tracking-wider text-neutral-300">Relayer (gas payer for signed calls)</div>
+        {% if relayer.configured %}
+        <span class="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-emerald-400">configured</span>
+        {% else %}
+        <span class="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-amber-400">not configured</span>
+        {% endif %}
+    </div>
+    {% if relayer.address %}
+    <div class="hash mt-2 text-xs text-neutral-300 break-all">{{ relayer.address }}</div>
+    {% endif %}
+    <dl class="mt-3 grid gap-x-8 gap-y-2 text-xs sm:grid-cols-3">
+        <dt class="text-neutral-300">Balance</dt>
+        <dd class="text-neutral-300">{% if relayer.balance_qor is not None %}{{ relayer.balance_qor|floatformat:4 }} QOR{% else %}—{% endif %}</dd>
+        <dt class="text-neutral-300">EVM window</dt>
+        <dd class="text-neutral-300">{% if relayer.window and relayer.window.live %}live ({{ relayer.window.remaining_txs }} txs left){% elif relayer.window %}not live{% else %}unknown{% endif %}</dd>
+    </dl>
+    {% if relayer.warnings %}
+    <ul class="mt-3 space-y-1 text-xs text-amber-300">
+        {% for warning in relayer.warnings %}<li>{{ warning }}</li>{% endfor %}
+    </ul>
+    {% endif %}
+</div>
+
 <div class="mt-8 rounded-xl border border-red-500/30 bg-red-500/5 p-5 text-xs leading-relaxed text-neutral-300">
     <div class="font-semibold text-red-300 mb-2">Verify it yourself</div>
     <p>

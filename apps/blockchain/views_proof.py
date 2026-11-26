@@ -15,7 +15,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.views.decorators.http import require_GET
 
-from apps.blockchain.services.relayer import RelayerError, escrow_state
+from apps.blockchain.services.reads import RelayerError, escrow_state
 from apps.escrow.models import Escrow
 from integrations.qorechain.client import get_network
 
@@ -214,6 +214,13 @@ def security_page(request):
         },
     ]
 
+    try:
+        from apps.blockchain.services.reads import relayer_health
+
+        relayer = relayer_health()
+    except Exception:  # status page must render even if the relayer is unreachable
+        relayer = {"configured": False, "warnings": ["relayer health check failed"], "window": None}
+
     return render(
         request,
         "blockchain/security.html",
@@ -223,5 +230,6 @@ def security_page(request):
             "board_address": board_address,
             "network": network,
             "escrow_count": Escrow.objects.count(),
+            "relayer": relayer,
         },
     )

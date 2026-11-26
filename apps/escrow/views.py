@@ -17,7 +17,8 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.views.decorators.http import require_GET, require_POST
 
-from apps.blockchain.services.relayer import RelayerError, escrow_state, is_verifier, submit_release, vault_credits
+from apps.blockchain.services.reads import RelayerError, escrow_state, is_verifier, vault_credits
+from apps.blockchain.services.relayer import submit_release
 from apps.oracle.models import FulfilmentEvidence
 from config.ratelimit import is_rate_limited
 from integrations.qorechain.client import get_network
@@ -51,7 +52,7 @@ def escrow_new(request):
 def next_escrow_id(request):
     """Next on-chain escrow id (used by the direct-creation page)."""
     try:
-        from apps.blockchain.services.relayer import _vault_contract
+        from apps.blockchain.services.reads import _vault_contract
         from integrations.qorechain.client import get_evm_client
 
         w3 = get_evm_client()

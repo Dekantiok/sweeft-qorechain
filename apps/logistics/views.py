@@ -13,7 +13,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
-from apps.blockchain.services.relayer import escrow_state
+from apps.blockchain.services.reads import escrow_state
 from apps.escrow.models import Escrow
 
 from . import carriers
@@ -220,7 +220,8 @@ def api_carrier_attest(request, escrow_id: int):
 
     import time
 
-    from apps.blockchain.services.relayer import attest_carrier_evidence, carrier_nonce
+    from apps.blockchain.services.relayer import attest_carrier_evidence
+    from apps.blockchain.services.reads import carrier_nonce
 
     try:
         _, _, carrier_evm = carriers.demo_carrier_keypair()

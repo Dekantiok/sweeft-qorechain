@@ -95,7 +95,7 @@ class ApiV1Tests(TestCase):
 
     def test_escrow_detail(self):
         fake_live = {"status": 1, "release_eligible": True}
-        with mock.patch("apps.blockchain.services.relayer.escrow_state", return_value=fake_live):
+        with mock.patch("apps.blockchain.services.reads.escrow_state", return_value=fake_live):
             r = self.client.get("/api/v1/escrows/5/")
         self.assertEqual(r.status_code, 200)
         body = r.json()
@@ -129,7 +129,7 @@ class ApiV1Tests(TestCase):
         self.assertEqual(r.json()["results"], [])
 
     def test_board_chain_failure_is_502(self):
-        with mock.patch("apps.blockchain.services.relayer.board_state", side_effect=RuntimeError("down")):
+        with mock.patch("apps.blockchain.services.reads.board_state", side_effect=RuntimeError("down")):
             r = self.client.get("/api/v1/board/")
         self.assertEqual(r.status_code, 502)
 

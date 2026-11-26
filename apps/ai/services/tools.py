@@ -61,7 +61,7 @@ def tool_search_listings(query: str = "", max_price_qor: float | None = None) ->
 
 
 def tool_get_escrow_status(escrow_id: int) -> dict:
-    from apps.blockchain.services.relayer import escrow_state
+    from apps.blockchain.services.reads import escrow_state
 
     try:
         state = escrow_state(int(escrow_id))
@@ -247,7 +247,8 @@ def tool_execute_autopilot(escrow_id: int, wallet: str | None = None) -> dict:
     checks them. Mandate caps are re-checked first. The caller's wallet is
     resolved server-side and must be the escrow's buyer (N-11).
     """
-    from apps.blockchain.services.relayer import escrow_state, submit_release as relayer_release
+    from apps.blockchain.services.reads import escrow_state
+    from apps.blockchain.services.relayer import submit_release as relayer_release
     from apps.escrow.models import Escrow
 
     escrow = Escrow.objects.filter(on_chain_id=int(escrow_id)).first()

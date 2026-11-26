@@ -137,9 +137,26 @@ def demo_carrier_keypair():
 
     if get_network().network != "testnet":
         raise ValueError("Demo Carrier is testnet-only")
-    mnemonic = os.getenv("DEMO_CARRIER_MNEMONIC") or os.getenv("SWEEFT_DEPLOYER_MNEMONIC", "")
+    # Prefer a dedicated mnemonic; falling back to the deployer mnemonic
+    # (owner keys) works for the throwaway demo but should be a conscious,
+    # visible choice — log it so a misconfigured deploy is obvious.
+    import logging
+    import warnings
+
+    mnemonic = os.getenv("DEMO_CARRIER_MNEMONIC", "")
     if not mnemonic:
-        raise ValueError("Demo Carrier key is not configured — set SWEEFT_DEPLOYER_MNEMONIC or DEMO_CARRIER_MNEMONIC")
+        mnemonic = os.getenv("SWEEFT_DEPLOYER_MNEMONIC", "")
+        if mnemonic:
+            warnings.warn(
+                "Demo Carrier is using SWEEFT_DEPLOYER_MNEMONIC (owner keys). "
+                "Set DEMO_CARRIER_MNEMONIC to a dedicated testnet account.",
+                stacklevel=2,
+            )
+            logging.getLogger(__name__).warning(
+                "Demo Carrier key derived from deployer mnemonic — set DEMO_CARRIER_MNEMONIC"
+            )
+    if not mnemonic:
+        raise ValueError("Demo Carrier key is not configured — set DEMO_CARRIER_MNEMONIC or SWEEFT_DEPLOYER_MNEMONIC")
     account = derive_unified_account(mnemonic.strip(), index=6)
     return account.pqc, account.cosmos, account.evm
 

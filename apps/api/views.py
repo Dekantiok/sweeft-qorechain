@@ -158,7 +158,7 @@ def escrows(request):
 def escrow_detail(request, on_chain_id: int):
     if _limited(request):
         return JsonResponse({"error": "slow down"}, status=429)
-    from apps.blockchain.services.relayer import escrow_state
+    from apps.blockchain.services.reads import escrow_state
     from apps.escrow.models import Escrow
 
     e = Escrow.objects.filter(on_chain_id=on_chain_id).select_related("buyer", "seller").first()
@@ -281,7 +281,7 @@ def board(request):
     """Live dispute-board parameters + pool (chain read, cached 30s)."""
     if _limited(request):
         return JsonResponse({"error": "slow down"}, status=429)
-    from apps.blockchain.services.relayer import board_state
+    from apps.blockchain.services.reads import board_state
 
     try:
         state = board_state()

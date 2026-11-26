@@ -41,7 +41,7 @@ def dispute_list(request):
 
     board_state = None
     try:
-        from apps.blockchain.services.relayer import board_state as read_board_state
+        from apps.blockchain.services.reads import board_state as read_board_state
 
         board_state = read_board_state()
         board_state["min_stake_qor"] = board_state["min_stake_wei"] / 10**18
