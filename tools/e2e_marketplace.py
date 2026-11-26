@@ -195,10 +195,18 @@ def main() -> None:
     print(f"      nonce={nonce} message={len(message)}B payload={len(payload)}B signature={len(signature)}B")
 
     seller_before = w3.eth.get_balance(w3.to_checksum_address(seller.evm))
+    lib.ensure_evm_window(seller, blocks=3_600, max_txs=40, max_value=5_000_000)
     result = lib.send_evm_expect_success(
         w3, buyer, vault.functions.release(escrow_id, signature), gas=8_000_000
     )
     print(f"      release tx {result['hash']}")
+
+    # Credits-only settlement (v8): release credits the seller; nothing moves
+    # until the seller withdraws.
+    credited = vault.functions.credits(w3.to_checksum_address(seller.evm)).call()
+    print(f"      seller credited {_qor(credited)} QOR (withdraw to receive it)")
+    result = lib.send_evm_expect_success(w3, seller, vault.functions.withdrawCredits(), gas=200_000)
+    print(f"      withdraw tx {result['hash']}")
 
     seller_after = w3.eth.get_balance(w3.to_checksum_address(seller.evm))
     delta = seller_after - seller_before
@@ -214,8 +222,9 @@ def main() -> None:
     print()
 
     fee = (PRICE * 200) // 10_000  # 2% on release
-    if delta != PRICE - fee or escrow[5] != 2:
-        lib.die("final assertions failed")
+    # Exact credit, plus a successful withdrawal (net of the withdraw tx's gas).
+    if credited != PRICE - fee or not (0 < delta <= credited) or escrow[5] != 2:
+        lib.die(f"final assertions failed (credited={credited}, delta={delta})")
     print("COMPLETE MARKET SCENARIO: PASS")
 
 

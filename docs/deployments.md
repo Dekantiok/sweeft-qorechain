@@ -4,7 +4,44 @@
 **Deployer:** `qor1etuzhk8tmpmrfmakzzhx8fau788r4jrapjkzlp` / `0xcaF82Bd8EBd87634eFb610aE63a7bCf1CE3ac87D`
 **Explorer:** https://explore.qore.network
 
-## v7 — patched v6 (live; deployed 25 November 2026)
+## v8 — credits-only settlement (live; deployed 26 November 2026)
+
+Same contracts as v7 plus the Stage 5 pattern-removal patch (credits-only
+settlement, named access modifiers, typed registry calls, fee-bps bound,
+absolute draw cap). Deployed with `contracts/script/DeployV6.s.sol`
+(45 txs). Wiring verified on-chain via `eth_call` (all owners = DAO2,
+`feeBps = 200`, `MAX_DRAW_ATTEMPTS = 128`, verifier + carrier registered,
+typed-call registry live).
+
+| Contract | Address |
+|---|---|
+| **SweeftOracleRegistry (v8)** | `0x76D4F6D164C688b319eE0A16003a9c06f5b1AB7A` |
+| **SweeftVault (v8)** | `0x820CE1C670D26A2fF6ca5ce53f5a9EFdf3dC869a` |
+| **SweeftMarketplace (v8)** | `0xf5cC7Bf4EECC160E23b4fF615E68D716bEFCd47C` |
+| **SweeftDisputeBoard (v8)** | `0x50a74dD32647bcf456DcE09b76849C5EBD2A0508` |
+| **SweeftDAO2 (v8)** | `0x91d0eCCE908bec0FcF06fB8d419ad9edb43Cf59b` |
+
+### v8 end-to-end evidence (26 November 2026)
+
+`tools/e2e_marketplace.py` against vault `0x820C…869a` — full PQ-gated
+release on v8 (run twice, both PASS). Settlement is **credits-only**:
+release credits the seller, the seller withdraws:
+
+| Step | Escrow #0 | Escrow #1 |
+|---|---|---|
+| release (ML-DSA-87 via `pqcVerify`) | `0x123c059f…` | `0x5fb42c9d…` |
+| withdrawCredits (seller) | `0xa64ed602…` | — |
+
+Observed both runs: seller credited 0.098 QOR (0.1 − 2% fee), escrow
+**Completed**, listing **Sold** (net balance delta is credited minus the
+withdraw tx's gas).
+Fixtures: escrow #2 (Funded), escrow #3 (release-eligible). Playwright E2E
+**32/32** on v8. Indexer synced (0 handler failures).
+
+**Audit scope note:** v8 == Stage 6 bundle source; Stage 6 QCAI (72/100)
+findings fixed/documented in `docs/AUDIT.md` (Stage 6 section).
+
+## v7 — patched v6 (superseded by v8; 25 November 2026)
 
 Same contracts as v6 plus the Stage 4 patch (CEI ordering in
 `finalize`/`_finalizeAppeal`/`DAO2.execute`, bounded `_drawPanel`,
