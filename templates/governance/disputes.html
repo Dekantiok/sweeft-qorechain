@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Dispute Board — Sweeft{% endblock %}
+{% block title %}Dispute Board: Sweeft{% endblock %}
 
 {% block content %}
 <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
@@ -86,7 +86,7 @@
                 {% elif dispute.state == 'appealed' %}
                     appeal voting ends {{ dispute.appeal_voting_ends_at|date:"M d, H:i" }} UTC
                 {% else %}
-                    settled — outcome: {{ dispute.release_to_seller|yesno:"seller paid,buyer refunded" }}
+                    settled: outcome: {{ dispute.release_to_seller|yesno:"seller paid,buyer refunded" }}
                 {% endif %}
             </span>
         </div>
@@ -109,7 +109,7 @@
                     </li>
                     {% empty %}
                     <li class="rounded border border-dashed border-neutral-800 px-3 py-2 text-center text-neutral-300">
-                        Panel not drawn yet — anyone can draw it after the join window.
+                        Panel not drawn yet: anyone can draw it after the join window.
                     </li>
                     {% endfor %}
                 </ul>
@@ -138,7 +138,7 @@
                     <span>Refund: <span class="text-blue-400 font-semibold">{{ dispute.votes_for_refund }}</span></span>
                     {% if dispute.state == 'appealed' %}
                     <span class="text-xs text-neutral-300">
-                        appeal — release {{ dispute.appeal_votes_for_release }}, refund {{ dispute.appeal_votes_for_refund }}
+                        appeal: release {{ dispute.appeal_votes_for_release }}, refund {{ dispute.appeal_votes_for_refund }}
                     </span>
                     {% endif %}
                 </div>
@@ -182,7 +182,7 @@
     </div>
     {% empty %}
     <div class="rounded-xl border border-dashed border-neutral-800 p-12 text-center text-neutral-300">
-        No disputes yet. Raise one from a funded escrow page — the escrow freezes until a staked
+        No disputes yet. Raise one from a funded escrow page: the escrow freezes until a staked
         panel decides release or refund, and either party can appeal the first decision.
     </div>
     {% endfor %}

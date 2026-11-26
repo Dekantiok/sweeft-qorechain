@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard — Sweeft{% endblock %}
+{% block title %}Dashboard: Sweeft{% endblock %}
 
 {% block content %}
 <div class="flex items-center justify-between">
     <div>
         <h1 class="text-2xl font-bold">Dashboard</h1>
-        <p class="mt-1 text-sm text-neutral-300">{{ escrow_count }} escrow{{ escrow_count|pluralize }} · {{ listing_count }} listing{{ listing_count|pluralize }} — projected from on-chain events</p>
+        <p class="mt-1 text-sm text-neutral-300">{{ escrow_count }} escrow{{ escrow_count|pluralize }} · {{ listing_count }} listing{{ listing_count|pluralize }}: projected from on-chain events</p>
     </div>
     <button hx-post="/api/indexer/sync/" hx-swap="none"
             data-reload-on-success
@@ -48,7 +48,7 @@
                     <td class="px-4 py-3"><a href="{% url 'escrow:detail' escrow.on_chain_id %}" class="text-red-400 hover:text-red-300 text-xs">View →</a></td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="7" class="px-4 py-10 text-center text-neutral-300">No escrows indexed yet — press “Refresh from chain”.</td></tr>
+                <tr><td colspan="7" class="px-4 py-10 text-center text-neutral-300">No escrows indexed yet: press “Refresh from chain”.</td></tr>
                 {% endfor %}
             </tbody>
         </table>

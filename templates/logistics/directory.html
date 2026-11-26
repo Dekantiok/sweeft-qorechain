@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}Logistics — Sweeft{% endblock %}
+{% block title %}Logistics: Sweeft{% endblock %}
 
 {% block content %}
 <div>
     <h1 class="text-2xl font-bold">Logistics partners</h1>
     <p class="mt-1 text-sm text-neutral-300">
         Approved carriers whose signed tracking feeds the escrow oracle. Each partner registers an ML-DSA-87
-        key on QoreChain — their tracking payloads are verified **on-chain** by the vault.
+        key on QoreChain: their tracking payloads are verified **on-chain** by the vault.
     </p>
 </div>
 
@@ -17,7 +17,7 @@
         <div class="flex items-start justify-between">
             <div>
                 <div class="font-semibold">{{ partner.company_name }}</div>
-                <div class="mt-1 text-xs text-neutral-300">{{ partner.provider_id }} · {{ partner.operating_locations|default:"—" }}</div>
+                <div class="mt-1 text-xs text-neutral-300">{{ partner.provider_id }} · {{ partner.operating_locations|default:"-" }}</div>
             </div>
             <span class="rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-red-400">{{ partner.status }}</span>
         </div>
@@ -29,7 +29,7 @@
     </div>
     {% empty %}
     <div class="col-span-full rounded-xl border border-dashed border-neutral-800 p-12 text-center text-neutral-300">
-        No approved partners yet. The Demo Carrier (simulated) is the default — register a partner to onboard a real carrier.
+        No approved partners yet. The Demo Carrier (simulated) is the default: register a partner to onboard a real carrier.
     </div>
     {% endfor %}
 </div>

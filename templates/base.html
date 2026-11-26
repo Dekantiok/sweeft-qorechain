@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token }}">
-    <title>{% block title %}Sweeft — Post-Quantum Commerce on QoreChain{% endblock %}</title>
+    <title>{% block title %}Sweeft: Post-Quantum Commerce on QoreChain{% endblock %}</title>
     <meta name="description" content="Decentralized commerce and trust ecosystem on QoreChain. Escrow protected by ML-DSA-87 post-quantum signatures.">
     <script src="{% static 'js/htmx.min.js' %}" defer></script>
     <script src="{% static 'js/sweeft-wallet.js' %}"></script>
@@ -20,11 +20,11 @@
                 <div class="flex items-center gap-8">
                     <a href="/" class="flex items-center gap-2">
                         <span class="text-xl font-bold tracking-tight">Sweeft</span>
-                        <span class="rounded bg-red-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-red-400">PQ Escrow</span>
                     </a>
                     <div class="hidden md:flex items-center gap-6 text-sm text-neutral-300">
                         <a href="/marketplace/" class="hover:text-white transition-colors">Marketplace</a>
                         <a href="/escrow/new/" class="hover:text-white transition-colors">New escrow</a>
+                        {% if wallet_account %}
                         <a href="/dashboard/" class="hover:text-white transition-colors">Dashboard</a>
                         <a href="/disputes/" class="hover:text-white transition-colors">Disputes</a>
                         <a href="/security/" class="hover:text-white transition-colors">Security</a>
@@ -32,13 +32,10 @@
                         <a href="/oracle/" class="hover:text-white transition-colors">Oracle</a>
                         <a href="/governance/" class="hover:text-white transition-colors">Governance</a>
                         <a href="/ai/" class="hover:text-white transition-colors">AI Assistant</a>
+                        {% endif %}
                     </div>
                 </div>
                 <div class="flex items-center gap-3">
-                    <span class="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-3 py-1 text-xs text-red-400">
-                        <span class="h-1.5 w-1.5 rounded-full bg-red-400 animate-pulse"></span>
-                        Diana Testnet
-                    </span>
 
                     {% if wallet_account %}
                     <div class="relative">
@@ -94,7 +91,7 @@
 
     <footer class="border-t border-neutral-900 mt-16">
         <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-neutral-300">
-            <p>Sweeft — decentralized commerce with post-quantum escrow, built on QoreChain.</p>
+            <p>Sweeft: decentralized commerce with post-quantum escrow, built on QoreChain.</p>
             <p>Testnet only. Test tokens have no value.</p>
         </div>
     </footer>

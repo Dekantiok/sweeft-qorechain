@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}Marketplace — Sweeft{% endblock %}
+{% block title %}Marketplace: Sweeft{% endblock %}
 
 {% block content %}
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
     <div>
         <h1 class="text-2xl font-bold">Marketplace</h1>
-        <p class="mt-1 text-sm text-neutral-300">{{ listings|length }} listing{{ listings|length|pluralize }} — every purchase settles through PQ-protected escrow</p>
+        <p class="mt-1 text-sm text-neutral-300">{{ listings|length }} listing{{ listings|length|pluralize }}: every purchase settles through PQ-protected escrow</p>
     </div>
     <div class="flex items-center gap-3">
         <a href="/marketplace/new/" class="rounded-lg bg-red-500 shadow-lg shadow-red-500/25 px-4 py-2 text-sm font-semibold text-black hover:bg-red-400 transition-colors">

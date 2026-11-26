@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 
-{% block title %}Security — Sweeft{% endblock %}
+{% block title %}Security: Sweeft{% endblock %}
 
 {% block content %}
 <div>
-    <h1 class="text-2xl font-bold">Security — who can move money</h1>
+    <h1 class="text-2xl font-bold">Security: who can move money</h1>
     <p class="mt-1 max-w-3xl text-sm text-neutral-300">
         Every sensitive action in Sweeft is gated on-chain. No administrator, relayer or AI can move
         escrowed funds outside these rules. Each gate below is enforced by the contract and verified
@@ -49,7 +49,7 @@
     <p>
         The <strong class="text-neutral-300">proof pages</strong> decode any transaction or escrow into plain
         English: signatures tier, nonce binding, and why the same signature can never settle twice.
-        Every attack in the threat model — forged release, tampered message, wrong carrier — is recorded
+        Every attack in the threat model: forged release, tampered message, wrong carrier: is recorded
         as a reverting transaction on Diana, linked from <span class="hash">tools/e2e_*.py</span> outputs
         and <span class="hash">docs/deployments.md</span>.
     </p>

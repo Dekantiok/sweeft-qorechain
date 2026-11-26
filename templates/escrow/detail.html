@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Escrow #{{ escrow.on_chain_id }} — Sweeft{% endblock %}
+{% block title %}Escrow #{{ escrow.on_chain_id }}: Sweeft{% endblock %}
 
 {% block content %}
 <div class="flex items-center justify-between">
@@ -15,7 +15,7 @@
                 {{ escrow.get_state_display }}
             </span>
         </div>
-        <p class="mt-1 text-sm text-neutral-300">Order {{ escrow.order.reference }} — {{ escrow.order.listing.title|default:"direct escrow" }}</p>
+        <p class="mt-1 text-sm text-neutral-300">Order {{ escrow.order.reference }}: {{ escrow.order.listing.title|default:"direct escrow" }}</p>
     </div>
     <a href="{{ network.explorer_url }}" target="_blank" class="text-xs text-neutral-300 hover:text-red-400 transition-colors">Explorer ↗</a>
 </div>
@@ -111,7 +111,7 @@
             </div>
 
             {% if escrow.state == 'completed' %}
-            <p class="mt-3 text-sm text-red-300">Settled — the seller's share was credited against your ML-DSA-87 signature (credits-only settlement: no funds move during release).</p>
+            <p class="mt-3 text-sm text-red-300">Settled: the seller's share was credited against your ML-DSA-87 signature (credits-only settlement: no funds move during release).</p>
             <a href="{{ network.explorer_url }}" target="_blank" class="mt-2 block text-xs text-neutral-300 hover:text-red-400 break-all">tx: {{ escrow.release_tx }}</a>
             {% if my_credits_wei > 0 %}
             <p class="mt-3 text-xs text-neutral-300">You have <strong class="text-red-300">{{ my_credits_qor|floatformat:6 }} QOR</strong> in withdrawable credits.</p>
@@ -140,7 +140,7 @@
             <div class="mt-4 rounded-lg border border-red-500/20 bg-black/50 p-3">
                 {% if escrow.autopilot_enabled %}
                 <div class="text-xs font-semibold text-red-300">Autopilot enabled</div>
-                <p class="mt-1 text-[11px] text-neutral-300">You pre-signed a release of <strong class="text-neutral-300">{{ escrow.amount_qor }} QOR</strong>. The AI submits exactly that signature when the verifier attests — nothing more.</p>
+                <p class="mt-1 text-[11px] text-neutral-300">You pre-signed a release of <strong class="text-neutral-300">{{ escrow.amount_qor }} QOR</strong>. The AI submits exactly that signature when the verifier attests: nothing more.</p>
                 <button id="autopilot-revoke" class="mt-2 rounded border border-red-500/40 px-3 py-1 text-xs text-red-300 hover:bg-red-500/10 transition-colors">Revoke pre-authorization</button>
                 <p id="autopilot-status" class="mt-2 text-[11px] text-neutral-300"></p>
                 {% else %}
@@ -155,7 +155,7 @@
         <div class="rounded-xl border border-neutral-900 bg-black/50 p-5 text-xs text-neutral-300 leading-relaxed">
             <div class="font-semibold text-neutral-300 mb-2">What the contract enforces</div>
             <ul class="list-disc list-inside space-y-1">
-                <li>Your registered ML-DSA-87 key signs the release — a leaked EVM key alone moves nothing</li>
+                <li>Your registered ML-DSA-87 key signs the release: a leaked EVM key alone moves nothing</li>
                 <li>Only this escrow's exact terms (recipient, amount, nonce) are signed</li>
                 <li>The signature is verified on-chain by the pqcVerify precompile</li>
                 <li>A used signature can never be replayed</li>
@@ -163,7 +163,7 @@
             <a href="{% url 'blockchain:escrow_proof' escrow.on_chain_id %}" class="mt-3 inline-block text-red-400 hover:text-red-300">
                 Verify this escrow in your browser →
             </a>
-            <p id="browser-proof" class="mt-2 text-neutral-300">PDF: the proof page reads the buyer's registered key and this escrow's live state from chain — no trust in this page needed.</p>
+            <p id="browser-proof" class="mt-2 text-neutral-300">PDF: the proof page reads the buyer's registered key and this escrow's live state from chain: no trust in this page needed.</p>
         </div>
 
         {% if live.status == 1 %}
@@ -179,7 +179,7 @@
             <button id="confirm-button" class="mt-3 w-full rounded-lg border border-red-500/40 px-4 py-2 text-sm text-red-300 hover:bg-red-500/10 transition-colors">
                 Confirm receipt
             </button>
-            <p class="mt-2 text-[11px] text-neutral-300">Satisfies the inspection condition immediately — the seller can then be paid against your PQ release signature.</p>
+            <p class="mt-2 text-[11px] text-neutral-300">Satisfies the inspection condition immediately: the seller can then be paid against your PQ release signature.</p>
             {% else %}
             <p class="mt-3 text-[11px] text-neutral-300">
                 Connect with the buyer or seller wallet to act on this escrow.
@@ -222,7 +222,7 @@
             {% else %}
             <div class="mt-3 text-xs text-neutral-300">
                 {% if escrow.delivery_type == "digital" %}
-                Digital delivery — no carrier. The seller sends the files and the buyer confirms receipt.
+                Digital delivery: no carrier. The seller sends the files and the buyer confirms receipt.
                 {% else %}
                 No shipment registered yet. The seller or buyer can register the carrier shipment for this escrow.
                 {% endif %}
@@ -315,11 +315,11 @@ preauthButton?.addEventListener("click", async () => {
         const req = await fetch(`/api/escrow/${ESCROW_ID}/release-request/`).then(r => r.json());
         if (req.error) throw new Error(req.error);
 
-        preauthStatus.textContent = "Approve in QoreX — scopes: this escrow, " + req.amount_wei + " wei, nonce " + req.nonce;
+        preauthStatus.textContent = "Approve in QoreX: scopes: this escrow, " + req.amount_wei + " wei, nonce " + req.nonce;
         await qorex.enable(req.chain_id);
         const { bech32Address } = await qorex.getKey(req.chain_id);
         if (bech32Address !== req.buyer_qor) {
-            throw new Error(`This escrow's buyer is ${req.buyer_qor} — switch QoreX to that account.`);
+            throw new Error(`This escrow's buyer is ${req.buyer_qor}: switch QoreX to that account.`);
         }
         const signature = await qorex.signArbitrary(req.chain_id, bech32Address, req.message);
         const pqB64 = signature?.pq?.signature;
@@ -332,7 +332,7 @@ preauthButton?.addEventListener("click", async () => {
         }).then(r => r.json());
         if (result.error) throw new Error(result.error);
 
-        preauthStatus.textContent = "Pre-authorized ✓ The AI can now settle this escrow on attestation — no further taps.";
+        preauthStatus.textContent = "Pre-authorized ✓ The AI can now settle this escrow on attestation: no further taps.";
         setTimeout(() => location.reload(), 1500);
     } catch (err) {
         preauthStatus.textContent = "";
@@ -347,19 +347,19 @@ revokeButton?.addEventListener("click", async () => {
             method: "POST",
             headers: { "X-CSRFToken": document.querySelector('meta[name="csrf-token"]').content },
         });
-        autopilotStatus.textContent = "Revoked — the AI can no longer submit a release for this escrow.";
+        autopilotStatus.textContent = "Revoked: the AI can no longer submit a release for this escrow.";
         setTimeout(() => location.reload(), 1500);
     } catch (err) {
         alert("Revoke failed: " + (err.message || err));
     }
 });
 
-// PQ release flow — meta-transaction:
+// PQ release flow: meta-transaction:
 //  1. GET the exact message for this escrow from Django
 //  2. Ask QoreX to sign it with the account's ML-DSA-87 key (signArbitrary)
 //  3. POST the signature; Django relays release() and the contract verifies it
 // Settlement is credits-only: after release the seller withdraws via
-// withdrawCredits() — a plain EVM call, no signature needed.
+// withdrawCredits(): a plain EVM call, no signature needed.
 const releaseButton = document.getElementById("release-button");
 const releaseStatus = document.getElementById("release-status");
 const ESCROW_ID = {{ escrow.on_chain_id }};
@@ -388,15 +388,15 @@ releaseButton?.addEventListener("click", async () => {
         const req = await fetch(`/api/escrow/${ESCROW_ID}/release-request/`).then(r => r.json());
         if (req.error) throw new Error(req.error);
 
-        releaseStatus.textContent = "Waiting for QoreX approval — check your wallet…";
+        releaseStatus.textContent = "Waiting for QoreX approval: check your wallet…";
         await qorex.enable(req.chain_id);
         const { bech32Address } = await qorex.getKey(req.chain_id);
 
         if (bech32Address !== req.buyer_qor) {
-            throw new Error(`This escrow's buyer is ${req.buyer_qor} — switch QoreX to that account (you are ${bech32Address}).`);
+            throw new Error(`This escrow's buyer is ${req.buyer_qor}: switch QoreX to that account (you are ${bech32Address}).`);
         }
 
-        // QoreX signs "qorechain-msg-v1|" + chainId + "|" + message — exactly
+        // QoreX signs "qorechain-msg-v1|" + chainId + "|" + message: exactly
         // what the contract verifies.
         const signature = await qorex.signArbitrary(req.chain_id, bech32Address, req.message);
         const pqB64 = signature?.pq?.signature;
@@ -410,7 +410,7 @@ releaseButton?.addEventListener("click", async () => {
         }).then(r => r.json());
 
         if (result.error) throw new Error(result.error);
-        releaseStatus.innerHTML = `Released ✓ — <span class="hash">${result.tx_hash}</span>`;
+        releaseStatus.innerHTML = `Released ✓: <span class="hash">${result.tx_hash}</span>`;
         setTimeout(() => location.reload(), 2500);
     } catch (err) {
         releaseStatus.textContent = "";
@@ -418,7 +418,7 @@ releaseButton?.addEventListener("click", async () => {
     }
 });
 
-// Raise dispute — freezes the escrow via the dispute board.
+// Raise dispute: freezes the escrow via the dispute board.
 const disputeButton = document.getElementById("dispute-button");
 const disputeStatus = document.getElementById("dispute-status");
 const BOARD = "{{ dispute_board_address }}";
@@ -433,7 +433,7 @@ async function simpleVaultAction(selector, label, statusEl) {
         const data = "0x" + selector + ESCROW_ID.toString(16).padStart(64, "0");
         statusEl.textContent = "Confirm in your wallet…";
         const txHash = await window.SweeftWallet.sendTx({ to: VAULT_ADDRESS, data });
-        statusEl.textContent = label + " — tx " + txHash;
+        statusEl.textContent = label + ": tx " + txHash;
         setTimeout(async () => {
             await fetch("/api/indexer/sync/", { method: "POST" });
             location.reload();
@@ -473,7 +473,7 @@ evidenceButton?.addEventListener("click", async () => {
             }),
         }).then((r) => r.json());
         if (result.error) throw new Error(result.error);
-        status.textContent = "Submitted — verifiers review it on the Oracle page.";
+        status.textContent = "Submitted: verifiers review it on the Oracle page.";
         setTimeout(() => location.reload(), 2000);
     } catch (err) {
         status.textContent = "";
@@ -494,7 +494,7 @@ document.getElementById("ship-create")?.addEventListener("click", async () => {
             body: JSON.stringify({ escrow_id: String(ESCROW_ID), scenario: "delivered" }),
         }).then((r) => r.json());
         if (result.error) throw new Error(result.error);
-        status.textContent = `Shipment ${result.tracking_number} registered — advancing demo scans…`;
+        status.textContent = `Shipment ${result.tracking_number} registered: advancing demo scans…`;
         // Novice path: advance through the demo states automatically
         for (const next of ["ACCEPTED", "PICKED_UP", "IN_TRANSIT", "OUT_FOR_DELIVERY", "DELIVERED"]) {
             await fetch(`/api/logistics/shipments/${result.shipment_id}/events/`, {
@@ -550,12 +550,12 @@ document.getElementById("carrier-attest")?.addEventListener("click", async () =>
 
 disputeButton?.addEventListener("click", async () => {
     try {
-        // openDispute(uint256 escrowId) — selector 0x27d00fb0. The raiser bond
+        // openDispute(uint256 escrowId): selector 0x27d00fb0. The raiser bond
         // is 1% of escrow value with a 0.1 QOR floor (computed server-side).
         const data = "0x27d00fb0" + ESCROW_ID.toString(16).padStart(64, "0");
         disputeStatus.textContent = "Confirm in your wallet…";
         const txHash = await window.SweeftWallet.sendTx({ to: BOARD, data, value: BigInt({{ dispute_bond_wei }}) });
-        disputeStatus.textContent = "Dispute opened — a staked panel can now be drawn.";
+        disputeStatus.textContent = "Dispute opened: a staked panel can now be drawn.";
         console.log("dispute tx", txHash);
         setTimeout(() => location.reload(), 6000);
     } catch (err) {

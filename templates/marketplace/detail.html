@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ listing.title }} — Sweeft{% endblock %}
+{% block title %}{{ listing.title }}: Sweeft{% endblock %}
 
 {% block content %}
 <div class="grid gap-8 lg:grid-cols-3">
@@ -13,7 +13,7 @@
             </span>
         </div>
         <h1 class="mt-3 text-3xl font-bold">{{ listing.title }}</h1>
-        <p class="mt-4 text-neutral-300">{{ listing.description|default:"On-chain listing — metadata is hash-anchored to the chain." }}</p>
+        <p class="mt-4 text-neutral-300">{{ listing.description|default:"On-chain listing: metadata is hash-anchored to the chain." }}</p>
 
         <div class="mt-8 rounded-xl border border-neutral-900 bg-black/50 p-5">
             <h2 class="text-sm font-semibold text-neutral-300">On-chain record</h2>
@@ -25,7 +25,7 @@
                 <dt class="text-neutral-300">Metadata hash</dt>
                 <dd class="hash text-neutral-300">{{ listing.metadata_hash|truncatechars:30 }}</dd>
                 <dt class="text-neutral-300">Created in block</dt>
-                <dd class="text-neutral-300">{{ listing.created_block|default:"—" }}</dd>
+                <dd class="text-neutral-300">{{ listing.created_block|default:"-" }}</dd>
             </dl>
         </div>
     </div>
@@ -53,9 +53,9 @@
             <div class="font-semibold text-neutral-300 mb-2">How buying works</div>
             <ol class="list-decimal list-inside space-y-1">
                 <li>Open a scoped EVM window in QoreX</li>
-                <li>Purchase — funds enter the on-chain escrow</li>
+                <li>Purchase: funds enter the on-chain escrow</li>
                 <li>Seller delivers, verifier attests</li>
-                <li>You sign the release — seller gets paid</li>
+                <li>You sign the release: seller gets paid</li>
             </ol>
         </div>
     </div>
@@ -63,7 +63,7 @@
 
 <script nonce="{{ csp_nonce }}">
 // Buy flow: EVM wallet purchase inside an open scoped EVM window.
-// purchase(uint256 listingId, uint64 deliveryDeadline) payable — selector 0xb79bd650
+// purchase(uint256 listingId, uint64 deliveryDeadline) payable: selector 0xb79bd650
 const buyButton = document.getElementById("buy-button");
 const LISTING_ID = {{ listing.on_chain_id }};
 const PRICE_WEI = BigInt("{{ listing.price_uqor }}");
@@ -81,7 +81,7 @@ buyButton?.addEventListener("click", async () => {
 
         buyButton.textContent = "Confirm in your wallet…";
         const txHash = await window.SweeftWallet.sendTx({ to: MARKETPLACE, data, value: PRICE_WEI });
-        buyButton.textContent = "Purchased — syncing…";
+        buyButton.textContent = "Purchased: syncing…";
         setTimeout(async () => {
             await fetch("/api/indexer/sync/", { method: "POST" });
             location.href = "/dashboard/";
@@ -94,7 +94,7 @@ buyButton?.addEventListener("click", async () => {
             "\n\nChecklist:\n" +
             "• Wallet connected to QoreChain Diana (the nav shows your address)\n" +
             "• The account holds QOR from https://dashboard.qorechain.io/faucet\n" +
-            "• An open EVM window on the account (see docs \u201cTest in the browser\u201d — open one with tools/qor_account.py)"
+            "• An open EVM window on the account (see docs \u201cTest in the browser\u201d: open one with tools/qor_account.py)"
         );
     }
 });

@@ -1,25 +1,25 @@
 {% extends "base.html" %}
 
-{% block title %}New listing — Sweeft{% endblock %}
+{% block title %}New listing: Sweeft{% endblock %}
 
 {% block content %}
 <div class="mx-auto max-w-2xl">
     <h1 class="text-2xl font-bold">Sell on Sweeft</h1>
     <p class="mt-1 text-sm text-neutral-300">
-        The listing is published <strong class="text-neutral-300">on-chain</strong> from your wallet —
+        The listing is published <strong class="text-neutral-300">on-chain</strong> from your wallet -
         price, quantity and a hash of the description below. Buyers pay into PQ-protected escrow.
     </p>
 
     {% if not wallet_account %}
     <div class="mt-6 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-sm text-amber-300">
-        Connect your wallet first — the listing is signed by you.
+        Connect your wallet first: the listing is signed by you.
     </div>
     {% endif %}
 
     <div class="mt-6 space-y-4 rounded-xl border border-neutral-900 bg-black/50 p-6">
         <div>
             <label class="text-xs uppercase tracking-wider text-neutral-300">Title</label>
-            <input id="f-title" type="text" maxlength="120" placeholder="e.g. MacBook Pro 14 — used, excellent"
+            <input id="f-title" type="text" maxlength="120" placeholder="e.g. MacBook Pro 14: used, excellent"
                    class="mt-1 w-full rounded-lg border border-neutral-800 bg-black px-3 py-2 text-sm focus:border-red-500 focus:outline-none">
         </div>
         <div>
@@ -44,14 +44,14 @@
             <label class="text-xs uppercase tracking-wider text-neutral-300">Delivery</label>
             <select id="f-delivery" class="mt-1 w-full rounded-lg border border-neutral-800 bg-black px-3 py-2 text-sm">
                 <option value="digital">Digital (buyer confirmation, no carrier)</option>
-                <option value="physical">Physical (carrier — Demo Carrier)</option>
+                <option value="physical">Physical (carrier: Demo Carrier)</option>
             </select>
         </div>
         <div>
-            <label class="text-xs uppercase tracking-wider text-neutral-300">Negotiation floor (QOR — optional, 0 = fixed price)</label>
+            <label class="text-xs uppercase tracking-wider text-neutral-300">Negotiation floor (QOR: optional, 0 = fixed price)</label>
             <input id="f-floor" type="text" inputmode="decimal" placeholder="0.08"
                    class="mt-1 w-full rounded-lg border border-neutral-800 bg-black px-3 py-2 text-sm focus:border-red-500 focus:outline-none">
-            <p class="mt-1 text-[11px] text-neutral-300">The AI can bargain down to this floor — it's never revealed in negotiation.</p>
+            <p class="mt-1 text-[11px] text-neutral-300">The AI can bargain down to this floor: it's never revealed in negotiation.</p>
         </div>
         <div id="logistics-fields" class="hidden">
             <label class="text-xs uppercase tracking-wider text-neutral-300">Logistics fee (QOR, reserved from the price)</label>
@@ -69,7 +69,7 @@
 
     <div class="mt-4 rounded-xl border border-neutral-900 bg-black/50 p-4 text-xs leading-relaxed text-neutral-300">
         <strong class="text-neutral-300">How it works:</strong> your description is stored as JSON and its
-        SHA-256 is written into the listing on QoreChain. Buyers can re-hash the file and verify it matches —
+        SHA-256 is written into the listing on QoreChain. Buyers can re-hash the file and verify it matches -
         nobody can silently change your terms. Creating a listing needs an open EVM window and a little QOR for gas
         (QoreX: “EVM access window”).
     </div>
@@ -163,7 +163,7 @@ publishButton?.addEventListener("click", async () => {
 
         publishStatus.textContent = "Confirm the transaction in your wallet…";
         const txHash = await window.SweeftWallet.sendTx({ to: MARKETPLACE, data });
-        publishStatus.textContent = "Published — syncing from chain…";
+        publishStatus.textContent = "Published: syncing from chain…";
         console.log("createListing tx", txHash);
 
         setTimeout(async () => {

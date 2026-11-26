@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Proof — {{ tx_hash|truncatechars:22 }} — Sweeft{% endblock %}
+{% block title %}Proof: {{ tx_hash|truncatechars:22 }}: Sweeft{% endblock %}
 
 {% block content %}
 <div>
@@ -28,7 +28,7 @@
         <dd class="text-neutral-300">classical (EVM lane)</dd>
     </dl>
     <p class="mt-4 text-xs leading-relaxed text-neutral-300">
-        EVM transactions carry no ML-DSA-87 layer — that's the chain's honest label, not a gap.
+        EVM transactions carry no ML-DSA-87 layer: that's the chain's honest label, not a gap.
         Sweeft's safety comes from <strong class="text-neutral-300">in-contract verification</strong>: the vault
         checks the buyer's registered ML-DSA-87 signature via the <span class="hash">pqcVerify</span> precompile
         before any funds move. The precompile call is visible in the transaction trace on the explorer.
@@ -52,7 +52,7 @@
     <p class="mt-2 text-xs leading-relaxed text-neutral-300">
         Release and refund signatures bind the vault, escrow id, both parties, amount and the per-buyer
         nonce. Submitting the same signature again fails <span class="hash">NotReleaseEligible</span>, and
-        changing any field fails <span class="hash">BadPqcSignature</span> — both recorded as reverting
+        changing any field fails <span class="hash">BadPqcSignature</span>: both recorded as reverting
         transactions in the attack simulation (<span class="hash">tools/e2e_attack.py</span>).
     </p>
 </div>

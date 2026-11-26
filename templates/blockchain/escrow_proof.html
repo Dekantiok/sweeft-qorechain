@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 
-{% block title %}Escrow proof #{{ escrow.on_chain_id }} — Sweeft{% endblock %}
+{% block title %}Escrow proof #{{ escrow.on_chain_id }}: Sweeft{% endblock %}
 
 {% block content %}
 <div class="flex flex-wrap items-center gap-3">
-    <h1 class="text-2xl font-bold">Escrow #{{ escrow.on_chain_id }} — proof</h1>
+    <h1 class="text-2xl font-bold">Escrow #{{ escrow.on_chain_id }}: proof</h1>
     <span class="rounded-full px-3 py-1 text-xs uppercase tracking-wider bg-neutral-900/50 text-neutral-300">{{ escrow.get_state_display }}</span>
 </div>
 <p class="mt-2 text-sm text-neutral-300">Everything below is read live from QoreChain; nothing here is stored or cached.</p>
@@ -23,11 +23,11 @@
         <dt class="text-neutral-300">algorithm</dt><dd class="text-neutral-300">{{ pqc_status.algorithm_name|default:"ML-DSA-87" }}</dd>
         <dt class="text-neutral-300">possession proven</dt><dd class="text-red-400">{{ pqc_status.possession_proven|yesno:"yes,no" }}</dd>
         <dt class="text-neutral-300">key type</dt><dd class="text-neutral-300">{{ pqc_status.key_type|default:"hybrid" }}</dd>
-        <dt class="text-neutral-300">created at height</dt><dd class="text-neutral-300">{{ pqc_status.created_at_height|default:"—" }}</dd>
+        <dt class="text-neutral-300">created at height</dt><dd class="text-neutral-300">{{ pqc_status.created_at_height|default:"-" }}</dd>
     </dl>
     <p class="mt-3 text-[11px] leading-relaxed text-neutral-300">
         The vault reads this exact key on-chain (pqcKeyStatus → pqcVerify) before releasing. The buyer proves
-        possession of the secret key on every release — a leaked EVM key has nothing to do with it.
+        possession of the secret key on every release: a leaked EVM key has nothing to do with it.
     </p>
 </div>
 {% endif %}
@@ -57,7 +57,7 @@
             <span class="hash">sweeft-release-v1|vault=…|escrow=…|buyer=…|recipient=…|amount=…|nonce=…</span>,
             signed as <span class="hash">qorechain-msg-v1|qorechain-diana|…</span>. Claim a different
             recipient, a different amount or a previous nonce and the contract rejects it with
-            <span class="hash">BadPqcSignature</span> — proven on testnet with the attack simulator.
+            <span class="hash">BadPqcSignature</span>: proven on testnet with the attack simulator.
         </p>
     </div>
     <div class="rounded-xl border border-neutral-900 bg-black/50 p-5">

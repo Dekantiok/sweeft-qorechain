@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 
-{% block title %}Oracle — Sweeft{% endblock %}
+{% block title %}Oracle: Sweeft{% endblock %}
 
 {% block content %}
 <div class="flex items-center justify-between">
     <div>
-        <h1 class="text-2xl font-bold">Oracle — fulfilment verification</h1>
+        <h1 class="text-2xl font-bold">Oracle: fulfilment verification</h1>
         <p class="mt-1 text-sm text-neutral-300">
             Evidence submitted by sellers, reviewed by DAO-approved verifiers. An attestation is
             recorded on-chain and feeds the escrow's release conditions.
@@ -20,7 +20,7 @@
 
 {% if is_verifier %}
 <div class="mt-6 rounded-xl border border-red-500/30 bg-red-500/5 p-4 text-sm text-red-300">
-    Your wallet is an authorized verifier — review each submission and attest it on-chain.
+    Your wallet is an authorized verifier: review each submission and attest it on-chain.
 </div>
 {% elif wallet_attached %}
 <div class="mt-6 rounded-xl border border-neutral-800 bg-black/50 p-4 text-sm text-neutral-300">
@@ -74,7 +74,7 @@
     {% endwith %}
     {% empty %}
     <div class="rounded-xl border border-dashed border-neutral-800 p-12 text-center text-neutral-300">
-        No evidence submitted yet — sellers submit it from their escrow pages.
+        No evidence submitted yet: sellers submit it from their escrow pages.
     </div>
     {% endfor %}
 </div>
