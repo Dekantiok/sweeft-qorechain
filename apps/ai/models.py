@@ -89,6 +89,14 @@ class Mandate(models.Model):
     class Meta:
         ordering = ["-created_at"]
 
+    @property
+    def per_tx_qor(self):
+        return int(self.per_tx_limit_uqor) / 1_000_000
+
+    @property
+    def daily_qor(self):
+        return int(self.daily_limit_uqor) / 1_000_000
+
     def __str__(self) -> str:
         return f"Mandate for {self.owner.display_name} ({self.state})"
 

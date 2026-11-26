@@ -1,8 +1,10 @@
 """Contract address book and ABI loading for deployed Sweeft contracts.
 
-ABIs are read from Foundry build artifacts (`contracts/out/`), so the Django
-side and the contracts never drift. After `forge build`, artifacts exist at
-`contracts/out/<Contract>.sol/<Contract>.json`.
+ABIs prefer Foundry build artifacts (`contracts/out/<Contract>.sol/<Contract>.json`,
+so the Django side and the contracts never drift) and fall back to the bundled
+copies in `integrations/qorechain/abi/` for deployed services with no forge
+available (see `contracts_base.load_abi`). Keep the bundled copies in sync
+after every `forge build` (`tools/bundle_contracts.py`).
 """
 
 from __future__ import annotations
@@ -29,6 +31,7 @@ ADDRESS_ENV = {
     "SweeftVault": "SWEEFT_VAULT_ADDRESS",
     "SweeftMarketplace": "SWEEFT_MARKETPLACE_ADDRESS",
     "SweeftOracleRegistry": "SWEEFT_ORACLE_REGISTRY_ADDRESS",
+    # Legacy: superseded by SweeftDAO2; only read during historical backfill.
     "SweeftDAO": "SWEEFT_DAO_ADDRESS",
     "SweeftDAO2": "SWEEFT_DAO2_ADDRESS",
     "SweeftDisputeBoard": "SWEEFT_DISPUTE_BOARD_ADDRESS",

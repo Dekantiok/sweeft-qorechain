@@ -61,6 +61,29 @@ class ToolsUnitTests(TestCase):
         self.assertEqual(result["offered_qor"], 0.045)
         neg = Negotiation.objects.get(pk=result["negotiation_id"])
         self.assertEqual(int(neg.proposed_uqor), 45_000)  # uqor, not wei
+        # Regression: negotiations were recorded against the seller (placeholder).
+        self.assertEqual(neg.buyer_id, self.buyer.id)
+        self.assertNotEqual(neg.buyer_id, self.seller.id)
+
+    def test_negotiate_without_wallet_refused(self):
+        result = execute_tool("negotiate", wallet=None, listing_id=11, offered_qor=0.045)
+        self.assertIn("error", result)
+        self.assertFalse(Negotiation.objects.exists())
+
+    def test_negotiate_with_self_refused(self):
+        # Seller negotiating with themselves must not create a record.
+        Mandate.objects.create(
+            owner=self.seller,
+            per_tx_limit_uqor=500_000,
+            daily_limit_uqor=2_000_000,
+            state=Mandate.State.ACTIVE,
+            expires_at=timezone.now() + timedelta(days=7),
+        )
+        result = execute_tool(
+            "negotiate", wallet=self.seller.evm_address, listing_id=11, offered_qor=0.045
+        )
+        self.assertIn("error", result)
+        self.assertFalse(Negotiation.objects.exists())
 
     def test_negotiate_below_floor_countered(self):
         result = execute_tool(

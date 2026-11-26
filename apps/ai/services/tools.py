@@ -332,6 +332,16 @@ def tool_negotiate(listing_id: int, offered_qor: float = 0, details: str = "", w
     if listing.status != Listing.Status.ACTIVE:
         return {"error": "listing is not active"}
 
+    # The negotiation belongs to the wallet that authorized it (injected
+    # server-side by execute_tool — a model can never supply it). Refuse
+    # unattributed or self-negotiations instead of recording a placeholder
+    # buyer, which previously hid who actually made the offer.
+    buyer = _participant(wallet) if wallet else None
+    if buyer is None:
+        return {"error": "no Sweeft participant for the connected wallet — negotiation refused"}
+    if listing.seller_id == buyer.id:
+        return {"error": "cannot negotiate with yourself"}
+
     try:
         offered = int(round(float(offered_qor) * 1e6))  # uqor, matches stored fields
     except (TypeError, ValueError):
@@ -349,7 +359,7 @@ def tool_negotiate(listing_id: int, offered_qor: float = 0, details: str = "", w
     if not floor or (listing.auto_accept_floor and offered >= floor):
         negotiation = Negotiation.objects.create(
             listing=listing,
-            buyer=listing.seller,  # AI offers on behalf of the buyer wallet; placeholder till linked
+            buyer=buyer,
             proposed_uqor=offered,
             details=str(details)[:1000],
             state=Negotiation.State.ACCEPTED,
@@ -369,7 +379,7 @@ def tool_negotiate(listing_id: int, offered_qor: float = 0, details: str = "", w
         counter = (offered + floor) // 2
         Negotiation.objects.create(
             listing=listing,
-            buyer=listing.seller,
+            buyer=buyer,
             proposed_uqor=offered,
             counter_uqor=counter,
             details=str(details)[:1000],
@@ -386,7 +396,7 @@ def tool_negotiate(listing_id: int, offered_qor: float = 0, details: str = "", w
 
     Negotiation.objects.create(
         listing=listing,
-        buyer=listing.seller,
+        buyer=buyer,
         proposed_uqor=offered,
         details=str(details)[:1000],
         state=Negotiation.State.REJECTED,

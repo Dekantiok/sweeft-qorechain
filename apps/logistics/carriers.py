@@ -133,6 +133,10 @@ def demo_carrier_keypair():
 
     from qorsdk import derive_unified_account
 
+    from integrations.qorechain.client import get_network
+
+    if get_network().network != "testnet":
+        raise ValueError("Demo Carrier is testnet-only")
     mnemonic = os.getenv("DEMO_CARRIER_MNEMONIC") or os.getenv("SWEEFT_DEPLOYER_MNEMONIC", "")
     if not mnemonic:
         raise ValueError("Demo Carrier key is not configured — set SWEEFT_DEPLOYER_MNEMONIC or DEMO_CARRIER_MNEMONIC")

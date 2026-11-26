@@ -24,6 +24,20 @@ STORAGES = {
 if os.getenv("DJANGO_DB_ENGINE") == "sqlite":
     # Demo deployments (e.g. Render free tier): single-file DB. Ephemeral by
     # default — `seed_from_chain` rebuilds the projection on every boot.
+    # Off-chain-only data (AI conversations, mandates, negotiations) is lost
+    # on restart; use Postgres (DATABASE_URL) for anything that must persist.
+    import logging
+    import warnings
+
+    warnings.warn(
+        "Sweeft is running on ephemeral SQLite: off-chain data (mandates, "
+        "AI conversations, negotiations) will not survive a restart. "
+        "Set DATABASE_URL for a persistent Postgres deployment.",
+        stacklevel=2,
+    )
+    logging.getLogger(__name__).warning(
+        "ephemeral SQLite in use — off-chain data will not persist across restarts"
+    )
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",

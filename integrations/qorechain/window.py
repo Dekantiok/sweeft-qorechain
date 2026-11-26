@@ -48,12 +48,25 @@ def evm_window_status(address: str) -> dict | None:
     return payload if payload.get("found") else None
 
 
+def _require_testnet() -> None:
+    """The relayer holds a live signing key; never run it against mainnet."""
+    if get_network().network != "testnet":
+        raise RuntimeError("relayer is testnet-only — refusing to run on mainnet")
+
+
 def relayer_account():
-    """Derive the relayer unified account from environment configuration."""
+    """Derive the relayer unified account from environment configuration.
+
+    The relayer is a low-privilege gas payer that only submits
+    signature-authorized calls. It must never fall back to the deployer
+    mnemonic (which owns the vault/registry/DAO): a compromised relayer
+    environment would otherwise expose owner-level keys.
+    """
+    _require_testnet()
     qorsdk = _qorsdk()
-    mnemonic = os.getenv("RELAYER_MNEMONIC") or os.getenv("SWEEFT_DEPLOYER_MNEMONIC", "")
+    mnemonic = os.getenv("RELAYER_MNEMONIC", "")
     if not mnemonic:
-        raise RuntimeError("RELAYER_MNEMONIC or SWEEFT_DEPLOYER_MNEMONIC must be set")
+        raise RuntimeError("RELAYER_MNEMONIC must be set (the deployer mnemonic is not a substitute)")
     return qorsdk.derive_unified_account(mnemonic.strip())
 
 
