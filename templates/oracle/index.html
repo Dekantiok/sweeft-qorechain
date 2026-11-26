@@ -6,7 +6,7 @@
 <div class="flex items-center justify-between">
     <div>
         <h1 class="text-2xl font-bold">Oracle — fulfilment verification</h1>
-        <p class="mt-1 text-sm text-neutral-500">
+        <p class="mt-1 text-sm text-neutral-300">
             Evidence submitted by sellers, reviewed by DAO-approved verifiers. An attestation is
             recorded on-chain and feeds the escrow's release conditions.
         </p>
@@ -23,7 +23,7 @@
     Your wallet is an authorized verifier — review each submission and attest it on-chain.
 </div>
 {% elif wallet_attached %}
-<div class="mt-6 rounded-xl border border-neutral-800 bg-neutral-950/50 p-4 text-sm text-neutral-500">
+<div class="mt-6 rounded-xl border border-neutral-800 bg-black/50 p-4 text-sm text-neutral-300">
     Your wallet is connected but not an authorized verifier. Only DAO-approved verifiers can attest
     (verifier accounts: <span class="hash">0x9E9745aABd5706291C0D4CA2FD2022B832a875c8</span>).
 </div>
@@ -32,24 +32,24 @@
 <div class="mt-8 space-y-4">
     {% for row in rows %}
     {% with item=row.evidence %}
-    <div class="rounded-xl border border-neutral-900 bg-neutral-950/50 p-5">
+    <div class="rounded-xl border border-neutral-900 bg-black/50 p-5">
         <div class="flex flex-wrap items-center justify-between gap-2">
             <div class="flex items-center gap-3">
-                <span class="text-xs text-neutral-600">Escrow #{{ item.escrow.on_chain_id }}</span>
+                <span class="text-xs text-neutral-300">Escrow #{{ item.escrow.on_chain_id }}</span>
                 <span class="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider
                     {% if item.verification_status == 'verified' %}bg-red-500/10 text-red-400
                     {% elif item.verification_status == 'rejected' %}bg-red-500/10 text-red-400
                     {% else %}bg-amber-500/10 text-amber-400{% endif %}">{{ item.verification_status }}</span>
-                <span class="rounded-full bg-neutral-900 px-2 py-0.5 text-[10px] text-neutral-500">{{ item.get_evidence_type_display }}</span>
+                <span class="rounded-full bg-neutral-950 px-2 py-0.5 text-[10px] text-neutral-300">{{ item.get_evidence_type_display }}</span>
             </div>
-            <span class="text-xs text-neutral-600">{{ item.submitted_at|date:"M d, H:i" }}</span>
+            <span class="text-xs text-neutral-300">{{ item.submitted_at|date:"M d, H:i" }}</span>
         </div>
 
-        <p class="mt-3 text-sm text-neutral-400">{{ item.description|default:"Evidence record" }}</p>
+        <p class="mt-3 text-sm text-neutral-300">{{ item.description|default:"Evidence record" }}</p>
         {% if item.evidence_reference %}
-        <p class="mt-1 text-xs text-neutral-600">reference: <span class="hash text-neutral-500">{{ item.evidence_reference }}</span></p>
+        <p class="mt-1 text-xs text-neutral-300">reference: <span class="hash text-neutral-300">{{ item.evidence_reference }}</span></p>
         {% endif %}
-        <div class="mt-2 flex flex-wrap items-center gap-4 text-xs text-neutral-600">
+        <div class="mt-2 flex flex-wrap items-center gap-4 text-xs text-neutral-300">
             <span>submitted by <span class="hash">{{ item.submitted_by.evm_address }}</span></span>
             <span>content hash <span class="hash">{{ item.content_hash|truncatechars:24 }}</span></span>
             {% if item.attestation_tx %}
@@ -59,21 +59,21 @@
 
         {% if is_verifier %}
             {% if row.state and row.state.status == 1 %}
-            <button class="attest-button mt-4 rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-black hover:bg-red-400 transition-colors"
+            <button class="attest-button mt-4 rounded-lg bg-red-500 shadow-lg shadow-red-500/25 px-4 py-2 text-sm font-semibold text-black hover:bg-red-400 transition-colors"
                     data-escrow="{{ item.escrow.on_chain_id }}"
                     data-item="{{ item.pk }}"
                     data-hash="{{ item.content_hash }}">
                 Attest on-chain
             </button>
-            <p class="mt-2 text-xs text-neutral-600" id="attest-status-{{ item.pk }}"></p>
+            <p class="mt-2 text-xs text-neutral-300" id="attest-status-{{ item.pk }}"></p>
             {% else %}
-            <p class="mt-3 text-xs text-neutral-600">Escrow is no longer awaiting attestation (status {{ row.state.status|default:"?" }}).</p>
+            <p class="mt-3 text-xs text-neutral-300">Escrow is no longer awaiting attestation (status {{ row.state.status|default:"?" }}).</p>
             {% endif %}
         {% endif %}
     </div>
     {% endwith %}
     {% empty %}
-    <div class="rounded-xl border border-dashed border-neutral-800 p-12 text-center text-neutral-600">
+    <div class="rounded-xl border border-dashed border-neutral-800 p-12 text-center text-neutral-300">
         No evidence submitted yet — sellers submit it from their escrow pages.
     </div>
     {% endfor %}

@@ -6,7 +6,7 @@
 <div class="flex items-center justify-between">
     <div>
         <h1 class="text-2xl font-bold">Dashboard</h1>
-        <p class="mt-1 text-sm text-neutral-500">{{ escrow_count }} escrow{{ escrow_count|pluralize }} · {{ listing_count }} listing{{ listing_count|pluralize }} — projected from on-chain events</p>
+        <p class="mt-1 text-sm text-neutral-300">{{ escrow_count }} escrow{{ escrow_count|pluralize }} · {{ listing_count }} listing{{ listing_count|pluralize }} — projected from on-chain events</p>
     </div>
     <button hx-post="/api/indexer/sync/" hx-swap="none"
             data-reload-on-success
@@ -17,10 +17,10 @@
 
 <!-- Escrows -->
 <section class="mt-8">
-    <h2 class="text-sm font-semibold uppercase tracking-wider text-neutral-500">Escrows</h2>
+    <h2 class="text-sm font-semibold uppercase tracking-wider text-neutral-300">Escrows</h2>
     <div class="mt-3 overflow-x-auto rounded-xl border border-neutral-900">
         <table class="w-full text-sm">
-            <thead class="bg-neutral-950/80 text-left text-xs uppercase tracking-wider text-neutral-600">
+            <thead class="bg-black/80 text-left text-xs uppercase tracking-wider text-neutral-300">
                 <tr>
                     <th class="px-4 py-3">#</th>
                     <th class="px-4 py-3">Amount</th>
@@ -33,22 +33,22 @@
             </thead>
             <tbody class="divide-y divide-neutral-900">
                 {% for escrow in escrows %}
-                <tr class="hover:bg-neutral-950/50 transition-colors">
-                    <td class="px-4 py-3 font-mono text-neutral-500">{{ escrow.on_chain_id }}</td>
+                <tr class="hover:bg-black/50 transition-colors">
+                    <td class="px-4 py-3 font-mono text-neutral-300">{{ escrow.on_chain_id }}</td>
                     <td class="px-4 py-3 text-red-400">{{ escrow.amount_qor }} QOR</td>
-                    <td class="px-4 py-3 hash text-neutral-600 max-w-[140px] truncate">{{ escrow.buyer.evm_address }}</td>
-                    <td class="px-4 py-3 hash text-neutral-600 max-w-[140px] truncate">{{ escrow.seller.evm_address }}</td>
+                    <td class="px-4 py-3 hash text-neutral-300 max-w-[140px] truncate">{{ escrow.buyer.evm_address }}</td>
+                    <td class="px-4 py-3 hash text-neutral-300 max-w-[140px] truncate">{{ escrow.seller.evm_address }}</td>
                     <td class="px-4 py-3">
                         <span class="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider
                             {% if escrow.state == 'completed' %}bg-red-500/10 text-red-400
                             {% elif escrow.state == 'release_eligible' %}bg-amber-500/10 text-amber-400
-                            {% else %}bg-neutral-800/50 text-neutral-500{% endif %}">{{ escrow.state }}</span>
+                            {% else %}bg-neutral-900/50 text-neutral-300{% endif %}">{{ escrow.state }}</span>
                     </td>
-                    <td class="px-4 py-3 text-neutral-600 text-xs">{{ escrow.delivery_deadline|date:"M d, H:i" }}</td>
+                    <td class="px-4 py-3 text-neutral-300 text-xs">{{ escrow.delivery_deadline|date:"M d, H:i" }}</td>
                     <td class="px-4 py-3"><a href="{% url 'escrow:detail' escrow.on_chain_id %}" class="text-red-400 hover:text-red-300 text-xs">View →</a></td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="7" class="px-4 py-10 text-center text-neutral-600">No escrows indexed yet — press “Refresh from chain”.</td></tr>
+                <tr><td colspan="7" class="px-4 py-10 text-center text-neutral-300">No escrows indexed yet — press “Refresh from chain”.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -57,10 +57,10 @@
 
 <!-- Listings -->
 <section class="mt-10">
-    <h2 class="text-sm font-semibold uppercase tracking-wider text-neutral-500">Listings</h2>
+    <h2 class="text-sm font-semibold uppercase tracking-wider text-neutral-300">Listings</h2>
     <div class="mt-3 overflow-x-auto rounded-xl border border-neutral-900">
         <table class="w-full text-sm">
-            <thead class="bg-neutral-950/80 text-left text-xs uppercase tracking-wider text-neutral-600">
+            <thead class="bg-black/80 text-left text-xs uppercase tracking-wider text-neutral-300">
                 <tr>
                     <th class="px-4 py-3">#</th>
                     <th class="px-4 py-3">Title</th>
@@ -73,17 +73,17 @@
             </thead>
             <tbody class="divide-y divide-neutral-900">
                 {% for listing in listings %}
-                <tr class="hover:bg-neutral-950/50 transition-colors">
-                    <td class="px-4 py-3 font-mono text-neutral-500">{{ listing.on_chain_id }}</td>
+                <tr class="hover:bg-black/50 transition-colors">
+                    <td class="px-4 py-3 font-mono text-neutral-300">{{ listing.on_chain_id }}</td>
                     <td class="px-4 py-3 text-neutral-300">{{ listing.title }}</td>
                     <td class="px-4 py-3 text-red-400">{{ listing.price_qor }} QOR</td>
-                    <td class="px-4 py-3 text-neutral-500">{{ listing.quantity }}</td>
-                    <td class="px-4 py-3"><span class="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider {% if listing.status == 'active' %}bg-red-500/10 text-red-400{% else %}bg-neutral-800/50 text-neutral-500{% endif %}">{{ listing.status }}</span></td>
-                    <td class="px-4 py-3 hash text-neutral-600 max-w-[140px] truncate">{{ listing.seller.evm_address }}</td>
+                    <td class="px-4 py-3 text-neutral-300">{{ listing.quantity }}</td>
+                    <td class="px-4 py-3"><span class="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider {% if listing.status == 'active' %}bg-red-500/10 text-red-400{% else %}bg-neutral-900/50 text-neutral-300{% endif %}">{{ listing.status }}</span></td>
+                    <td class="px-4 py-3 hash text-neutral-300 max-w-[140px] truncate">{{ listing.seller.evm_address }}</td>
                     <td class="px-4 py-3"><a href="{% url 'marketplace:detail' listing.on_chain_id %}" class="text-red-400 hover:text-red-300 text-xs">View →</a></td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="7" class="px-4 py-10 text-center text-neutral-600">No listings indexed yet.</td></tr>
+                <tr><td colspan="7" class="px-4 py-10 text-center text-neutral-300">No listings indexed yet.</td></tr>
                 {% endfor %}
             </tbody>
         </table>

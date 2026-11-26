@@ -5,8 +5,8 @@
 {% block content %}
 <div class="mx-auto max-w-2xl">
     <h1 class="text-2xl font-bold">Sell on Sweeft</h1>
-    <p class="mt-1 text-sm text-neutral-500">
-        The listing is published <strong class="text-neutral-400">on-chain</strong> from your wallet —
+    <p class="mt-1 text-sm text-neutral-300">
+        The listing is published <strong class="text-neutral-300">on-chain</strong> from your wallet —
         price, quantity and a hash of the description below. Buyers pay into PQ-protected escrow.
     </p>
 
@@ -16,59 +16,59 @@
     </div>
     {% endif %}
 
-    <div class="mt-6 space-y-4 rounded-xl border border-neutral-900 bg-neutral-950/50 p-6">
+    <div class="mt-6 space-y-4 rounded-xl border border-neutral-900 bg-black/50 p-6">
         <div>
-            <label class="text-xs uppercase tracking-wider text-neutral-600">Title</label>
+            <label class="text-xs uppercase tracking-wider text-neutral-300">Title</label>
             <input id="f-title" type="text" maxlength="120" placeholder="e.g. MacBook Pro 14 — used, excellent"
-                   class="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm focus:border-red-500 focus:outline-none">
+                   class="mt-1 w-full rounded-lg border border-neutral-800 bg-black px-3 py-2 text-sm focus:border-red-500 focus:outline-none">
         </div>
         <div>
-            <label class="text-xs uppercase tracking-wider text-neutral-600">Description</label>
+            <label class="text-xs uppercase tracking-wider text-neutral-300">Description</label>
             <textarea id="f-description" rows="4" placeholder="Condition, delivery expectations, anything a buyer should know…"
-                      class="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm focus:border-red-500 focus:outline-none"></textarea>
+                      class="mt-1 w-full rounded-lg border border-neutral-800 bg-black px-3 py-2 text-sm focus:border-red-500 focus:outline-none"></textarea>
         </div>
         <div class="grid gap-4 sm:grid-cols-2">
             <div>
-                <label class="text-xs uppercase tracking-wider text-neutral-600">Price (QOR, total)</label>
+                <label class="text-xs uppercase tracking-wider text-neutral-300">Price (QOR, total)</label>
                 <input id="f-price" type="text" inputmode="decimal" placeholder="0.1"
-                       class="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm focus:border-red-500 focus:outline-none">
+                       class="mt-1 w-full rounded-lg border border-neutral-800 bg-black px-3 py-2 text-sm focus:border-red-500 focus:outline-none">
             </div>
             <div>
-                <label class="text-xs uppercase tracking-wider text-neutral-600">Quantity in stock</label>
+                <label class="text-xs uppercase tracking-wider text-neutral-300">Quantity in stock</label>
                 <input id="f-quantity" type="number" min="1" max="1000" value="1"
-                       class="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm focus:border-red-500 focus:outline-none">
+                       class="mt-1 w-full rounded-lg border border-neutral-800 bg-black px-3 py-2 text-sm focus:border-red-500 focus:outline-none">
             </div>
         </div>
 
         <div>
-            <label class="text-xs uppercase tracking-wider text-neutral-600">Delivery</label>
-            <select id="f-delivery" class="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm">
+            <label class="text-xs uppercase tracking-wider text-neutral-300">Delivery</label>
+            <select id="f-delivery" class="mt-1 w-full rounded-lg border border-neutral-800 bg-black px-3 py-2 text-sm">
                 <option value="digital">Digital (buyer confirmation, no carrier)</option>
                 <option value="physical">Physical (carrier — Demo Carrier)</option>
             </select>
         </div>
         <div>
-            <label class="text-xs uppercase tracking-wider text-neutral-600">Negotiation floor (QOR — optional, 0 = fixed price)</label>
+            <label class="text-xs uppercase tracking-wider text-neutral-300">Negotiation floor (QOR — optional, 0 = fixed price)</label>
             <input id="f-floor" type="text" inputmode="decimal" placeholder="0.08"
-                   class="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm focus:border-red-500 focus:outline-none">
-            <p class="mt-1 text-[11px] text-neutral-600">The AI can bargain down to this floor — it's never revealed in negotiation.</p>
+                   class="mt-1 w-full rounded-lg border border-neutral-800 bg-black px-3 py-2 text-sm focus:border-red-500 focus:outline-none">
+            <p class="mt-1 text-[11px] text-neutral-300">The AI can bargain down to this floor — it's never revealed in negotiation.</p>
         </div>
         <div id="logistics-fields" class="hidden">
-            <label class="text-xs uppercase tracking-wider text-neutral-600">Logistics fee (QOR, reserved from the price)</label>
+            <label class="text-xs uppercase tracking-wider text-neutral-300">Logistics fee (QOR, reserved from the price)</label>
             <input id="f-logistics-fee" type="text" inputmode="decimal" value="0"
-                   class="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm focus:border-red-500 focus:outline-none">
-            <p class="mt-1 text-[11px] text-neutral-600">Paid to the carrier on release. Goods = price − fee. Leave 0 for self-delivery.</p>
+                   class="mt-1 w-full rounded-lg border border-neutral-800 bg-black px-3 py-2 text-sm focus:border-red-500 focus:outline-none">
+            <p class="mt-1 text-[11px] text-neutral-300">Paid to the carrier on release. Goods = price − fee. Leave 0 for self-delivery.</p>
         </div>
 
         <button id="publish-button" {% if not wallet_account %}disabled{% endif %}
-                class="w-full rounded-lg bg-red-500 px-4 py-3 font-semibold text-black hover:bg-red-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                class="w-full rounded-lg bg-red-500 shadow-lg shadow-red-500/25 px-4 py-3 font-semibold text-black hover:bg-red-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
             Publish on-chain
         </button>
-        <p id="publish-status" class="text-xs leading-relaxed text-neutral-500"></p>
+        <p id="publish-status" class="text-xs leading-relaxed text-neutral-300"></p>
     </div>
 
-    <div class="mt-4 rounded-xl border border-neutral-900 bg-neutral-950/50 p-4 text-xs leading-relaxed text-neutral-500">
-        <strong class="text-neutral-400">How it works:</strong> your description is stored as JSON and its
+    <div class="mt-4 rounded-xl border border-neutral-900 bg-black/50 p-4 text-xs leading-relaxed text-neutral-300">
+        <strong class="text-neutral-300">How it works:</strong> your description is stored as JSON and its
         SHA-256 is written into the listing on QoreChain. Buyers can re-hash the file and verify it matches —
         nobody can silently change your terms. Creating a listing needs an open EVM window and a little QOR for gas
         (QoreX: “EVM access window”).

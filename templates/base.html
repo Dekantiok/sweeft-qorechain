@@ -14,7 +14,7 @@
     {% block extra_head %}{% endblock %}
 </head>
 <body class="h-full bg-black text-neutral-200 antialiased">
-    <nav class="border-b border-neutral-900 bg-neutral-950/80 backdrop-blur sticky top-0 z-40">
+    <nav class="border-b border-neutral-900 bg-black/80 backdrop-blur sticky top-0 z-40">
         <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div class="flex h-16 items-center justify-between">
                 <div class="flex items-center gap-8">
@@ -22,7 +22,7 @@
                         <span class="text-xl font-bold tracking-tight">Sweeft</span>
                         <span class="rounded bg-red-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-red-400">PQ Escrow</span>
                     </a>
-                    <div class="hidden md:flex items-center gap-6 text-sm text-neutral-500">
+                    <div class="hidden md:flex items-center gap-6 text-sm text-neutral-300">
                         <a href="/marketplace/" class="hover:text-white transition-colors">Marketplace</a>
                         <a href="/dashboard/" class="hover:text-white transition-colors">Dashboard</a>
                         <a href="/disputes/" class="hover:text-white transition-colors">Disputes</a>
@@ -46,13 +46,13 @@
                             <span class="h-1.5 w-1.5 rounded-full bg-red-400"></span>
                             <span id="wallet-short" class="max-w-[9rem] truncate">{{ wallet_short }}</span>
                         </button>
-                        <div id="account-menu" class="hidden absolute right-0 mt-2 w-72 rounded-xl border border-neutral-800 bg-neutral-950 p-3 shadow-xl z-50">
-                            <div class="px-1 text-[10px] uppercase tracking-wider text-neutral-600 mb-2">
+                        <div id="account-menu" class="hidden absolute right-0 mt-2 w-72 rounded-xl border border-neutral-800 bg-black p-3 shadow-xl z-50">
+                            <div class="px-1 text-[10px] uppercase tracking-wider text-neutral-300 mb-2">
                                 Connected with {{ wallet_method|default:"wallet"|upper }}
                             </div>
-                            <div class="rounded-lg bg-neutral-900/60 px-3 py-2 mb-2">
-                                <div class="hash text-[11px] text-neutral-400 break-all" id="wallet-evm">{{ wallet_account }}</div>
-                                <div class="hash text-[10px] text-neutral-600 break-all mt-1">{{ wallet_qor }}</div>
+                            <div class="rounded-lg bg-neutral-950/60 px-3 py-2 mb-2">
+                                <div class="hash text-[11px] text-neutral-300 break-all" id="wallet-evm">{{ wallet_account }}</div>
+                                <div class="hash text-[10px] text-neutral-300 break-all mt-1">{{ wallet_qor }}</div>
                             </div>
                             <div class="grid grid-cols-2 gap-2 text-xs">
                                 <a href="/dashboard/?address={{ wallet_account }}" class="rounded-lg border border-neutral-800 px-3 py-2 text-center hover:border-red-500/50 hover:text-red-300 transition-colors">My activity</a>
@@ -64,7 +64,7 @@
                     </div>
                     {% else %}
                     <button id="connect-wallet"
-                            class="inline-flex h-9 items-center rounded-lg bg-red-500 px-3.5 text-sm font-semibold text-black hover:bg-red-400 transition-colors">
+                            class="inline-flex h-9 items-center rounded-lg bg-red-500 shadow-lg shadow-red-500/25 px-3.5 text-sm font-semibold text-black hover:bg-red-400 transition-colors">
                         Connect wallet
                     </button>
                     {% endif %}
@@ -80,7 +80,7 @@
         <div class="rounded-lg border px-4 py-3 text-sm mb-2
             {% if message.tags == 'error' %}border-red-500/30 bg-red-500/10 text-red-300
             {% elif message.tags == 'success' %}border-red-500/30 bg-red-500/10 text-red-300
-            {% else %}border-neutral-800 bg-neutral-900/50 text-neutral-400{% endif %}">
+            {% else %}border-neutral-800 bg-neutral-950/50 text-neutral-300{% endif %}">
             {{ message }}
         </div>
         {% endfor %}
@@ -92,7 +92,7 @@
     </main>
 
     <footer class="border-t border-neutral-900 mt-16">
-        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-neutral-600">
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-neutral-300">
             <p>Sweeft — decentralized commerce with post-quantum escrow, built on QoreChain.</p>
             <p>Testnet only. Test tokens have no value.</p>
         </div>

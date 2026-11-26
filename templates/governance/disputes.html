@@ -6,7 +6,7 @@
 <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
     <div>
         <h1 class="text-2xl font-bold">Dispute Board</h1>
-        <p class="mt-1 max-w-3xl text-sm text-neutral-500">
+        <p class="mt-1 max-w-3xl text-sm text-neutral-300">
             Resolvers stake into a pool. After a dispute's join window, anyone draws a random
             3-resolver panel (parties, the verifier and the carrier are excluded); a 2-of-3
             majority records a decision. Either party may appeal to a 5-resolver panel
@@ -23,34 +23,34 @@
 
 <!-- Board stats + staking -->
 <div class="mt-6 grid gap-4 sm:grid-cols-3">
-    <div class="rounded-xl border border-neutral-900 bg-neutral-950/50 p-5">
-        <div class="text-xs uppercase tracking-wider text-neutral-600">Reward pool</div>
+    <div class="rounded-xl border border-neutral-900 bg-black/50 p-5">
+        <div class="text-xs uppercase tracking-wider text-neutral-300">Reward pool</div>
         <div class="mt-1 text-xl font-bold text-red-400">
             {{ board_state.reward_pool_qor|default:0|floatformat:4 }} QOR
         </div>
-        <div class="mt-1 text-[11px] text-neutral-600">
+        <div class="mt-1 text-[11px] text-neutral-300">
             Fee share, slashed non-voters and forfeited appeal bonds
         </div>
     </div>
-    <div class="rounded-xl border border-neutral-900 bg-neutral-950/50 p-5">
-        <div class="text-xs uppercase tracking-wider text-neutral-600">Your stake</div>
+    <div class="rounded-xl border border-neutral-900 bg-black/50 p-5">
+        <div class="text-xs uppercase tracking-wider text-neutral-300">Your stake</div>
         <div class="mt-1 text-xl font-bold text-neutral-300" id="my-stake">connect wallet</div>
         <div class="mt-1 flex flex-wrap gap-2">
-            <button id="stake-button" class="rounded bg-red-500/90 px-3 py-1 text-xs font-semibold text-black hover:bg-red-400 transition-colors">
+            <button id="stake-button" class="rounded bg-red-500/90 shadow-lg shadow-red-500/25 px-3 py-1 text-xs font-semibold text-black hover:bg-red-400 transition-colors">
                 Stake {{ board_state.min_stake_qor|default:20|floatformat:0 }} QOR
             </button>
-            <button id="unstake-button" class="rounded border border-neutral-800 px-3 py-1 text-xs text-neutral-400 hover:border-neutral-600 transition-colors">
+            <button id="unstake-button" class="rounded border border-neutral-800 px-3 py-1 text-xs text-neutral-300 hover:border-neutral-600 transition-colors">
                 Request unstake
             </button>
-            <button id="withdraw-stake-button" class="rounded border border-neutral-800 px-3 py-1 text-xs text-neutral-400 hover:border-neutral-600 transition-colors">
+            <button id="withdraw-stake-button" class="rounded border border-neutral-800 px-3 py-1 text-xs text-neutral-300 hover:border-neutral-600 transition-colors">
                 Withdraw stake
             </button>
         </div>
     </div>
-    <div class="rounded-xl border border-neutral-900 bg-neutral-950/50 p-5">
-        <div class="text-xs uppercase tracking-wider text-neutral-600">Resolver pool</div>
+    <div class="rounded-xl border border-neutral-900 bg-black/50 p-5">
+        <div class="text-xs uppercase tracking-wider text-neutral-300">Resolver pool</div>
         <div class="mt-1 text-xl font-bold text-neutral-300">{{ board_state.pool_size|default:0 }} staked</div>
-        <div class="mt-1 text-[11px] text-neutral-600">
+        <div class="mt-1 text-[11px] text-neutral-300">
             Base stake {{ board_state.min_stake_qor|default:20|floatformat:0 }} QOR + 100% of the
             escrow value · join {{ board_state.join_window|default:0 }}s ·
             vote {{ board_state.voting_period|default:0 }}s ·
@@ -62,7 +62,7 @@
 <!-- Disputes -->
 <div class="mt-8 space-y-4">
     {% for dispute in disputes %}
-    <div class="rounded-xl border border-neutral-900 bg-neutral-950/50 p-5">
+    <div class="rounded-xl border border-neutral-900 bg-black/50 p-5">
         <div class="flex flex-wrap items-center justify-between gap-2">
             <div class="flex flex-wrap items-center gap-3">
                 <span class="text-sm font-semibold">Dispute #{{ dispute.on_chain_id }}</span>
@@ -73,11 +73,11 @@
                     {% else %}bg-amber-500/10 text-amber-400{% endif %}">
                     {{ dispute.get_state_display }}
                 </span>
-                <span class="text-xs text-neutral-600">
+                <span class="text-xs text-neutral-300">
                     escrow #{{ dispute.escrow.on_chain_id }} · {{ dispute.escrow.amount_qor }} QOR
                 </span>
             </div>
-            <span class="text-xs text-neutral-600">
+            <span class="text-xs text-neutral-300">
                 {% if dispute.state == 'open' %}
                     {% if dispute.panel_selected %}voting ends {{ dispute.voting_ends_at|date:"M d, H:i" }} UTC
                     {% else %}join window ends {{ dispute.joining_ends_at|date:"M d, H:i" }} UTC{% endif %}
@@ -93,38 +93,38 @@
 
         <div class="mt-4 grid gap-4 sm:grid-cols-2">
             <div>
-                <div class="text-xs uppercase tracking-wider text-neutral-600">
+                <div class="text-xs uppercase tracking-wider text-neutral-300">
                     First panel ({{ dispute.first_panel|length }}/3)
                 </div>
                 <ul class="mt-2 space-y-1 text-xs">
                     {% for member in dispute.first_panel %}
-                    <li class="flex items-center justify-between rounded bg-neutral-900/50 px-3 py-1.5">
-                        <span class="hash text-neutral-500">{{ member.participant.evm_address|truncatechars:20 }}</span>
+                    <li class="flex items-center justify-between rounded bg-neutral-950/50 px-3 py-1.5">
+                        <span class="hash text-neutral-300">{{ member.participant.evm_address|truncatechars:20 }}</span>
                         <span>
                             {% if member.vote_release == True %}<span class="text-red-400">voted: release</span>
                             {% elif member.vote_release == False %}<span class="text-blue-400">voted: refund</span>
-                            {% else %}<span class="text-neutral-600">waiting</span>{% endif %}
+                            {% else %}<span class="text-neutral-300">waiting</span>{% endif %}
                             {% if member.claimed %}<span class="text-red-400 ml-1">· rewarded</span>{% endif %}
                         </span>
                     </li>
                     {% empty %}
-                    <li class="rounded border border-dashed border-neutral-800 px-3 py-2 text-center text-neutral-600">
+                    <li class="rounded border border-dashed border-neutral-800 px-3 py-2 text-center text-neutral-300">
                         Panel not drawn yet — anyone can draw it after the join window.
                     </li>
                     {% endfor %}
                 </ul>
                 {% if dispute.appeal_panel %}
-                <div class="mt-3 text-xs uppercase tracking-wider text-neutral-600">
+                <div class="mt-3 text-xs uppercase tracking-wider text-neutral-300">
                     Appeal panel ({{ dispute.appeal_panel|length }}/5)
                 </div>
                 <ul class="mt-2 space-y-1 text-xs">
                     {% for member in dispute.appeal_panel %}
-                    <li class="flex items-center justify-between rounded bg-neutral-900/50 px-3 py-1.5">
-                        <span class="hash text-neutral-500">{{ member.participant.evm_address|truncatechars:20 }}</span>
+                    <li class="flex items-center justify-between rounded bg-neutral-950/50 px-3 py-1.5">
+                        <span class="hash text-neutral-300">{{ member.participant.evm_address|truncatechars:20 }}</span>
                         <span>
                             {% if member.vote_release == True %}<span class="text-red-400">voted: release</span>
                             {% elif member.vote_release == False %}<span class="text-blue-400">voted: refund</span>
-                            {% else %}<span class="text-neutral-600">waiting</span>{% endif %}
+                            {% else %}<span class="text-neutral-300">waiting</span>{% endif %}
                         </span>
                     </li>
                     {% endfor %}
@@ -132,12 +132,12 @@
                 {% endif %}
             </div>
             <div>
-                <div class="text-xs uppercase tracking-wider text-neutral-600">Votes</div>
+                <div class="text-xs uppercase tracking-wider text-neutral-300">Votes</div>
                 <div class="mt-2 flex flex-wrap items-center gap-4 text-sm">
                     <span>Release: <span class="text-red-400 font-semibold">{{ dispute.votes_for_release }}</span></span>
                     <span>Refund: <span class="text-blue-400 font-semibold">{{ dispute.votes_for_refund }}</span></span>
                     {% if dispute.state == 'appealed' %}
-                    <span class="text-xs text-neutral-600">
+                    <span class="text-xs text-neutral-300">
                         appeal — release {{ dispute.appeal_votes_for_release }}, refund {{ dispute.appeal_votes_for_refund }}
                     </span>
                     {% endif %}
@@ -145,14 +145,14 @@
                 <div class="mt-3 flex flex-wrap gap-2">
                     {% if dispute.state == 'open' %}
                         {% if not dispute.panel_selected %}
-                        <button class="dispute-action rounded bg-neutral-900 px-3 py-1.5 text-xs hover:bg-neutral-800 transition-colors"
+                        <button class="dispute-action rounded bg-neutral-950 px-3 py-1.5 text-xs hover:bg-neutral-900 transition-colors"
                                 data-action="select-panel" data-dispute="{{ dispute.on_chain_id }}">Draw panel</button>
                         {% else %}
-                        <button class="dispute-action rounded bg-red-500/90 px-3 py-1.5 text-xs font-semibold text-black hover:bg-red-400 transition-colors"
+                        <button class="dispute-action rounded bg-red-500/90 shadow-lg shadow-red-500/25 px-3 py-1.5 text-xs font-semibold text-black hover:bg-red-400 transition-colors"
                                 data-action="vote-release" data-dispute="{{ dispute.on_chain_id }}">Vote: release to seller</button>
                         <button class="dispute-action rounded border border-blue-500/40 px-3 py-1.5 text-xs text-blue-300 hover:bg-blue-500/10 transition-colors"
                                 data-action="vote-refund" data-dispute="{{ dispute.on_chain_id }}">Vote: refund buyer</button>
-                        <button class="dispute-action rounded border border-neutral-800 px-3 py-1.5 text-xs text-neutral-400 hover:border-red-500/50 transition-colors"
+                        <button class="dispute-action rounded border border-neutral-800 px-3 py-1.5 text-xs text-neutral-300 hover:border-red-500/50 transition-colors"
                                 data-action="resolve-expired" data-dispute="{{ dispute.on_chain_id }}">Resolve expired panel</button>
                         {% endif %}
                     {% elif dispute.state == 'resolved' %}
@@ -161,27 +161,27 @@
                                 data-bond-wei="{{ dispute.appeal_bond_wei }}">
                             Appeal ({{ dispute.appeal_bond_qor|floatformat:2 }} QOR bond)
                         </button>
-                        <button class="dispute-action rounded bg-red-500/90 px-3 py-1.5 text-xs font-semibold text-black hover:bg-red-400 transition-colors"
+                        <button class="dispute-action rounded bg-red-500/90 shadow-lg shadow-red-500/25 px-3 py-1.5 text-xs font-semibold text-black hover:bg-red-400 transition-colors"
                                 data-action="finalize" data-dispute="{{ dispute.on_chain_id }}">Finalize after appeal window</button>
                     {% elif dispute.state == 'appealed' %}
-                        <button class="dispute-action rounded bg-red-500/90 px-3 py-1.5 text-xs font-semibold text-black hover:bg-red-400 transition-colors"
+                        <button class="dispute-action rounded bg-red-500/90 shadow-lg shadow-red-500/25 px-3 py-1.5 text-xs font-semibold text-black hover:bg-red-400 transition-colors"
                                 data-action="appeal-vote-release" data-dispute="{{ dispute.on_chain_id }}">Appeal vote: release</button>
                         <button class="dispute-action rounded border border-blue-500/40 px-3 py-1.5 text-xs text-blue-300 hover:bg-blue-500/10 transition-colors"
                                 data-action="appeal-vote-refund" data-dispute="{{ dispute.on_chain_id }}">Appeal vote: refund</button>
-                        <button class="dispute-action rounded border border-neutral-800 px-3 py-1.5 text-xs text-neutral-400 hover:border-red-500/50 transition-colors"
+                        <button class="dispute-action rounded border border-neutral-800 px-3 py-1.5 text-xs text-neutral-300 hover:border-red-500/50 transition-colors"
                                 data-action="resolve-appeal-expired" data-dispute="{{ dispute.on_chain_id }}">Resolve expired appeal</button>
                     {% endif %}
                     {% if dispute.state == 'final' %}
-                    <button class="dispute-action rounded border border-neutral-800 px-3 py-1.5 text-xs text-neutral-400 hover:border-red-500/50 transition-colors"
+                    <button class="dispute-action rounded border border-neutral-800 px-3 py-1.5 text-xs text-neutral-300 hover:border-red-500/50 transition-colors"
                             data-action="claim" data-dispute="{{ dispute.on_chain_id }}">Claim resolver reward</button>
                     {% endif %}
                 </div>
             </div>
         </div>
-        <p class="mt-3 text-[11px] text-neutral-600" id="status-{{ dispute.on_chain_id }}"></p>
+        <p class="mt-3 text-[11px] text-neutral-300" id="status-{{ dispute.on_chain_id }}"></p>
     </div>
     {% empty %}
-    <div class="rounded-xl border border-dashed border-neutral-800 p-12 text-center text-neutral-600">
+    <div class="rounded-xl border border-dashed border-neutral-800 p-12 text-center text-neutral-300">
         No disputes yet. Raise one from a funded escrow page — the escrow freezes until a staked
         panel decides release or refund, and either party can appeal the first decision.
     </div>

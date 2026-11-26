@@ -5,42 +5,42 @@
 {% block content %}
 <div class="mx-auto max-w-2xl">
     <h1 class="text-2xl font-bold">Register as a carrier</h1>
-    <p class="mt-1 text-sm text-neutral-500">
+    <p class="mt-1 text-sm text-neutral-300">
         Carriers apply, get reviewed, then integrate through the Partner API. Your tracking payloads are
         signed with your QoreChain ML-DSA-87 key and verified on-chain — no hardware attestation needed.
     </p>
 
-    <form method="post" class="mt-6 space-y-4 rounded-xl border border-neutral-900 bg-neutral-950/50 p-6">
+    <form method="post" class="mt-6 space-y-4 rounded-xl border border-neutral-900 bg-black/50 p-6">
         {% csrf_token %}
         <div class="grid gap-4 sm:grid-cols-2">
             <div>
-                <label class="text-xs uppercase tracking-wider text-neutral-600">Company name *</label>
-                <input name="company_name" required class="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm focus:border-red-500 focus:outline-none">
+                <label class="text-xs uppercase tracking-wider text-neutral-300">Company name *</label>
+                <input name="company_name" required class="mt-1 w-full rounded-lg border border-neutral-800 bg-black px-3 py-2 text-sm focus:border-red-500 focus:outline-none">
             </div>
             <div>
-                <label class="text-xs uppercase tracking-wider text-neutral-600">Provider ID</label>
-                <input name="provider_id" placeholder="LOG-EXAMPLE-001" class="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm focus:border-red-500 focus:outline-none">
+                <label class="text-xs uppercase tracking-wider text-neutral-300">Provider ID</label>
+                <input name="provider_id" placeholder="LOG-EXAMPLE-001" class="mt-1 w-full rounded-lg border border-neutral-800 bg-black px-3 py-2 text-sm focus:border-red-500 focus:outline-none">
             </div>
         </div>
         <div class="grid gap-4 sm:grid-cols-2">
             <div>
-                <label class="text-xs uppercase tracking-wider text-neutral-600">Contact email</label>
-                <input name="email" type="email" class="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm focus:border-red-500 focus:outline-none">
+                <label class="text-xs uppercase tracking-wider text-neutral-300">Contact email</label>
+                <input name="email" type="email" class="mt-1 w-full rounded-lg border border-neutral-800 bg-black px-3 py-2 text-sm focus:border-red-500 focus:outline-none">
             </div>
             <div>
-                <label class="text-xs uppercase tracking-wider text-neutral-600">Settlement wallet (0x)</label>
-                <input name="settlement_wallet" placeholder="your QoreChain 0x account" class="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm focus:border-red-500 focus:outline-none">
+                <label class="text-xs uppercase tracking-wider text-neutral-300">Settlement wallet (0x)</label>
+                <input name="settlement_wallet" placeholder="your QoreChain 0x account" class="mt-1 w-full rounded-lg border border-neutral-800 bg-black px-3 py-2 text-sm focus:border-red-500 focus:outline-none">
             </div>
         </div>
         <div>
-            <label class="text-xs uppercase tracking-wider text-neutral-600">Operating locations</label>
-            <input name="operating_locations" placeholder="Lagos, Abuja, Port Harcourt" class="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm focus:border-red-500 focus:outline-none">
+            <label class="text-xs uppercase tracking-wider text-neutral-300">Operating locations</label>
+            <input name="operating_locations" placeholder="Lagos, Abuja, Port Harcourt" class="mt-1 w-full rounded-lg border border-neutral-800 bg-black px-3 py-2 text-sm focus:border-red-500 focus:outline-none">
         </div>
         <div>
-            <label class="text-xs uppercase tracking-wider text-neutral-600">Services (one per line)</label>
-            <textarea name="services" rows="3" placeholder="Same-day delivery — Lagos — 5 QOR / item" class="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm focus:border-red-500 focus:outline-none"></textarea>
+            <label class="text-xs uppercase tracking-wider text-neutral-300">Services (one per line)</label>
+            <textarea name="services" rows="3" placeholder="Same-day delivery — Lagos — 5 QOR / item" class="mt-1 w-full rounded-lg border border-neutral-800 bg-black px-3 py-2 text-sm focus:border-red-500 focus:outline-none"></textarea>
         </div>
-        <button class="w-full rounded-lg bg-red-500 px-4 py-3 font-semibold text-black hover:bg-red-400 transition-colors">
+        <button class="w-full rounded-lg bg-red-500 shadow-lg shadow-red-500/25 px-4 py-3 font-semibold text-black hover:bg-red-400 transition-colors">
             Submit for review
         </button>
     </form>

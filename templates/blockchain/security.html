@@ -5,7 +5,7 @@
 {% block content %}
 <div>
     <h1 class="text-2xl font-bold">Security — who can move money</h1>
-    <p class="mt-1 max-w-3xl text-sm text-neutral-500">
+    <p class="mt-1 max-w-3xl text-sm text-neutral-300">
         Every sensitive action in Sweeft is gated on-chain. No administrator, relayer or AI can move
         escrowed funds outside these rules. Each gate below is enforced by the contract and verified
         with ML-DSA-87 against keys registered on QoreChain.
@@ -14,40 +14,40 @@
 
 <div class="mt-8 space-y-4">
     {% for gate in gates %}
-    <div class="rounded-xl border border-neutral-900 bg-neutral-950/50 p-5">
+    <div class="rounded-xl border border-neutral-900 bg-black/50 p-5">
         <div class="flex flex-wrap items-center justify-between gap-2">
             <div class="font-semibold text-red-300">{{ gate.action }}</div>
             <span class="rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-red-400">on-chain</span>
         </div>
         <dl class="mt-3 grid gap-x-8 gap-y-2 text-xs sm:grid-cols-2">
-            <dt class="text-neutral-600">Who can act</dt><dd class="text-neutral-400">{{ gate.who }}</dd>
-            <dt class="text-neutral-600">Mechanism</dt><dd class="text-neutral-500 leading-relaxed">{{ gate.mechanism }}</dd>
-            <dt class="text-neutral-600">Replay protection</dt><dd class="text-neutral-500 leading-relaxed">{{ gate.anti_replay }}</dd>
-            <dt class="text-neutral-600">Evidence</dt><dd class="text-neutral-500 leading-relaxed">{{ gate.evidence }}</dd>
+            <dt class="text-neutral-300">Who can act</dt><dd class="text-neutral-300">{{ gate.who }}</dd>
+            <dt class="text-neutral-300">Mechanism</dt><dd class="text-neutral-300 leading-relaxed">{{ gate.mechanism }}</dd>
+            <dt class="text-neutral-300">Replay protection</dt><dd class="text-neutral-300 leading-relaxed">{{ gate.anti_replay }}</dd>
+            <dt class="text-neutral-300">Evidence</dt><dd class="text-neutral-300 leading-relaxed">{{ gate.evidence }}</dd>
         </dl>
     </div>
     {% endfor %}
 </div>
 
 <div class="mt-8 grid gap-4 sm:grid-cols-3">
-    <div class="rounded-xl border border-neutral-900 bg-neutral-950/50 p-5">
-        <div class="text-xs uppercase tracking-wider text-neutral-600">Escrows indexed</div>
+    <div class="rounded-xl border border-neutral-900 bg-black/50 p-5">
+        <div class="text-xs uppercase tracking-wider text-neutral-300">Escrows indexed</div>
         <div class="mt-1 text-xl font-bold text-red-400">{{ escrow_count }}</div>
     </div>
-    <div class="rounded-xl border border-neutral-900 bg-neutral-950/50 p-5">
-        <div class="text-xs uppercase tracking-wider text-neutral-600">Vault</div>
-        <div class="hash mt-1 text-xs text-neutral-500 break-all">{{ vault_address }}</div>
+    <div class="rounded-xl border border-neutral-900 bg-black/50 p-5">
+        <div class="text-xs uppercase tracking-wider text-neutral-300">Vault</div>
+        <div class="hash mt-1 text-xs text-neutral-300 break-all">{{ vault_address }}</div>
     </div>
-    <div class="rounded-xl border border-neutral-900 bg-neutral-950/50 p-5">
-        <div class="text-xs uppercase tracking-wider text-neutral-600">Dispute board</div>
-        <div class="hash mt-1 text-xs text-neutral-500 break-all">{{ board_address }}</div>
+    <div class="rounded-xl border border-neutral-900 bg-black/50 p-5">
+        <div class="text-xs uppercase tracking-wider text-neutral-300">Dispute board</div>
+        <div class="hash mt-1 text-xs text-neutral-300 break-all">{{ board_address }}</div>
     </div>
 </div>
 
-<div class="mt-8 rounded-xl border border-red-500/30 bg-red-500/5 p-5 text-xs leading-relaxed text-neutral-500">
+<div class="mt-8 rounded-xl border border-red-500/30 bg-red-500/5 p-5 text-xs leading-relaxed text-neutral-300">
     <div class="font-semibold text-red-300 mb-2">Verify it yourself</div>
     <p>
-        The <strong class="text-neutral-400">proof pages</strong> decode any transaction or escrow into plain
+        The <strong class="text-neutral-300">proof pages</strong> decode any transaction or escrow into plain
         English: signatures tier, nonce binding, and why the same signature can never settle twice.
         Every attack in the threat model — forged release, tampered message, wrong carrier — is recorded
         as a reverting transaction on Diana, linked from <span class="hash">tools/e2e_*.py</span> outputs
