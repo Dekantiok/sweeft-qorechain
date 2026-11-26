@@ -22,7 +22,8 @@ comes only from verified outcomes, and a DAO governs who may attest.
 - **Superseded: v7/v6/v5** — previous live stacks (v7: push settlement;
   v6/v5 buy-side identical until the credits-only change).
 - **Audit scope:** Stage 3 (78/100) covers v5; Stage 4 (72/100) covers v6;
-  v7 == patched v6 source (Stage 5 bundle in `docs/audit/stage-5/`).
+  v7 == patched v6 source (Stage 5 bundle in `docs/audit/stage-5/`); v8 ==
+  Stage 6 bundle source (`docs/audit/stage-6/`), live since 26 Nov 2026.
 
 ## Architecture
 
