@@ -7,8 +7,16 @@ from pathlib import Path
 
 
 def load_abi(artifact: Path) -> list:
-    """Load the ABI from a Foundry artifact JSON file."""
+    """Load the ABI from a Foundry artifact JSON file.
+
+    Falls back to the bundled copies in this package (`abi/<Name>.json`) so
+    deployed services (no forge available) work out of the box.
+    """
     if not artifact.exists():
+        bundled = Path(__file__).parent / "abi" / f"{artifact.parent.name.replace('.sol', '')}.json"
+        if bundled.exists():
+            with bundled.open() as fh:
+                return json.load(fh)["abi"]
         raise FileNotFoundError(
             f"ABI artifact not found: {artifact}. Run `forge build` in contracts/ first."
         )
