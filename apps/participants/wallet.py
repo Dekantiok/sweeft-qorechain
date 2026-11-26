@@ -183,15 +183,22 @@ def verify(request):
         request.session.pop("wallet_challenge", None)
         return JsonResponse({"error": reason}, status=401)
 
-    # Normalise both address forms for display and future actions.
+    # Normalise both address forms for display and future actions. Mobile
+    # wallets sometimes send the "other" form (qor1 via EVM path or 0x via
+    # QoreX); convert robustly instead of crashing (HTTP 500).
     from qorsdk.address import bech32_to_hex, hex_to_bech32
 
-    if method == "qorex":
-        evm = "0x" + bech32_to_hex(address).replace("0x", "")
-        qor = address
-    else:
-        evm = address
-        qor = hex_to_bech32(address)
+    try:
+        if address.lower().startswith("qor1"):
+            evm = "0x" + bech32_to_hex(address).lower().replace("0x", "")
+            qor = address
+        elif address.lower().startswith("0x"):
+            evm = address
+            qor = hex_to_bech32(address)
+        else:
+            return JsonResponse({"error": "unrecognized address format (want 0x… or qor1…)"}, status=400)
+    except Exception:
+        return JsonResponse({"error": "could not convert the address form — try again"}, status=400)
 
     # Rotate the session key on login to prevent fixation.
     request.session.cycle_key()

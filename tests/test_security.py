@@ -163,6 +163,92 @@ class WalletLoginTests(TestCase):
         )
         self.assertEqual(r.status_code, 400)
 
+    # -- mixed address forms (mobile 500 regression) ---------------------
+
+    def _set_challenge(self, client, address, message):
+        session = client.session
+        session["wallet_challenge"] = {
+            "message": message,
+            "address": address.lower(),
+            "issued_at": time.time(),
+            "domain": "testserver",
+        }
+        session.save()
+
+    def test_verify_evm_path_with_qor_address_converts(self):
+        """Mobile regression: a qor1 address via the EVM method must convert,
+        not 500."""
+        client = Client()
+        from qorsdk.address import hex_to_bech32
+
+        qor = hex_to_bech32("0x1111111111111111111111111111111111111111")
+        message = "Sweeft login\ndomain: testserver\naddress: " + qor
+        self._set_challenge(client, qor, message)
+
+        # Reuse a real EIP-191 signature from a known key.
+        from eth_account import Account
+
+        key = "0x" + "11" * 32
+        signed = Account.sign_message(
+            __import__("eth_account.messages", fromlist=["encode_defunct"]).encode_defunct(text=message),
+            key,
+        )
+        r = client.post(
+            "/api/wallet/verify/",
+            data=json.dumps(
+                {
+                    "method": "evm",
+                    "address": qor,
+                    "message": message,
+                    "signature": signed.signature.hex(),
+                }
+            ),
+            content_type="application/json",
+        )
+        # The recovered signer is the EVM form, not the qor1 form, so this
+        # legitimately fails as a mismatch — but it must be a 400/401 JSON
+        # response and NEVER a 500.
+        self.assertIn(r.status_code, (400, 401))
+        self.assertIn("error", r.json())
+
+    def test_verify_unknown_address_format_is_400_not_500(self):
+        client = Client()
+        message = "Sweeft login\ndomain: testserver\naddress: nonsense"
+        self._set_challenge(client, "nonsense", message)
+        r = client.post(
+            "/api/wallet/verify/",
+            data=json.dumps({"method": "evm", "address": "nonsense", "message": message, "signature": "0x00"}),
+            content_type="application/json",
+        )
+        # Malformed signatures are rejected (401) — the point is a JSON
+        # error, never a 500.
+        self.assertIn(r.status_code, (400, 401))
+        self.assertIn("error", r.json())
+
+    def test_verify_evm_method_normalizes_0x_address(self):
+        """A valid EVM signature logs the wallet in (session + dual forms)."""
+        client = Client()
+        from eth_account import Account
+        from eth_account.messages import encode_defunct
+        from qorsdk.address import hex_to_bech32
+
+        key = "0x" + "22" * 32
+        evm = Account.from_key(key).address
+        message = "Sweeft login\ndomain: testserver\naddress: " + evm
+        self._set_challenge(client, evm, message)
+        signed = Account.sign_message(encode_defunct(text=message), key)
+        r = client.post(
+            "/api/wallet/verify/",
+            data=json.dumps(
+                {"method": "evm", "address": evm, "message": message, "signature": signed.signature.hex()}
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertEqual(body["evm"].lower(), evm.lower())
+        self.assertEqual(body["qor"], hex_to_bech32(evm))
+
 
 class MandateTests(TestCase):
     def setUp(self):
