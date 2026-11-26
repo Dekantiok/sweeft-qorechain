@@ -24,6 +24,7 @@ from apps.blockchain.services.reads import (  # noqa: F401  (re-exported)
     escrow_state,
     is_verifier,
     relayer_health,
+    stake_position,
     vault_credits,
 )
 from integrations.qorechain.client import get_evm_client, get_network

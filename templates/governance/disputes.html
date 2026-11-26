@@ -34,22 +34,47 @@
     </div>
     <div class="rounded-xl border border-neutral-900 bg-black/50 p-5">
         <div class="text-xs uppercase tracking-wider text-neutral-300">Your stake</div>
-        <div class="mt-1 text-xl font-bold text-neutral-300" id="my-stake">connect wallet</div>
-        <div class="mt-1 flex flex-wrap gap-2">
+        {% if not wallet_attached %}
+        <div class="mt-1 text-xl font-bold text-neutral-300">connect wallet</div>
+        {% elif my_stake and my_stake.stake_wei > 0 %}
+        <div class="mt-1 text-xl font-bold text-red-300">{{ my_stake.stake_qor|floatformat:2 }} QOR</div>
+        <div class="mt-1 text-[11px] text-neutral-400">
+            {% if my_stake.locked_until > now_ts %}
+            Locked until a panel finishes ({{ my_stake.locked_until|date:"M d, H:i" }}).
+            {% elif my_stake.unstake_available_at > now_ts %}
+            Unstake requested. Withdrawable {{ my_stake.unstake_available_at|date:"M d, H:i" }} UTC.
+            {% else %}
+            Active in the resolver pool.
+            {% endif %}
+        </div>
+        <div class="mt-2 flex flex-wrap gap-2">
+            {% if my_stake.locked_until > now_ts %}
+            <button disabled class="cursor-not-allowed rounded border border-neutral-800 px-3 py-1 text-xs text-neutral-500">Locked by a panel</button>
+            {% elif my_stake.unstake_available_at > now_ts %}
+            <button disabled class="cursor-not-allowed rounded border border-neutral-800 px-3 py-1 text-xs text-neutral-500">Withdraw in {{ my_stake.unstake_available_at|date:"H:i" }}</button>
+            {% elif my_stake.unstake_available_at != 0 %}
+            <button id="withdraw-stake-button" class="rounded bg-red-500/90 shadow-lg shadow-red-500/25 px-3 py-1 text-xs font-semibold text-black hover:bg-red-400 transition-colors">
+                Withdraw {{ my_stake.stake_qor|floatformat:2 }} QOR
+            </button>
+            {% else %}
+            <button id="unstake-button" class="rounded border border-neutral-800 px-3 py-1 text-xs text-neutral-300 hover:border-neutral-600 transition-colors">
+                Unstake (pays to your wallet)
+            </button>
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="mt-1 text-xl font-bold text-neutral-300">0 QOR</div>
+        <div class="mt-1 text-[11px] text-neutral-400">No active stake. Staking makes you eligible for panels.</div>
+        <div class="mt-2 flex flex-wrap gap-2">
             <button id="stake-button" class="rounded bg-red-500/90 shadow-lg shadow-red-500/25 px-3 py-1 text-xs font-semibold text-black hover:bg-red-400 transition-colors">
                 Stake {{ board_state.min_stake_qor|default:20|floatformat:0 }} QOR
             </button>
-            <button id="unstake-button" class="rounded border border-neutral-800 px-3 py-1 text-xs text-neutral-300 hover:border-neutral-600 transition-colors">
-                Request unstake
-            </button>
-            <button id="withdraw-stake-button" class="rounded border border-neutral-800 px-3 py-1 text-xs text-neutral-300 hover:border-neutral-600 transition-colors">
-                Withdraw stake
-            </button>
         </div>
+        {% endif %}
     </div>
     <div class="rounded-xl border border-neutral-900 bg-black/50 p-5">
         <div class="text-xs uppercase tracking-wider text-neutral-300">Resolver pool</div>
-        <div class="mt-1 text-xl font-bold text-neutral-300">{{ board_state.pool_size|default:0 }} staked</div>
+        <div class="mt-1 text-xl font-bold text-neutral-300">{{ board_state.pool_size|default:0 }} resolvers in pool</div>
         <div class="mt-1 text-[11px] text-neutral-300">
             Base stake {{ board_state.min_stake_qor|default:20|floatformat:0 }} QOR + 100% of the
             escrow value · join {{ board_state.join_window|default:0 }}s ·
@@ -224,7 +249,8 @@ document.getElementById("stake-button")?.addEventListener("click", async () => {
 document.getElementById("unstake-button")?.addEventListener("click", async () => {
     try {
         const hash = await walletTx("0xfc63958e"); // requestUnstake()
-        alert("Unstake requested (cooldown starts once you are off all panels).\n" + hash);
+        alert("Unstake requested. After the 1-hour cooldown the Withdraw button pays the full stake to your wallet.\n" + hash);
+        setTimeout(() => location.reload(), 5000);
     } catch (err) { alert("Request failed: " + (err.message || err)); }
 });
 

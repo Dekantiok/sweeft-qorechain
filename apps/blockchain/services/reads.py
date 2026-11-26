@@ -104,6 +104,28 @@ def vault_credits(address: str) -> int:
     return int(vault.functions.credits(w3.to_checksum_address(address)).call())
 
 
+def stake_position(address: str) -> dict:
+    """Live resolver stake position: amount, cooldown, panel lock (wei/secs)."""
+    if not address:
+        return {"stake_wei": 0, "unstake_available_at": 0, "locked_until": 0}
+    import os
+
+    from integrations.qorechain.contracts_base import load_abi, make_contract
+
+    w3 = get_evm_client()
+    board_address = os.getenv("SWEEFT_DISPUTE_BOARD_ADDRESS", "")
+    if not board_address:
+        raise RelayerError("SWEEFT_DISPUTE_BOARD_ADDRESS is not configured")
+    abi = load_abi(artifact_path("SweeftDisputeBoard"))
+    board = make_contract(w3, board_address, abi)
+    checksum = w3.to_checksum_address(address)
+    return {
+        "stake_wei": int(board.functions.stakeOf(checksum).call()),
+        "unstake_available_at": int(board.functions.unstakeAvailableAt(checksum).call()),
+        "locked_until": int(board.functions.lockedUntil(checksum).call()),
+    }
+
+
 def board_state() -> dict:
     """Read the dispute board's parameters and pool directly from the chain.
 

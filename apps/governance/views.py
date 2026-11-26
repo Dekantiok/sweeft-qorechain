@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 
 from django.shortcuts import render
 
@@ -49,6 +50,18 @@ def dispute_list(request):
     except Exception:
         logger.exception("could not read dispute board state")
 
+    # Live personal stake position ( amount + cooldown/lock timers ).
+    my_stake = None
+    wallet = (request.session.get("wallet_account") or {}).get("evm", "")
+    if wallet:
+        try:
+            from apps.blockchain.services.reads import stake_position
+
+            my_stake = stake_position(wallet)
+            my_stake["stake_qor"] = my_stake["stake_wei"] / 10**18
+        except Exception:
+            logger.exception("could not read stake position")
+
     return render(
         request,
         "governance/disputes.html",
@@ -56,5 +69,8 @@ def dispute_list(request):
             "disputes": disputes,
             "board_state": board_state,
             "board_address": os.getenv("SWEEFT_DISPUTE_BOARD_ADDRESS", ""),
+            "my_stake": my_stake,
+            "now_ts": int(time.time()),
+            "wallet_attached": bool(wallet),
         },
     )
