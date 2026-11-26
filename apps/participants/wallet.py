@@ -68,6 +68,43 @@ def challenge(request):
     return JsonResponse({"message": message, "nonce": nonce, "chain_id": network.chain_id, "expires_in": CHALLENGE_TTL_SECONDS})
 
 
+def _pqc_status_via_precompile(address: str) -> dict:
+    """Read the PQC key status through the Ethereum precompile.
+
+    Same registry the REST endpoint reads, via `eth_call` to
+    `pqcKeyStatus(address)` at 0x...0a02 (testnet only).
+    """
+    from eth_abi import abi
+
+    from integrations.qorechain.client import get_evm_client
+    from qorsdk.address import bech32_to_hex
+
+    w3 = get_evm_client()
+    try:
+        target = w3.to_checksum_address(address)
+    except Exception:
+        target = "0x" + bech32_to_hex(address).lower().replace("0x", "")
+
+    selector = w3.keccak(text="pqcKeyStatus(address)").hex()[:8]
+    padded = target.lower().replace("0x", "").rjust(64, "0")
+
+    data = w3.eth.call(
+        {
+            "to": "0x0000000000000000000000000000000000000a02",
+            "data": "0x" + selector + padded,
+        }
+    )
+    registered, _algo, pubkey, proven = abi.decode(["bool", "uint8", "bytes", "bool"], data)
+
+    import base64 as _b64
+
+    return {
+        "registered": bool(registered),
+        "pubkey": _b64.b64encode(pubkey).decode(),
+        "possession_proven": bool(proven),
+    }
+
+
 def _verify_qorex(address: str, message: str, signature_pq_b64: str, message_signature_json: str | None = None) -> tuple[bool, str]:
     """Verify a QoreX message signature against the registered ML-DSA-87 key.
 
@@ -91,14 +128,19 @@ def _verify_qorex(address: str, message: str, signature_pq_b64: str, message_sig
         except Exception:
             return False, "invalid EVM address"
 
+    # Key lookup: the REST endpoint is the happy path, but the EVM precompile
+    # (pqcKeyStatus) reads the same registry through the EVM lane, which
+    # stays reachable even when the REST host is not.
     network = get_network()
     try:
         status = qorsdk.fetch_pqc_status(network.rest_url, address)
-    except requests.RequestException:
-        return False, "could not read the account's key from the chain — try again"
     except Exception as exc:
-        logger.exception("pqc status read failed")
-        return False, f"could not read the account's key from the chain ({str(exc)[:80]})"
+        logger.warning("REST pqc status read failed for %s (%s); trying precompile", address[:12], str(exc)[:80])
+        try:
+            status = _pqc_status_via_precompile(address)
+        except Exception:
+            logger.exception("precompile pqc status read failed")
+            return False, "could not read the account's key from the chain — try again"
 
     if not status.get("registered"):
         return False, "this account has no ML-DSA-87 key registered — open QoreX and register one first"
