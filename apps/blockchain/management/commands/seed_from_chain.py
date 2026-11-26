@@ -54,4 +54,31 @@ class Command(BaseCommand):
         for name, count in results.items():
             self.stdout.write(f"{name:24s} {count} event(s) handled")
             total += count
+
+        # Backfill display titles for demo fixture listings whose placeholder
+        # URIs can never verify: chain URI basename -> catalog entry.
+        from apps.blockchain.services.indexer import _catalog_entry
+        from apps.marketplace.models import Listing
+
+        backfilled = 0
+        for listing in Listing.objects.filter(title__startswith="Listing #"):
+            try:
+                from apps.blockchain.services.indexer import _contract
+
+                contract = _contract("SweeftMarketplace")
+                if contract is None:
+                    break
+                on_chain = contract.functions.getListing(listing.on_chain_id).call()
+                entry = _catalog_entry(on_chain[4])
+                if entry.get("title"):
+                    listing.title = entry["title"]
+                    if entry.get("description"):
+                        listing.description = entry["description"]
+                    listing.save(update_fields=["title", "description"])
+                    backfilled += 1
+            except Exception as exc:
+                self.stdout.write(self.style.WARNING(f"title backfill skipped for #{listing.on_chain_id}: {exc}"))
+        if backfilled:
+            self.stdout.write(self.style.SUCCESS(f"backfilled {backfilled} demo listing title(s)"))
+
         self.stdout.write(self.style.SUCCESS(f"seed complete ({total} events)"))

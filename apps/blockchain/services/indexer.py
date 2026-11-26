@@ -117,6 +117,53 @@ def _wei_to_uqor(value: int) -> int:
     return int(value) // 10**12
 
 
+# Demo catalog: display titles for the well-known fixture listings whose
+# metadata URIs are placeholders (sweeft.example). Only used when the live
+# fetch below fails — user-submitted metadata (hash-verified) always wins,
+# and editing a title in the UI is never overwritten (backfill checks for
+# the "Listing #N" placeholder).
+DEMO_CATALOG = {
+    "demo-laptop": {
+        "title": "MacBook Pro 14",
+        "description": "14-inch laptop, used in excellent condition. Ships with charger; battery health 92%.",
+    },
+    "demo-funded": {
+        "title": "Ergonomic Desk Lamp",
+        "description": "Adjustable brass desk lamp with warm LED. Ships tracked within 2 days.",
+    },
+    "demo-eligible": {
+        "title": "Mechanical Keyboard",
+        "description": "Hot-swappable 75% mechanical keyboard, silent linear switches, QMK/VIA support.",
+    },
+    "demo-keyboard": {
+        "title": "Mechanical Keyboard",
+        "description": "Hot-swappable 75% mechanical keyboard, silent linear switches.",
+    },
+    "demo-lamp": {
+        "title": "Brass Desk Lamp",
+        "description": "Vintage-style brass desk lamp, rewired and tested.",
+    },
+    "demo-4": {
+        "title": "Smart Speaker",
+        "description": "Voice-controlled smart speaker, tested with post-quantum-signed payments.",
+    },
+    "demo-5": {
+        "title": "Wireless Earbuds",
+        "description": "Noise-cancelling wireless earbuds, battery 80%.",
+    },
+    "demo-6": {
+        "title": "4K Monitor",
+        "description": "27-inch 4K display, color-calibrated, minor desk wear.",
+    },
+}
+
+
+def _catalog_entry(uri: str) -> dict:
+    """Fallback product info for demo fixture listings (display-only)."""
+    base = (uri or "").rsplit("/", 1)[-1].removesuffix(".json")
+    return DEMO_CATALOG.get(base, {})
+
+
 # ---------------------------------------------------------------------------
 # Handlers
 # ---------------------------------------------------------------------------
@@ -154,19 +201,27 @@ def _handle_listing_created(event) -> dict:
     # The event doesn't carry the URI; read it from the contract, then fetch
     # and verify the description against the hash the event carries.
     metadata = {}
+    metadata_uri = ""
     logistics_partner = ""
     logistics_fee = 0
     try:
         listing_contract = _contract("SweeftMarketplace")
         if listing_contract is not None:
             on_chain = listing_contract.functions.getListing(int(args["listingId"])).call()
-            metadata = _fetch_verified_metadata(on_chain[4], metadata_hash)
+            metadata_uri = on_chain[4]
+            metadata = _fetch_verified_metadata(metadata_uri, metadata_hash)
             # v4 struct: [seller, price, qty, status, uri, hash, createdAt, updatedAt, partner, fee]
             if len(on_chain) > 9:
                 logistics_partner = on_chain[8] or ""
                 logistics_fee = _wei_to_uqor(on_chain[9])
     except Exception:
         logger.exception("could not load listing metadata")
+
+    # Demo fixture listings point at placeholder URIs that can never verify;
+    # fall back to the display catalog so the marketplace shows real product
+    # names. Hash-verified metadata above always takes precedence.
+    if not metadata.get("title"):
+        metadata = _catalog_entry(metadata_uri)
 
     listing, created = Listing.objects.update_or_create(
         on_chain_id=int(args["listingId"]),
