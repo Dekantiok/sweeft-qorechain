@@ -143,7 +143,7 @@ PQC precompiles (testnet): `pqcVerify` at `0x…0a01`, `pqcKeyStatus` at `0x…0
 
 See `docs/AUDIT.md` for the finding-by-finding mapping (including the external
 review response and the v6 hardening notes) and `contracts/test/` for the
-regression suites (131 Foundry + 28 Django tests at the time of writing).
+regression suites (136 Foundry + 70 Django tests at the time of writing).
 
 ### Known limitations
 
