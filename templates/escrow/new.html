@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block title %}New escrow — Sweeft{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-2xl">
+    <div>
+        <h1 class="text-2xl font-bold">New escrow</h1>
+        <p class="mt-1 text-sm text-neutral-400">
+            Fund an escrow directly — no listing needed. Pay a freelancer, a seller, or
+            anyone else: your QOR sits in the Vault until you sign the release with your
+            ML-DSA-87 key (or the dispute board settles it). Your wallet must have a
+            registered, proven post-quantum key.
+        </p>
+    </div>
+
+    <div class="mt-8 rounded-xl border border-neutral-800 bg-neutral-950 p-6">
+        <div>
+            <label for="f-seller" class="text-xs font-semibold uppercase tracking-wider text-neutral-400">Seller EVM address</label>
+            <input id="f-seller" type="text" placeholder="0x…"
+                   class="mt-2 w-full rounded-lg border border-neutral-700 bg-black px-3 py-2 font-mono text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-red-500/60 focus:outline-none">
+        </div>
+        <div class="mt-4 grid gap-4 sm:grid-cols-2">
+            <div>
+                <label for="f-amount" class="text-xs font-semibold uppercase tracking-wider text-neutral-400">Amount (QOR)</label>
+                <input id="f-amount" type="number" step="0.01" min="0.01" placeholder="0.10"
+                       class="mt-2 w-full rounded-lg border border-neutral-700 bg-black px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-red-500/60 focus:outline-none">
+            </div>
+            <div>
+                <label for="f-days" class="text-xs font-semibold uppercase tracking-wider text-neutral-400">Delivery window (days)</label>
+                <input id="f-days" type="number" step="1" min="1" max="90" value="7"
+                       class="mt-2 w-full rounded-lg border border-neutral-700 bg-black px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-red-500/60 focus:outline-none">
+                <p class="mt-1 text-[11px] text-neutral-500">Contract allows 1–90 days. Refund opens after it if nothing is proven delivered.</p>
+            </div>
+        </div>
+
+        <button id="create-escrow" class="mt-6 w-full rounded-lg bg-red-500 px-4 py-3 font-semibold text-white shadow-lg shadow-red-500/25 hover:bg-red-400 transition-colors">
+            Create + fund in wallet
+        </button>
+        <p class="mt-2 text-[11px] text-neutral-500">
+            Sends the exact amount with `createEscrow` — the escrow is funded in the same
+            transaction. Fees (2%) apply only on release, never on refund.
+        </p>
+        <p id="create-status" class="mt-3 text-xs text-neutral-400"></p>
+    </div>
+
+    <div class="mt-4 rounded-xl border border-neutral-800 bg-neutral-950 p-6 text-xs text-neutral-400 leading-relaxed">
+        <div class="font-semibold text-neutral-200 mb-2">How settlement works</div>
+        <ul class="list-disc list-inside space-y-1">
+            <li>The seller marks delivered; a verifier or the carrier can attest fulfilment on-chain</li>
+            <li>You confirm receipt, then sign the release in QoreX — the Vault verifies the ML-DSA-87 signature with `pqcVerify`</li>
+            <li>Release credits the seller (2% fee to treasury/dispute pool); they withdraw from the escrow page</li>
+            <li>Either party can dispute: a staked resolver panel decides, with appeal</li>
+        </ul>
+    </div>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+const VAULT = "{{ vault_address }}";
+const CREATE_SELECTOR = "55a147f4"; // createEscrow(address,address,uint64,uint256)
+
+function pad32(hexValue) {
+    return hexValue.replace(/^0x/, "").padStart(64, "0");
+}
+
+document.getElementById("create-escrow")?.addEventListener("click", async () => {
+    const status = document.getElementById("create-status");
+    const seller = document.getElementById("f-seller").value.trim();
+    const amountStr = document.getElementById("f-amount").value.trim();
+    const days = parseInt(document.getElementById("f-days").value, 10);
+
+    if (!/^0x[0-9a-fA-F]{40}$/.test(seller)) {
+        status.textContent = "Enter a valid EVM address (0x + 40 hex characters).";
+        return;
+    }
+    const amount = Number(amountStr);
+    if (!(amount > 0)) {
+        status.textContent = "Amount must be greater than 0 QOR.";
+        return;
+    }
+    if (!(days >= 1 && days <= 90)) {
+        status.textContent = "Delivery window must be 1–90 days.";
+        return;
+    }
+
+    const deadline = Math.floor(Date.now() / 1000) + days * 86400;
+
+    try {
+        const mine = window.SWEEFT_WALLET_EVM || "";
+        if (!/^0x[0-9a-fA-F]{40}$/.test(mine)) {
+            status.textContent = "";
+            alert("Connect your wallet first (top-right), then create the escrow.");
+            return;
+        }
+        if (seller.toLowerCase() === mine.toLowerCase()) {
+            status.textContent = "";
+            alert("Seller cannot be your own address.");
+            return;
+        }
+        status.textContent = "Reading next escrow id…";
+        const next = await (await fetch("/api/escrow/next-id/")).json();
+        const escrowId = next.next_escrow_id;
+
+        const data = "0x" + CREATE_SELECTOR
+            + pad32(mine)            // buyer (connected wallet)
+            + pad32(seller)          // seller
+            + pad32(deadline.toString(16))
+            + pad32(BigInt(Math.round(amount * 1e18)).toString(16));
+
+        status.textContent = "Confirm in your wallet…";
+        const hash = await window.SweeftWallet.sendTx({ to: VAULT, data, value: BigInt(Math.round(amount * 1e18)) });
+        status.textContent = "Created: " + hash + " — opening escrow #" + escrowId + " (indexing may take a minute)…";
+        setTimeout(() => { location.href = "/escrow/" + escrowId + "/"; }, 4000);
+    } catch (err) {
+        status.textContent = "";
+        alert("Create escrow failed: " + (err.message || err) +
+              "\n\nYour wallet needs a registered, proven post-quantum key and an open EVM window.");
+    }
+});
+</script>
+{% endblock %}

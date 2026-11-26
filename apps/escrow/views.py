@@ -28,6 +28,39 @@ from .models import Escrow
 logger = logging.getLogger(__name__)
 
 
+def escrow_new(request):
+    """Direct escrow creation — no marketplace listing needed.
+
+    The wallet sends `createEscrow(seller, deadline, amount)` payable to the
+    Vault; the indexer then projects the escrow (Order + Escrow rows) and the
+    normal lifecycle (deliver/attest/confirm/release) takes over.
+    """
+    import os
+
+    return render(
+        request,
+        "escrow/new.html",
+        {
+            "vault_address": os.getenv("SWEEFT_VAULT_ADDRESS", ""),
+            "wallet_attached": bool(request.session.get("wallet_account")),
+        },
+    )
+
+
+@require_GET
+def next_escrow_id(request):
+    """Next on-chain escrow id (used by the direct-creation page)."""
+    try:
+        from apps.blockchain.services.relayer import _vault_contract
+        from integrations.qorechain.client import get_evm_client
+
+        w3 = get_evm_client()
+        vault = _vault_contract(w3)
+        return JsonResponse({"next_escrow_id": int(vault.functions.escrowCount().call())})
+    except Exception as exc:
+        return JsonResponse({"error": str(exc)[:200]}, status=502)
+
+
 def escrow_detail(request, escrow_id: int):
     escrow = get_object_or_404(
         Escrow.objects.select_related("order", "order__listing", "buyer", "seller"), on_chain_id=escrow_id
