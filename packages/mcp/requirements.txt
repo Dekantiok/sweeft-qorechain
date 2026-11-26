@@ -1,0 +1,2 @@
+sweeft (python package) is the runtime dependency of this server.
+mcp>=1.0,<2  # v2 renamed FastMCP to MCPServer; pin for v1 API stability

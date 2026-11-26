@@ -175,6 +175,14 @@ curl /api/v1/verifiers/              # verifiers with attested evidence
 Units are explicit per field (`uqor` native, `wei` EVM lane). Writes stay in
 the wallet UI. Full contract addresses are in the index response.
 
+## Integration paths for other builders
+
+Beyond the REST API, Sweeft's components ship as reusable packages (see
+`packages/README.md`): Foundry contracts (`packages/contracts/`, import
+`SweeftVault`/`SweeftDisputeBoard`/… directly), a Python client
+(`packages/python/`, API reads + PQ message builders + mandate checks), and
+an MCP server (`packages/mcp/`, the AI tools exposed read-only to agents).
+
 ## Wallets — QoreX and EVM wallets, and why both
 
 Sweeft uses each wallet for what it can actually do (matching QoreX's own

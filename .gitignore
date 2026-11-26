@@ -33,3 +33,8 @@ node_modules/
 *.pem
 *.key
 static/js/ethers.test.min.js
+
+# Packages build artifacts
+packages/contracts/out/
+packages/contracts/cache/
+packages/contracts/broadcast/
