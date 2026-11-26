@@ -9,6 +9,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("", include("apps.marketplace.urls")),
     path("", include("apps.escrow.urls")),
+    path("", include("apps.api.urls")),
     path("", include("apps.participants.urls")),
     path("", include("apps.governance.urls")),
     path("", include("apps.oracle.urls")),

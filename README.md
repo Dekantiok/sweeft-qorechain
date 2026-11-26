@@ -155,6 +155,26 @@ regression suites (131 Foundry + 28 Django tests at the time of writing).
 - The Demo Carrier is simulated; real carriers sign with their own keys
   (`docs/AUDIT.md` B-10).
 
+## Public API (v1)
+
+Read-only JSON for every component — no auth, rate-limited (5s per IP per
+endpoint), indexed data only (chain reads are cached):
+
+```bash
+curl /api/v1/                       # component + contract index
+curl /api/v1/listings/?status=active
+curl /api/v1/listings/0/
+curl /api/v1/escrows/?seller=0x…&state=funded
+curl /api/v1/escrows/3/              # includes live state + proof link
+curl /api/v1/disputes/?state=final
+curl /api/v1/proposals/
+curl /api/v1/board/                  # live pool, windows, stake minimums
+curl /api/v1/verifiers/              # verifiers with attested evidence
+```
+
+Units are explicit per field (`uqor` native, `wei` EVM lane). Writes stay in
+the wallet UI. Full contract addresses are in the index response.
+
 ## Wallets — QoreX and EVM wallets, and why both
 
 Sweeft uses each wallet for what it can actually do (matching QoreX's own
