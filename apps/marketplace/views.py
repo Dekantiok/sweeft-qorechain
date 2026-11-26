@@ -21,7 +21,14 @@ logger = logging.getLogger(__name__)
 
 def home(request):
     recent = Listing.objects.filter(status=Listing.Status.ACTIVE).select_related("seller", "category")[:6]
-    return render(request, "marketplace/home.html", {"recent_listings": recent})
+    return render(
+        request,
+        "marketplace/home.html",
+        {
+            "recent_listings": recent,
+            "wallet_attached": bool(request.session.get("wallet_account")),
+        },
+    )
 
 
 def listing_list(request):
