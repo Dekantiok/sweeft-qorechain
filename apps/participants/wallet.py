@@ -79,9 +79,17 @@ def _verify_qorex(address: str, message: str, signature_pq_b64: str, message_sig
     """
     try:
         import qorsdk
-        from qorsdk.address import bech32_to_hex
+        from qorsdk.address import bech32_to_hex, hex_to_bech32
     except Exception:
         return False, "server is missing the QoreChain SDK"
+
+    # The REST key lookup only accepts the bech32 (qor1...) form — mobile
+    # wallets sometimes hand us the hex form, which 400s. Normalise first.
+    if address.lower().startswith("0x"):
+        try:
+            address = hex_to_bech32(address)
+        except Exception:
+            return False, "invalid EVM address"
 
     network = get_network()
     try:
