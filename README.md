@@ -2,12 +2,13 @@
 
 **Decentralized commerce and trust ecosystem on QoreChain.**
 
-Sweeft is a post-quantum escrow marketplace built on QoreChain. Buyers and
+Sweeft is a post-quantum commerce ecosystem on QoreChain. Buyers and
 sellers discover each other in Django, agree terms, and settle through a
 Solidity Vault deployed on the Diana testnet — where releasing funds requires
 the buyer's ML-DSA-87 signature, verified on-chain by QoreChain's `pqcVerify`
-precompile. Fulfilment is attested by authorized oracle verifiers, reputation
-comes only from verified outcomes, and a DAO governs who may attest.
+precompile. Escrow is one component: the marketplace, oracle verifiers,
+dispute board, DAO and AI assistant are the rest, and reputation comes only
+from verified outcomes.
 
 > Built for **Build Before Q-Day** (QoreChain Developer Fest) — Post-Quantum dApp category.
 > Testnet only. Test tokens have no value.
