@@ -7,11 +7,18 @@ services:
     name: sweeft
     env: python
     buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
-    startCommand: python manage.py migrate && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
+    # SQLite on the demo: ephemeral by default, so `seed_from_chain`
+    # rebuilds the projection from the v8 deployment block on every boot
+    # (idempotent, ~5k blocks — seconds, not minutes).
+    startCommand: python manage.py migrate && python manage.py seed_from_chain --from-block 10773353 && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
     healthCheckPath: /
     envVars:
       - key: DJANGO_SETTINGS_MODULE
         value: config.settings.production
+      - key: DJANGO_DB_ENGINE
+        value: sqlite
+      - key: DJANGO_DB_PATH
+        value: /tmp/sweeft.sqlite3
       - key: DJANGO_ALLOWED_HOSTS
         sync: false
       - key: DJANGO_CSRF_TRUSTED_ORIGINS

@@ -186,18 +186,21 @@ an MCP server (`packages/mcp/`, the AI tools exposed read-only to agents).
 ## Hosted demo (Render)
 
 The repo ships a `render.yaml` (native Python env, WhiteNoise static,
-`DATABASE_URL` for managed Postgres, v8 contract addresses pre-filled).
+v8 contract addresses pre-filled). The demo runs on **SQLite** (ephemeral
+by default) and self-seeds from chain on every boot, so the marketplace is
+never empty: `seed_from_chain --from-block 10773353` (the v8 deployment
+block) rebuilds the projection from chain in seconds.
 
 1. On Render: **New → Blueprint** (or Web Service) from this repo — it
    reads `render.yaml`.
-2. Add a **PostgreSQL** database to the same project.
-3. Set the three `sync: false` vars: `DJANGO_ALLOWED_HOSTS` (your
+2. Set the three `sync: false` vars: `DJANGO_ALLOWED_HOSTS` (your
    `*.onrender.com` host), `DJANGO_CSRF_TRUSTED_ORIGINS` (`https://…`)
    and `MODEL_API_KEY` (Meta Model API key for the AI assistant).
-4. Deploy. `collectstatic` runs at build; `migrate` runs at start.
+3. Deploy. `collectstatic` runs at build; `migrate` + chain seed run at start.
 
-Verified locally first: production settings + gunicorn + Postgres serve
-pages, `/static/` (WhiteNoise) and `/api/v1/` with the CSP nonce header.
+Verified locally: production settings (sqlite + gunicorn) serve pages,
+`/static/` (WhiteNoise) and `/api/v1/` with the CSP nonce header, and a fresh
+sqlite DB seeds 7 listings + 4 escrows from the v8 deployment block.
 
 ## Wallets — QoreX and EVM wallets, and why both
 

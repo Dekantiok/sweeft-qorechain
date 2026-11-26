@@ -21,7 +21,16 @@ STORAGES = {
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedStaticFilesStorage"},
 }
 
-if os.getenv("DATABASE_URL"):
+if os.getenv("DJANGO_DB_ENGINE") == "sqlite":
+    # Demo deployments (e.g. Render free tier): single-file DB. Ephemeral by
+    # default — `seed_from_chain` rebuilds the projection on every boot.
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": os.getenv("DJANGO_DB_PATH", BASE_DIR / "db.sqlite3"),
+        }
+    }
+elif os.getenv("DATABASE_URL"):
     # Render (and most platforms) provide DATABASE_URL for managed Postgres.
     _db = urlparse(os.environ["DATABASE_URL"])
     DATABASES = {
