@@ -69,11 +69,11 @@ jobs:
       - name: pip-audit (blocking)
         run: |
           python -m pip install pip-audit
-          # PYSEC-2026-1325 (ecdsa CVE-2024-23342) is ignored: upstream
-          # considers side channels out of scope and has no fix planned; this
-          # repo never calls ecdsa's sign_digest (all signing is client-side
-          # or via eth_account). See docs/AUDIT.md v6 section.
-          pip-audit -r requirements.txt --ignore-vuln PYSEC-2026-1325
+          # Ignored advisories (documented in docs/AUDIT.md):
+          # - PYSEC-2026-1325 (ecdsa): no upstream fix; never used for signing.
+          # - PYSEC-2026-1448/PYSEC-2026-3002 (PyNaCl 1.6.x): cosmpy 0.12.2
+          #   (latest) pins pynacl==1.6.0; SDK still recommends cosmpy<1.
+          pip-audit -r requirements.txt --ignore-vuln PYSEC-2026-1325 --ignore-vuln PYSEC-2026-1448 --ignore-vuln PYSEC-2026-3002
       - name: Slither (blocking on High/Medium)
         uses: crytic/slither-action@v0.4.0
         with:
