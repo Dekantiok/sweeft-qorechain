@@ -1,0 +1,48 @@
+# Sweeft demo on Render (native Python env).
+# Dashboard alternative: create a Web Service from this repo, a Postgres
+# database, then set the env vars below. Render injects DATABASE_URL and
+# RENDER_EXTERNAL_HOSTNAME automatically.
+services:
+  - type: web
+    name: sweeft
+    env: python
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
+    startCommand: python manage.py migrate && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
+    healthCheckPath: /
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings.production
+      - key: DJANGO_ALLOWED_HOSTS
+        sync: false
+      - key: DJANGO_CSRF_TRUSTED_ORIGINS
+        sync: false
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: QORECHAIN_NETWORK
+        value: testnet
+      - key: QORECHAIN_CHAIN_ID
+        value: qorechain-diana
+      - key: QORECHAIN_EVM_CHAIN_ID
+        value: 9800
+      - key: QORECHAIN_REST_URL
+        value: https://api-testnet.qore.host
+      - key: QORECHAIN_EVM_RPC_URL
+        value: https://evm-testnet.qore.host
+      - key: QORECHAIN_EXPLORER_URL
+        value: https://explore.qore.network
+      - key: SWEEFT_VAULT_ADDRESS
+        value: 0x820CE1C670D26A2fF6ca5ce53f5a9EFdf3dC869a
+      - key: SWEEFT_MARKETPLACE_ADDRESS
+        value: 0xf5cC7Bf4EECC160E23b4fF615E68D716bEFCd47C
+      - key: SWEEFT_ORACLE_REGISTRY_ADDRESS
+        value: 0x76D4F6D164C688b319eE0A16003a9c06f5b1AB7A
+      - key: SWEEFT_DISPUTE_BOARD_ADDRESS
+        value: 0x50a74dD32647bcf456DcE09b76849C5EBD2A0508
+      - key: SWEEFT_DAO2_ADDRESS
+        value: 0x91d0eCCE908bec0FcF06fB8d419ad9edb43Cf59b
+      - key: SWEEFT_DAO_ADDRESS
+        value: 0x91d0eCCE908bec0FcF06fB8d419ad9edb43Cf59b
+      - key: MODEL_API_KEY
+        sync: false
+      - key: SWEEFT_INTERNAL_TOKEN
+        sync: false

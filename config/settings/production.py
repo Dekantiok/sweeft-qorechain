@@ -1,6 +1,7 @@
 """Production settings — hardened defaults for a real deployment."""
 
 import os
+from urllib.parse import unquote, urlparse
 
 from dotenv import load_dotenv
 
@@ -11,17 +12,39 @@ load_dotenv(BASE_DIR / ".env")  # noqa: F405
 SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
 DEBUG = False
 ALLOWED_HOSTS = [h for h in os.getenv("DJANGO_ALLOWED_HOSTS", "").split(",") if h]
+CSRF_TRUSTED_ORIGINS = [h for h in os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",") if h]
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ["POSTGRES_DB"],
-        "USER": os.environ["POSTGRES_USER"],
-        "PASSWORD": os.environ["POSTGRES_PASSWORD"],
-        "HOST": os.getenv("POSTGRES_HOST", "127.0.0.1"),
-        "PORT": os.getenv("POSTGRES_PORT", "5432"),
-    }
+# Serve static files (built Tailwind + htmx, no CDN) via WhiteNoise.
+MIDDLEWARE.insert(MIDDLEWARE.index("django.middleware.security.SecurityMiddleware") + 1, "whitenoise.middleware.WhiteNoiseMiddleware")
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedStaticFilesStorage"},
 }
+
+if os.getenv("DATABASE_URL"):
+    # Render (and most platforms) provide DATABASE_URL for managed Postgres.
+    _db = urlparse(os.environ["DATABASE_URL"])
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": _db.path.lstrip("/"),
+            "USER": unquote(_db.username or ""),
+            "PASSWORD": unquote(_db.password or ""),
+            "HOST": _db.hostname or "",
+            "PORT": str(_db.port or 5432),
+        }
+    }
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.environ["POSTGRES_DB"],
+            "USER": os.environ["POSTGRES_USER"],
+            "PASSWORD": os.environ["POSTGRES_PASSWORD"],
+            "HOST": os.getenv("POSTGRES_HOST", "127.0.0.1"),
+            "PORT": os.getenv("POSTGRES_PORT", "5432"),
+        }
+    }
 
 SECURE_SSL_REDIRECT = True
 SESSION_COOKIE_SECURE = True

@@ -20,3 +20,7 @@ openai>=1.40
 requests>=2.31
 Pillow>=10.0
 qorechain-qoresign (>=0.2.0)
+
+# Production serving (Render demo)
+gunicorn>=21.2
+whitenoise>=6.6

@@ -183,6 +183,22 @@ Beyond the REST API, Sweeft's components ship as reusable packages (see
 (`packages/python/`, API reads + PQ message builders + mandate checks), and
 an MCP server (`packages/mcp/`, the AI tools exposed read-only to agents).
 
+## Hosted demo (Render)
+
+The repo ships a `render.yaml` (native Python env, WhiteNoise static,
+`DATABASE_URL` for managed Postgres, v8 contract addresses pre-filled).
+
+1. On Render: **New → Blueprint** (or Web Service) from this repo — it
+   reads `render.yaml`.
+2. Add a **PostgreSQL** database to the same project.
+3. Set the three `sync: false` vars: `DJANGO_ALLOWED_HOSTS` (your
+   `*.onrender.com` host), `DJANGO_CSRF_TRUSTED_ORIGINS` (`https://…`)
+   and `MODEL_API_KEY` (Meta Model API key for the AI assistant).
+4. Deploy. `collectstatic` runs at build; `migrate` runs at start.
+
+Verified locally first: production settings + gunicorn + Postgres serve
+pages, `/static/` (WhiteNoise) and `/api/v1/` with the CSP nonce header.
+
 ## Wallets — QoreX and EVM wallets, and why both
 
 Sweeft uses each wallet for what it can actually do (matching QoreX's own
