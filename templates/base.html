@@ -25,14 +25,18 @@
                         <a href="/marketplace/" class="hover:text-white transition-colors">Marketplace</a>
                         {% if wallet_account %}
                         <a href="/escrow/new/" class="hover:text-white transition-colors">New escrow</a>
-                        <a href="/dashboard/" class="hover:text-white transition-colors">Dashboard</a>
-                        <a href="/disputes/" class="hover:text-white transition-colors">Disputes</a>
-                        <a href="/security/" class="hover:text-white transition-colors">Security</a>
-                        <a href="/logistics/" class="hover:text-white transition-colors">Logistics</a>
-                        <a href="/oracle/" class="hover:text-white transition-colors">Oracle</a>
-                        <a href="/governance/" class="hover:text-white transition-colors">Governance</a>
                         <a href="/ai/" class="hover:text-white transition-colors">AI Assistant</a>
                         {% endif %}
+                        {% if is_staked_resolver %}
+                        <a href="/dashboard/" class="hover:text-white transition-colors">Dashboard</a>
+                        <a href="/disputes/" class="hover:text-white transition-colors">Disputes</a>
+                        <a href="/oracle/" class="hover:text-white transition-colors">Oracle</a>
+                        <a href="/governance/" class="hover:text-white transition-colors">Governance</a>
+                        {% endif %}
+                        {% if is_logistics_provider %}
+                        <a href="/logistics/" class="hover:text-white transition-colors">Logistics</a>
+                        {% endif %}
+                        <a href="/security/" class="hover:text-white transition-colors">Security</a>
                     </div>
                 </div>
                 <div class="flex items-center gap-3">
