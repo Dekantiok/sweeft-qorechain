@@ -226,6 +226,41 @@ is not code-responsive. Sweeft's audit story for the jury is: QCAI 78/100
 (v5) + 72/100 on v6/v7 with every finding mapped to a fix or a documented
 false positive — stronger evidence than any single number.
 
+## Stage 6 — audit on the v8 candidate (QCAI report, **72/100**, 2026-11-26)
+
+PDF: `docs/audit/stage-6/QoreChain_Audit_Contract_1795674246798.pdf`
+(a genuinely fresh submission — new report ID). Bundle:
+`docs/audit/stage-6/sweeft-combined.sol` (pattern-removal patch).
+
+**Findings shifted again** (7 → 6): both Stage 5 Vault HIGHs are *gone* —
+reentrancy-in-release (credits-only settlement), oracle-manipulation (typed
+registry calls), and unchecked-returns no longer fire. But two new HIGH
+triggers replaced them on functions the auditor did not read, and severity
+reshuffled (fee overflow M→H, ERC I→L, timestamp INFO appeared). Net score
+unchanged at 72 despite objectively less attack surface (Slither Highs
+7→3 after the patch, Vault settle path has zero external calls). This run
+confirms the Stage 1–5 pattern: the score is template noise in a 72–78
+band (cf. Haven Escrow's 35/100 with comparable code), while the
+findings themselves are worth fixing when real.
+
+| ID | Severity | Location | Verdict |
+|---|---|---|---|
+| QC6-1 | HIGH | Vault `setTreasury`/`setFeeBps` | **False positive** — both are `onlyOwner` (DAO-owned). The template credits the *name* of the modifier in some runs (`registerCarrier` was cleared in Stage 5) but not others; nothing to fix. |
+| QC6-2 | HIGH | Vault `_feeForAmount` | **False positive** — explicit `bps > MAX_FEE_BPS` bound + `amount > max/bps` overflow guard (Stage 5 patch). Demands SafeMath (deprecated since Solidity 0.8) — not applicable. |
+| QC6-3 | MEDIUM | Vault `withdrawCredits` | **False positive** — `nonReentrant`, CEI (credit zeroed before the single call), and credits can only be the caller's own. A "recipient must not be a contract" rule would break contract wallets for no gain. |
+| QC6-4 | MEDIUM | Board `_drawPanel` | Same loop finding again despite `MAX_DRAW_ATTEMPTS_PER_POOL` + absolute `MAX_DRAW_ATTEMPTS = 128` cap — the template never credits bounds. |
+| QC6-5 | LOW | All contracts | ERC compliance (was INFO) — accepted, internal economy by design. |
+| QC6-6 | INFO | Vault deadline checks | `block.timestamp` — required for delivery deadlines; bounded by MIN/MAX_WINDOW. |
+
+**Bottom line:** pattern removal worked (both Vault HIGHs eliminated,
+Slither Highs 7→3, zero settle-path external calls), but the score is
+severity-reshuffled template output, not a code delta. The v8 patch is
+deployed-ready on its technical merits (136 Foundry tests, credits-only
+settlement, typed registry calls); chasing the number further is not a
+productive use of the remaining pre-deadline days. The audit trail
+(78 v5 → 72 v6 → 78 re-submission → 72 v8, every finding mapped) is the
+jury-facing evidence.
+
 ## External security review — response (v5 hardening)
 
 A line-by-line external review of `contracts/src/*` and the Django apps produced
