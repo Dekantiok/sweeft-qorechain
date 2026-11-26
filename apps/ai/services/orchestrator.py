@@ -173,7 +173,12 @@ def run_chat(user_message: str, *, wallet: str | None = None, history: list[dict
     assistant_msg = response.choices[0].message
     tool_calls_out = []
 
-    if assistant_msg.tool_calls:
+    # Up to 3 rounds of tool calls, so the agent can chain e.g.
+    # search -> negotiate -> check_mandate within one turn. Every round's
+    # `wallet` is still server-injected (N-11).
+    for _ in range(3):
+        if not assistant_msg.tool_calls:
+            break
         tool_results = []
         for call in assistant_msg.tool_calls:
             name = call.function.name
@@ -191,13 +196,13 @@ def run_chat(user_message: str, *, wallet: str | None = None, history: list[dict
 
         messages.append(assistant_msg.model_dump())
         messages.extend(tool_results)
-        final = client.chat.completions.create(
-            model=config.reason_model, messages=messages
+        response = client.chat.completions.create(
+            model=config.reason_model, messages=messages, tools=TOOLS, tool_choice="auto"
         )
-        text = final.choices[0].message.content or ""
-        return {"text": text, "tool_calls": tool_calls_out}
+        assistant_msg = response.choices[0].message
 
-    return {"text": assistant_msg.content or "", "tool_calls": tool_calls_out}
+    text = assistant_msg.content or ""
+    return {"text": text, "tool_calls": tool_calls_out}
 
 
 def _stub_response(user_message: str) -> dict:

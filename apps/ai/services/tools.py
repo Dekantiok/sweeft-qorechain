@@ -43,7 +43,7 @@ def tool_search_listings(query: str = "", max_price_qor: float | None = None) ->
         listings = listings.filter(cond)
     results = []
     for listing in listings[:10]:
-        price = float(listing.price_uqor) / 1e12
+        price = float(listing.price_uqor) / 1e6  # uqor -> QOR
         if max_price_qor and price > max_price_qor:
             continue
         results.append(
@@ -259,7 +259,7 @@ def tool_execute_autopilot(escrow_id: int, wallet: str | None = None) -> dict:
         return {"error": "no pre-authorization stored — the buyer must sign once in QoreX first (Autopilot on the escrow page)"}
 
     # Django-side mandate check (the chain rule is the hard cap)
-    amount_qor = float(escrow.amount_uqor) / 1e12
+    amount_qor = float(escrow.amount_uqor) / 1e6  # uqor -> QOR
     caps = tool_check_mandate("release", amount_qor, wallet=wallet)
     if not caps.get("within_caps"):
         from apps.ai.models import AgentAction, Mandate
@@ -333,10 +333,9 @@ def tool_negotiate(listing_id: int, offered_qor: float = 0, details: str = "", w
         return {"error": "listing is not active"}
 
     try:
-        offered = int(round(float(offered_qor) * 10**18))  # wei, matches on-chain price
+        offered = int(round(float(offered_qor) * 1e6))  # uqor, matches stored fields
     except (TypeError, ValueError):
         return {"error": "offered_qor must be a number"}
-    list_price = int(listing.price_uqor)
 
     # Mandate check first — the AI can never bargain above caps
     from .tools import tool_check_mandate
@@ -360,7 +359,7 @@ def tool_negotiate(listing_id: int, offered_qor: float = 0, details: str = "", w
             "status": "accepted",
             "negotiation_id": negotiation.pk,
             "listing_id": listing.on_chain_id,
-            "offered_qor": round(offered / 1e18, 6),
+            "offered_qor": round(offered / 1e6, 6),
             "note": "Seller has accepted. The buyer now purchases at this price (the seller updates the listing price first if needed).",
         }
 
@@ -380,8 +379,8 @@ def tool_negotiate(listing_id: int, offered_qor: float = 0, details: str = "", w
             "ok": True,
             "status": "countered",
             "listing_id": listing.on_chain_id,
-            "offered_qor": round(offered / 1e18, 6),
-            "counter_qor": round(counter / 1e18, 6),
+            "offered_qor": round(offered / 1e6, 6),
+            "counter_qor": round(counter / 1e6, 6),
             "note": "Seller counter-offered. Accept and the AI drafts a purchase at this price — your wallet still signs.",
         }
 
@@ -396,7 +395,7 @@ def tool_negotiate(listing_id: int, offered_qor: float = 0, details: str = "", w
         "ok": True,
         "status": "rejected",
         "listing_id": listing.on_chain_id,
-        "offered_qor": round(offered / 1e18, 6),
+        "offered_qor": round(offered / 1e6, 6),
         "note": "Offer rejected — try closer to the list price, or buy directly.",
     }
 
