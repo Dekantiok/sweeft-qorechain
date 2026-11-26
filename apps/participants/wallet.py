@@ -73,7 +73,9 @@ def _verify_qorex(address: str, message: str, signature_pq_b64: str, message_sig
 
     Preferred path uses the official QoreSign library — verify_message over the
     full hybrid signature (classical + PQ). Fallback keeps an ML-DSA-only check
-    for clients that only send the PQ part.
+    for clients that only send the PQ part. This function is total: every
+    malformed input shape returns (False, reason), never raises — a wallet
+    login must never 500.
     """
     try:
         import qorsdk
@@ -86,6 +88,9 @@ def _verify_qorex(address: str, message: str, signature_pq_b64: str, message_sig
         status = qorsdk.fetch_pqc_status(network.rest_url, address)
     except requests.RequestException:
         return False, "could not read the account's key from the chain — try again"
+    except Exception as exc:
+        logger.exception("pqc status read failed")
+        return False, f"could not read the account's key from the chain ({str(exc)[:80]})"
 
     if not status.get("registered"):
         return False, "this account has no ML-DSA-87 key registered — open QoreX and register one first"
@@ -94,8 +99,13 @@ def _verify_qorex(address: str, message: str, signature_pq_b64: str, message_sig
     if not public_key_b64:
         return False, "the registered key could not be read"
     try:
-        public_key = base64.b64decode(public_key_b64)
+        public_key = base64.b64decode(public_key_b64, validate=True)
     except Exception:
+        try:
+            public_key = base64.b64decode(public_key_b64)
+        except Exception:
+            return False, "malformed key encoding"
+    if not len(public_key):
         return False, "malformed key encoding"
 
     if message_signature_json:
@@ -114,10 +124,17 @@ def _verify_qorex(address: str, message: str, signature_pq_b64: str, message_sig
 
     payload = f"qorechain-msg-v1|{network.chain_id}|{message}".encode()
     try:
-        signature = base64.b64decode(signature_pq_b64)
+        # Mobile wallets sometimes send unpadded base64; restore padding.
+        cleaned = (signature_pq_b64 or "").strip()
+        cleaned += "=" * (-len(cleaned) % 4)
+        signature = base64.b64decode(cleaned, validate=True)
     except Exception:
         return False, "malformed signature encoding"
-    if not qorsdk.pqc_verify(public_key, payload, signature):
+    try:
+        verified = qorsdk.pqc_verify(public_key, payload, signature)
+    except Exception:
+        verified = False
+    if not verified:
         return False, "signature does not match the registered key"
 
     try:
