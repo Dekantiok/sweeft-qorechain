@@ -56,6 +56,7 @@ contract DeployV6Script is Script {
         dao.setAllowedCall(address(vault), SweeftVault.removeCarrier.selector, true);
         dao.setAllowedCall(address(registry), SweeftOracleRegistry.addVerifier.selector, true);
         dao.setAllowedCall(address(registry), SweeftOracleRegistry.removeVerifier.selector, true);
+        dao.setAllowedCall(address(registry), SweeftOracleRegistry.rotateKeyVersion.selector, true);
         dao.setAllowedCall(address(registry), SweeftOracleRegistry.setThreshold.selector, true);
         dao.setAllowedCall(address(registry), SweeftOracleRegistry.slashVerifier.selector, true);
         dao.setAllowedCall(address(registry), SweeftOracleRegistry.setMinVerifierStake.selector, true);

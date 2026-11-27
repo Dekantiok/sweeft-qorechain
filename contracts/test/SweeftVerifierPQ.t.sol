@@ -7,16 +7,21 @@ import { SweeftDisputeBoard } from "../src/SweeftDisputeBoard.sol";
 import { SweeftOracleRegistry } from "../src/SweeftOracleRegistry.sol";
 
 contract MockKeyStatus3 {
-    mapping(address => bool) internal registered0;
+    mapping(address => bytes) internal pks;
     mapping(address => bool) internal proven0;
     function setRegistered(address a, bool r, bool p) external {
-        registered0[a] = r;
+        if (r) pks[a] = abi.encodePacked(a);
+        else pks[a] = bytes("");
         proven0[a] = p;
     }
+    /// @dev Simulate a key rotation: the account's registered key changes.
+    function rotateTo(address a, bytes memory newPk) external {
+        pks[a] = newPk;
+        proven0[a] = true;
+    }
     function pqcKeyStatus(address a) external view returns (bool, uint8, bytes memory, bool) {
-        // The verifier's chain-registered key is its address (test stand-in).
-        bytes memory pk = registered0[a] ? abi.encodePacked(a) : bytes("");
-        return (registered0[a], 1, pk, proven0[a]);
+        bool reg = pks[a].length > 0;
+        return (reg, 1, pks[a], proven0[a]);
     }
 }
 
@@ -79,7 +84,8 @@ contract SweeftVerifierPQTest is Test {
     // The mock verifies sig == abi.encode(pubkey, message); the "signature"
     // here literally carries that encoding (test-only convention).
     function _sign(address who, uint256 id, bytes32 evidence, bytes memory msg) internal view returns (bytes memory) {
-        return abi.encode(abi.encodePacked(who), msg);
+        (, , bytes memory pk, ) = MockKeyStatus3(0x0000000000000000000000000000000000000a02).pqcKeyStatus(who);
+        return abi.encode(pk, msg);
     }
 
     function _msg(address who, uint256 id, bytes32 evidence) internal view returns (bytes memory) {
@@ -252,9 +258,10 @@ contract SweeftVerifierPQTest is Test {
         vm.warp(ISSUED + 1);
         vault.attestEvidence(id, verifier, EV, ISSUED, ISSUED + 7 days, _sign(verifier, id, EV, msg));
         bytes memory msg2 = _msg(verifier, id, EV);
+        bytes memory sig2 = _sign(verifier, id, EV, msg2);
         vm.prank(stranger);
         vm.expectRevert(SweeftVault.AlreadyAttested.selector);
-        vault.attestEvidence(id, verifier, EV, ISSUED, ISSUED + 7 days, _sign(verifier, id, EV, msg2));
+        vault.attestEvidence(id, verifier, EV, ISSUED, ISSUED + 7 days, sig2);
         assertEq(vault.getEscrow(id).verifierAttestations, 1);
     }
 
@@ -267,5 +274,46 @@ contract SweeftVerifierPQTest is Test {
         vault.attestEvidence(id, verifier, EV, ISSUED, ISSUED + 7 days, hex"00112233");
         assertFalse(vault.getEscrow(id).evidenceAttested);
         assertEq(vault.verifierNonce(verifier, id), 0);
+    }
+
+    // Key rotation: the verifier rotates its chain-registered key; pending
+    // signatures signed under the old key die (registergy re-pin + chain
+    // pubkey changed); fresh attestations under the new key succeed.
+    function test_KeyRotation_KillsPendingAttestations() public {
+        uint256 id = _funded();
+        bytes memory msg = _msg(verifier, id, EV);
+        bytes memory pendingSig = _sign(verifier, id, EV, msg); // old key
+        vm.warp(ISSUED + 1);
+
+        // Simulate rotation: new pubkey registered on chain.
+        MockKeyStatus3(0x0000000000000000000000000000000000000a02).rotateTo(verifier, hex"beefcafe");
+        registry.rotateKeyVersion(verifier);
+        assertEq(registry.keyVersion(verifier), 1);
+
+        vm.expectRevert(SweeftVault.BadVerifierSignature.selector);
+        vault.attestEvidence(id, verifier, EV, ISSUED, ISSUED + 7 days, pendingSig);
+
+        // A fresh attestation under the rotated key verifies.
+        bytes memory sig2 = abi.encode(abi.encodePacked(hex"beefcafe"), _msg(verifier, id, EV));
+        // _msg's vault side uses the pinned version (1); body identical.
+        vault.attestEvidence(id, verifier, EV, ISSUED, ISSUED + 7 days, sig2);
+    }
+
+    // Revocation via removeVerifier keeps old attestations counted but
+    // blocks new ones (keyVersion pin stays, isVerifier false blocks first).
+    function test_Revocation_KeepsCountButBlocksNew() public {
+        uint256 id = _funded();
+        bytes memory msg = _msg(verifier, id, EV);
+        vm.warp(ISSUED + 1);
+        vault.attestEvidence(id, verifier, EV, ISSUED, ISSUED + 7 days, _sign(verifier, id, EV, msg));
+        registry.removeVerifier(verifier);
+        assertTrue(vault.getEscrow(id).evidenceAttested); // past attestation stands
+        uint256 id2 = _funded();
+        assertEq(id2, 1);
+        bytes memory msg2 = _msg(verifier, id2, EV);
+        bytes memory sig2 = _sign(verifier, id2, EV, msg2);
+        vm.prank(stranger);
+        vm.expectRevert(SweeftVault.NotVerifier.selector);
+        vault.attestEvidence(id2, verifier, EV, ISSUED, ISSUED + 7 days, sig2);
     }
 }
