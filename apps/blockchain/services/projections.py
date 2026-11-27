@@ -783,6 +783,9 @@ def _handle_carrier_attested(event) -> dict:
 def _handle_carrier_registered(event) -> dict:
     return {"carrier": event.args.get("carrier")}
 
+def _handle_seed_checkpointed(event) -> dict:
+    return {"dispute_id": event.args.get("disputeId"), "round": event.args.get("round")}
+
 def _handle_carrier_removed(event) -> dict:
     return {"carrier": event.args.get("carrier")}
 
@@ -830,6 +833,7 @@ HANDLERS = {
     ("SweeftDisputeBoard", "PanelSelected"): _handle_panel_selected,
     ("SweeftDisputeBoard", "ResolverVoted"): _handle_resolver_voted,
     ("SweeftDisputeBoard", "DisputeDecisionRecorded"): _handle_dispute_decision_recorded,
+    ("SweeftDisputeBoard", "SeedCheckpointed"): _handle_seed_checkpointed,
     ("SweeftDisputeBoard", "AppealOpened"): _handle_appeal_opened,
     ("SweeftDisputeBoard", "AppealPanelSelected"): _handle_appeal_panel_selected,
     ("SweeftDisputeBoard", "AppealResolverVoted"): _handle_appeal_voted,
