@@ -7,7 +7,7 @@
 <section class="pt-10 sm:pt-16">
     <div class="grid gap-10 md:grid-cols-2 md:gap-12">
         <div class="flex flex-col">
-            <h1 class="font-serif text-[clamp(44px,6vw,76px)] leading-[0.98] tracking-[-0.015em] motion-safe:animate-rise">
+            <h1 class="font-serif text-[clamp(32px,4vw,52px)] leading-[1.02] tracking-[-0.015em] motion-safe:animate-rise">
                 Every payment has a signature. Money settles on-chain.
             </h1>
             <p class="mt-7 max-w-[44ch] text-balance text-[17px] leading-[27px] motion-safe:animate-rise motion-safe:[animation-delay:120ms]">
@@ -29,7 +29,7 @@
             </div>
         </div>
         <div class="panel self-start motion-safe:animate-rise motion-safe:[animation-delay:240ms]">
-            <div class="panel-head">Paths</div>
+            <div class="panel-head">Six parts. One rule: the chain decides.</div>
             <nav aria-label="Sweeft paths" class="grid grid-cols-2 gap-3 p-4">
                 <a href="/marketplace/" class="group border border-line bg-black/40 p-4 hover:border-control transition-colors">
                     <div class="text-[11px] uppercase tracking-wider text-muted">01</div>
@@ -108,24 +108,10 @@
                 </div>
             </div>
         </div>
-        <div class="mt-4 flex items-center gap-4">
-            <button id="story-play" class="btn-secondary" type="button">Play the story</button>
-            <div class="flex-1 h-[2px] bg-panel"><div id="story-progress" class="h-[2px] bg-ink w-0 transition-all duration-500"></div></div>
+        <div class="mt-4 flex items-center gap-4" aria-live="polite">
+            <div class="flex-1 h-[2px] bg-panel"><div id="story-progress" class="h-[2px] bg-white w-0 transition-all duration-500"></div></div>
             <span id="story-count" class="text-[13px] text-muted tabular-nums">1 / 4</span>
         </div>
-    </div>
-</section>
-
-{# ---- Components as narrative sections ---- #}
-<section class="border-t border-line py-16">
-    <h2 class="font-serif text-[34px] leading-[1.06] lg:text-[44px] max-w-[640px]">Six parts. One rule: the chain decides.</h2>
-    <div class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <a href="/marketplace/" class="panel group block hover:border-control transition-colors"><div class="panel-head">Marketplace</div><p class="p-4 text-[13px] leading-[19px] text-muted">On-chain listings pin price plus a metadata hash at purchase. Discovery, negotiation, and AI drafts live here.</p></div>
-        <a href="/escrow/new/" class="panel group block hover:border-control transition-colors"><div class="panel-head">Escrow</div><p class="p-4 text-[13px] leading-[19px] text-muted">PQ-gated settlement. Funds move only on the buyer's ML-DSA-87 signature, with credits-only payouts and per-escrow nonces.</p></div>
-        <a href="/oracle/" class="panel group block hover:border-control transition-colors"><div class="panel-head">Verifiers</div><p class="p-4 text-[13px] leading-[19px] text-muted">A DAO-governed allowlist attests fulfilment evidence. An M-of-N threshold means no single verifier can block a refund.</p></div>
-        <a href="/disputes/" class="panel group block hover:border-control transition-colors"><div class="panel-head">Dispute board</div><p class="p-4 text-[13px] leading-[19px] text-muted">Staked, randomly drawn resolver panels decide frozen escrows, with a real appeal to a larger panel that can slash the first one.</p></div>
-        <a href="/governance/" class="panel group block hover:border-control transition-colors"><div class="panel-head">DAO</div><p class="p-4 text-[13px] leading-[19px] text-muted">Stake-weighted governance owns the registry, vault, and board. Allowlisted calls, a 2-day timelock, and a guardian veto.</p></div>
-        <a href="/ai/" class="panel group block hover:border-control transition-colors"><div class="panel-head">AI assistant</div><p class="p-4 text-[13px] leading-[19px] text-muted">Finds, negotiates, and buys inside your mandate. Caps are enforced in code, the signed release binds recipient, amount, and nonce, and the model never moves money itself.</p></div>
     </div>
 </section>
 
@@ -168,31 +154,37 @@
     if (heroConnect && window.SweeftWallet) {
         heroConnect.addEventListener("click", function () { SweeftWallet.openModal(); });
     }
-    // Story player: auto-advance through the four steps until stepped through.
+    // Story player: autoplays and loops through the four steps.
     var steps = document.querySelectorAll("#story .story-step");
     var progress = document.getElementById("story-progress");
     var count = document.getElementById("story-count");
-    var play = document.getElementById("story-play");
-    var current = 0, timer = null, playing = false;
+    var story = document.getElementById("story");
+    var current = 0, timer = null;
     function show(i) {
         current = i;
         steps.forEach(function (el, idx) { el.classList.toggle("story-step-on", idx <= i); });
         progress.style.width = ((i + 1) / steps.length * 100) + "%";
         count.textContent = (i + 1) + " / " + steps.length;
     }
-    function stop() { playing = false; clearInterval(timer); play.textContent = "Play the story"; }
-    play.addEventListener("click", function () {
-        if (playing) { stop(); return; }
-        playing = true; play.textContent = "Pause";
+    function tick() { show((current + 1) % steps.length); }
+    // Respect reduced motion: show the final step, never auto-advance.
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        show(steps.length - 1);
+    } else {
         show(0);
-        timer = setInterval(function () {
-            if (current >= steps.length - 1) { stop(); return; }
-            show(current + 1);
-        }, 2200);
-    });
-    show(0);
-    // Respect reduced motion: never auto-start.
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) { show(steps.length - 1); }
+        timer = setInterval(tick, 2200);
+    }
+    // Pause while hovered or focused so readers can study a step.
+    function pause() { if (timer) { clearInterval(timer); timer = null; } }
+    function resume() {
+        if (!timer && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+            timer = setInterval(tick, 2200);
+        }
+    }
+    story.addEventListener("mouseenter", pause);
+    story.addEventListener("mouseleave", resume);
+    story.addEventListener("focusin", pause);
+    story.addEventListener("focusout", resume);
 })();
 </script>
 {% endblock %}
