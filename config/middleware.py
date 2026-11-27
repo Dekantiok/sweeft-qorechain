@@ -7,6 +7,25 @@ import secrets
 from django.conf import settings
 
 
+class NoCacheHTMLMiddleware:
+    """HTML pages must never be served stale after a deploy.
+
+    Wallet state lives in the session, so caching HTML would show visitors
+    (and judges) the previous version of the site indefinitely. Static files
+    stay cached, but hashed filenames make them safe (see production.py).
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        content_type = response.get("Content-Type", "")
+        if "text/html" in content_type:
+            response["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        return response
+
+
 class ContentSecurityPolicyMiddleware:
     """Attach a Content-Security-Policy header when one is configured.
 

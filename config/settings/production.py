@@ -16,6 +16,7 @@ CSRF_TRUSTED_ORIGINS = [h for h in os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "").
 
 # Serve static files (built Tailwind + htmx, no CDN) via WhiteNoise.
 MIDDLEWARE.insert(MIDDLEWARE.index("django.middleware.security.SecurityMiddleware") + 1, "whitenoise.middleware.WhiteNoiseMiddleware")
+MIDDLEWARE.append("config.middleware.NoCacheHTMLMiddleware")
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     # Hashed filenames: a CSS change gets a new URL, so browsers never serve
