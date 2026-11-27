@@ -27,6 +27,12 @@ class Command(BaseCommand):
             required=True,
             help="Block to start indexing from (deployment block of the current stack)",
         )
+        parser.add_argument(
+            "--retries",
+            type=int,
+            default=3,
+            help="Retry the sync this many times with backoff (demo boot RPCs are flaky)",
+        )
 
     def handle(self, *args, **options):
         from apps.blockchain.models import IndexerCursor
@@ -41,6 +47,20 @@ class Command(BaseCommand):
                 )
             )
 
+        # Fail loudly on missing addresses: a demo with no contracts
+        # configured would otherwise boot with an empty marketplace.
+        from integrations.qorechain.contracts import ADDRESS_ENV, contract_address
+
+        missing = [ADDRESS_ENV[name] for name in CONTRACTS if not contract_address(name)]
+        if missing:
+            from django.core.management.base import CommandError
+
+            raise CommandError(
+                "seed_from_chain: no address configured for "
+                + ", ".join(sorted(set(missing)))
+                + " — set them in the environment (see render.yaml)"
+            )
+
         for name in CONTRACTS:
             cursor, _ = IndexerCursor.objects.get_or_create(contract_name=name)
             cursor.last_processed_block = min(cursor.last_processed_block or 0, from_block)
@@ -49,11 +69,37 @@ class Command(BaseCommand):
             cursor.save(update_fields=["last_processed_block", "updated_at"])
             self.stdout.write(f"cursor {name:24s} -> {from_block}")
 
-        results = sync_all()
+        import time
+
+        results: dict = {}
         total = 0
+        for attempt in range(1, max(1, options["retries"]) + 1):
+            results = sync_all()
+            total = sum(results.values())
+            if total > 0:
+                break
+            self.stdout.write(
+                self.style.WARNING(
+                    f"attempt {attempt}: 0 events handled — retrying in {attempt * 5}s"
+                )
+            )
+            time.sleep(attempt * 5)
         for name, count in results.items():
             self.stdout.write(f"{name:24s} {count} event(s) handled")
-            total += count
+        if total == 0:
+            try:
+                from integrations.qorechain.client import get_evm_client
+
+                head = get_evm_client().eth.block_number
+            except Exception:
+                head = "unknown"
+            self.stdout.write(
+                self.style.ERROR(
+                    f"WARNING: seed handled 0 events (chain head {head}) — "
+                    "the demo will be empty. Check RPC reachability and "
+                    "SWEEFT_INDEX_FROM_BLOCK, then redeploy."
+                )
+            )
 
         # Backfill display titles for demo fixture listings whose placeholder
         # URIs can never verify: chain URI basename -> catalog entry.
