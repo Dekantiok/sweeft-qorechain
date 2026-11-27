@@ -3,29 +3,63 @@
 {% block title %}Sweeft: Post-Quantum Commerce on QoreChain{% endblock %}
 
 {% block content %}
-{# ---- Hero (Meridian pattern: serif display, one CTA, live strip) ---- #}
-<section class="pt-10 sm:pt-16 text-center">
-    <div class="flex flex-col items-center">
-        <h1 class="font-serif text-[clamp(48px,8vw,96px)] leading-[0.96] tracking-[-0.015em] motion-safe:animate-rise">
-            Every payment has<br>a signature. Money<br>settles on-chain.
-        </h1>
-        <p class="mt-7 max-w-[44ch] text-balance text-[17px] leading-[27px] motion-safe:animate-rise motion-safe:[animation-delay:120ms]">
-            A post-quantum marketplace on QoreChain. Buyers fund escrow, carriers and verifiers prove delivery, and every release needs the buyer's ML-DSA-87 signature. A stolen classical key moves nothing.
-        </p>
-        <div class="mt-10 flex flex-col sm:flex-row items-center gap-5 motion-safe:animate-rise motion-safe:[animation-delay:220ms]">
-            {% if wallet_attached %}
-            <a href="/escrow/new/" class="btn btn-accent">New escrow</a>
-            <a href="/marketplace/" class="btn-ghost">Browse the marketplace</a>
-            {% else %}
-            <button id="hero-connect" class="btn">Connect wallet</button>
-            <a href="/marketplace/" class="btn-ghost">Browse the marketplace</a>
-            {% endif %}
+{# ---- Hero: intro left, paths grid right (Meridian pattern, monochrome) ---- #}
+<section class="pt-10 sm:pt-16">
+    <div class="grid gap-10 lg:grid-cols-2 lg:gap-12">
+        <div class="flex flex-col">
+            <h1 class="font-serif text-[clamp(44px,6vw,76px)] leading-[0.98] tracking-[-0.015em] motion-safe:animate-rise">
+                Every payment has a signature. Money settles on-chain.
+            </h1>
+            <p class="mt-7 max-w-[44ch] text-balance text-[17px] leading-[27px] motion-safe:animate-rise motion-safe:[animation-delay:120ms]">
+                A post-quantum marketplace on QoreChain. Buyers fund escrow, carriers and verifiers prove delivery, and every release needs the buyer's ML-DSA-87 signature. A stolen classical key moves nothing.
+            </p>
+            <div class="mt-8 flex flex-col sm:flex-row items-start gap-5 motion-safe:animate-rise motion-safe:[animation-delay:220ms]">
+                {% if wallet_attached %}
+                <a href="/escrow/new/" class="btn btn-accent">New escrow</a>
+                <a href="/marketplace/" class="btn-ghost">Browse the marketplace</a>
+                {% else %}
+                <button id="hero-connect" class="btn">Connect wallet</button>
+                <a href="/marketplace/" class="btn-ghost">Browse the marketplace</a>
+                {% endif %}
+            </div>
+            <div class="mt-8 flex flex-wrap gap-x-8 gap-y-2 text-[13px] text-muted motion-safe:animate-rise motion-safe:[animation-delay:320ms]">
+                <span><strong class="text-ink tabular-nums">{{ stats.listings_live }}</strong> listings live</span>
+                <span><strong class="text-ink tabular-nums">{{ stats.escrows_settled }}</strong> escrows settled</span>
+                <span><strong class="text-ink tabular-nums">{{ stats.released_qor }} QOR</strong> released on Diana</span>
+            </div>
         </div>
-        <div class="mt-10 flex flex-wrap justify-center gap-x-8 gap-y-2 text-[13px] text-muted motion-safe:animate-rise motion-safe:[animation-delay:320ms]">
-            <span><strong class="text-ink tabular-nums">{{ stats.listings_live }}</strong> listings live</span>
-            <span><strong class="text-ink tabular-nums">{{ stats.escrows_settled }}</strong> escrows settled</span>
-            <span><strong class="text-ink tabular-nums">{{ stats.released_qor }} QOR</strong> released on Diana</span>
-        </div>
+        <nav aria-label="Sweeft paths" class="grid grid-cols-2 gap-3 content-start motion-safe:animate-rise motion-safe:[animation-delay:240ms]">
+            <a href="/marketplace/" class="panel group block p-4 hover:border-control transition-colors">
+                <div class="text-[11px] uppercase tracking-wider text-muted">01</div>
+                <div class="mt-1 font-semibold group-hover:underline underline-offset-4">Marketplace</div>
+                <div class="mt-1 text-[12px] leading-[17px] text-muted">On-chain listings</div>
+            </a>
+            <a href="/escrow/new/" class="panel group block p-4 hover:border-control transition-colors">
+                <div class="text-[11px] uppercase tracking-wider text-muted">02</div>
+                <div class="mt-1 font-semibold group-hover:underline underline-offset-4">Escrow</div>
+                <div class="mt-1 text-[12px] leading-[17px] text-muted">PQ-gated settlement</div>
+            </a>
+            <a href="/oracle/" class="panel group block p-4 hover:border-control transition-colors">
+                <div class="text-[11px] uppercase tracking-wider text-muted">03</div>
+                <div class="mt-1 font-semibold group-hover:underline underline-offset-4">Verifiers</div>
+                <div class="mt-1 text-[12px] leading-[17px] text-muted">Fulfilment attestation</div>
+            </a>
+            <a href="/disputes/" class="panel group block p-4 hover:border-control transition-colors">
+                <div class="text-[11px] uppercase tracking-wider text-muted">04</div>
+                <div class="mt-1 font-semibold group-hover:underline underline-offset-4">Dispute board</div>
+                <div class="mt-1 text-[12px] leading-[17px] text-muted">Staked resolver panels</div>
+            </a>
+            <a href="/governance/" class="panel group block p-4 hover:border-control transition-colors">
+                <div class="text-[11px] uppercase tracking-wider text-muted">05</div>
+                <div class="mt-1 font-semibold group-hover:underline underline-offset-4">DAO</div>
+                <div class="mt-1 text-[12px] leading-[17px] text-muted">Stake-weighted governance</div>
+            </a>
+            <a href="/ai/" class="panel group block p-4 hover:border-control transition-colors">
+                <div class="text-[11px] uppercase tracking-wider text-muted">06</div>
+                <div class="mt-1 font-semibold group-hover:underline underline-offset-4">AI assistant</div>
+                <div class="mt-1 text-[12px] leading-[17px] text-muted">Mandate-capped agent</div>
+            </a>
+        </nav>
     </div>
 </section>
 
