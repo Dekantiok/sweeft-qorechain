@@ -99,7 +99,17 @@ contract SweeftDisputeBoardTest is Test {
         vm.prank(buyer);
         disputeId = board.openDispute{ value: BOND }(escrowId);
         vm.warp(block.timestamp + 2); // past joinWindow (1s)
+        vm.roll(block.number + 17); // past drawBlock (open + 16)
         board.selectPanel(disputeId);
+    }
+
+    function _drawAppealPanel(uint256 escrowId, uint256 disputeId, address party) internal {
+        escrowId;
+        vm.deal(party, APPEAL_BOND);
+        vm.prank(party);
+        board.appeal{value: APPEAL_BOND}(disputeId);
+        vm.roll(block.number + 17); // past appeal drawBlock
+        board.drawAppealPanel(disputeId);
     }
 
     function _members(uint256 disputeId) internal view returns (address[3] memory) {
@@ -313,9 +323,7 @@ contract SweeftDisputeBoardTest is Test {
         uint256 stakeBefore = board.stakeOf(first[0]);
 
         // Buyer appeals the release decision.
-        vm.deal(buyer, APPEAL_BOND);
-        vm.prank(buyer);
-        board.appeal{ value: APPEAL_BOND }(disputeId);
+        _drawAppealPanel(escrowId, disputeId, buyer);
 
         address[5] memory panel = _appealMembers(disputeId);
         vm.prank(panel[0]);
@@ -337,9 +345,7 @@ contract SweeftDisputeBoardTest is Test {
         uint256 stakeBefore = board.stakeOf(first[0]);
 
         // Buyer appeals; the larger panel upholds release.
-        vm.deal(buyer, APPEAL_BOND);
-        vm.prank(buyer);
-        board.appeal{ value: APPEAL_BOND }(disputeId);
+        _drawAppealPanel(escrowId, disputeId, buyer);
 
         address[5] memory panel = _appealMembers(disputeId);
         vm.prank(panel[0]);
@@ -386,9 +392,7 @@ contract SweeftDisputeBoardTest is Test {
     function test_AppealExpired_UpholdsFirstDecision() public {
         (uint256 escrowId, uint256 disputeId) = _openPanel();
         _decide(disputeId, true);
-        vm.deal(buyer, APPEAL_BOND);
-        vm.prank(buyer);
-        board.appeal{ value: APPEAL_BOND }(disputeId);
+        _drawAppealPanel(escrowId, disputeId, buyer);
 
         vm.warp(block.timestamp + 1 hours + 1);
         board.resolveAppealExpired(disputeId);
@@ -482,6 +486,59 @@ contract SweeftDisputeBoardTest is Test {
     }
 
     // ------------------------------------------------------------------
+    // Phase 5 regression tests (committed future-block seed)
+    // ------------------------------------------------------------------
+
+    function test_SelectPanel_BeforeDrawBlock_RevertsSeedNotReady() public {
+        (uint256 escrowId, uint256 disputeId) = _openPanel();
+        escrowId;
+        disputeId;
+        // _openPanel already drew; a second draw must fail as already-selected.
+        vm.expectRevert(SweeftDisputeBoard.PanelAlreadySelected.selector);
+        vm.roll(block.number + 30);
+        board.selectPanel(disputeId);
+    }
+
+    function test_SelectPanel_BeforeSeedBlock_Reverts() public {
+        uint256 escrowId = _fundedEscrow();
+        vm.deal(buyer, BOND);
+        vm.prank(buyer);
+        uint256 disputeId = board.openDispute{ value: BOND }(escrowId);
+        vm.warp(block.timestamp + 2); // still before drawBlock (block + 16)
+        vm.expectRevert(SweeftDisputeBoard.SeedNotReady.selector);
+        board.selectPanel(disputeId);
+        // And it is callable once the draw block passes.
+        vm.roll(block.number + 17);
+        board.selectPanel(disputeId);
+        assertEq(board.memberCount(disputeId), 3);
+    }
+
+    function test_CheckpointSeed_RevertsAfterWindow() public {
+        uint256 escrowId = _fundedEscrow();
+        vm.deal(buyer, BOND);
+        vm.prank(buyer);
+        uint256 disputeId = board.openDispute{ value: BOND }(escrowId);
+        // 300 blocks past the draw block: EVM blockhash no longer serves it.
+        vm.roll(block.number + 320);
+        vm.expectRevert(SweeftDisputeBoard.TooLateForCheckpoint.selector);
+        board.checkpointSeed(disputeId);
+    }
+
+    function test_DrawFallsBackToCaptureSeedWhenStale() public {
+        // Nobody checkpointed in time: the draw must still complete via the
+        // capture-time fallback seed (liveness preserved).
+        uint256 escrowId = _fundedEscrow();
+        vm.deal(buyer, BOND);
+        vm.prank(buyer);
+        uint256 disputeId = board.openDispute{ value: BOND }(escrowId);
+        vm.warp(block.timestamp + 2);
+        vm.roll(block.number + 400); // way past the 256-block blockhash window
+        board.selectPanel(disputeId);
+        assertEq(board.memberCount(disputeId), 3);
+
+    }
+
+    // ------------------------------------------------------------------
     // Stage 4 regression tests (QC4-1 CEI, QC4-6 bounded draw)
     // ------------------------------------------------------------------
 
@@ -526,6 +583,7 @@ contract SweeftDisputeBoardTest is Test {
         vm.prank(buyer);
         uint256 disputeId = board.openDispute{ value: BOND }(escrowId);
         vm.warp(block.timestamp + 2);
+        vm.roll(block.number + 17);
         board.selectPanel(disputeId);
         assertEq(board.memberCount(disputeId), 0);
         escrowId;

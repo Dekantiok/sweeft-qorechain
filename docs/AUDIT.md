@@ -226,6 +226,38 @@ is not code-responsive. Sweeft's audit story for the jury is: QCAI 78/100
 (v5) + 72/100 on v6/v7 with every finding mapped to a fix or a documented
 false positive — stronger evidence than any single number.
 
+## Phase hardening (2026-11-27, post-Stage 6)
+
+Source-only upgrade wave; nothing redeployed yet (see deployment note).
+**175 Foundry + 78 Django tests passing.**
+
+**Carrier domain separation (`sweeft-carrier-v2`, Phase 2).** Carrier
+authorizations bind chain, vault, carrier, provider, escrow, tracking hash,
+status, evidence hash, issuance, expiry and nonce; `expiresAt` is pinned to
+`issuedAt + MAX_ATTEST_AGE`, and the nonce is consumed only after all
+validation passes. Removed carriers retain no attest authority
+(`isCarrier` checked at submit). 15 domain tests prove every mutation
+reverts with state unchanged.
+
+**PQ verifier attestations (`sweeft-verifier-v1`, Phase 3).** Verifiers are
+pinned to their chain-registered ML-DSA-87 algorithm + registration
+timestamp at `addVerifier`; attestations are signed by that key, submitted
+by anyone (relayer), and counted once per verifier (per-verifier nonce).
+Revocation, expiry, duplicate, replay, cross-chain/vault/escrow/evidence
+tests all pass. A stolen classical key alone burns at `BadVerifierSignature`.
+
+**Governance hardening (Phase 4).** `execute` re-checks the (target, selector)
+allowlist at call time; revoking a selector mid-flight blocks execution.
+
+**Dispute randomness (Phase 5).** Open/appeal draws are seeded from a
+committed future block (`drawBlock = block.number + 16`, hash checkpointed
+by anyone within the 256-block window) chained with the capture-time
+prevrandao as liveness fallback. Callers can no longer grind panel draws
+by timing `selectPanel`; only a single validator could bias the capture
+moment, bounded by 100%-of-escrow resolver stake and the appeal's 50%
+overturn slash. Tests: too-early seed, stale checkpoint, stale fallback,
+one-shot draws.
+
 ## Stage 6 — audit on the v8 candidate (QCAI report, **72/100**, 2026-11-26)
 
 PDF: `docs/audit/stage-6/QoreChain_Audit_Contract_1795674246798.pdf`

@@ -78,6 +78,7 @@ EVENTS = {
         "PanelSelected",
         "ResolverVoted",
         "DisputeDecisionRecorded",
+        "SeedCheckpointed",
         "AppealOpened",
         "AppealPanelSelected",
         "AppealResolverVoted",

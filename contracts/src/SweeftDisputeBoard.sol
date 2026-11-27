@@ -64,6 +64,16 @@ contract SweeftDisputeBoard {
         uint256 appealRewardPerVoter;
         uint64 appealVotingEndsAt;
         address[5] appealMembers;
+        // --- randomness (Phase 5): committed at open/appeal time, drawn from
+        // a fixed future block. captureSeed = prevrandao at open/appeal;
+        // drawSeed = blockhash(drawBlock) checkpointed by anyone within the
+        // 256-block availability window. Caller timing cannot influence either.
+        uint64 drawBlock;
+        uint64 appealDrawBlock;
+        bytes32 captureSeed;
+        bytes32 appealCaptureSeed;
+        bytes32 drawSeed;
+        bytes32 appealDrawSeed;
         mapping(address => uint8) roundOf; // 1 = first panel, 2 = appeal panel
         mapping(address => bool) hasVoted;
         mapping(address => bool) votedRelease;
@@ -88,6 +98,7 @@ contract SweeftDisputeBoard {
     event AppealResolved(uint256 indexed disputeId, bool releaseToSeller, bool overturned);
     event DisputeSettled(uint256 indexed disputeId, uint256 indexed escrowId, bool releaseToSeller);
     event RewardClaimed(uint256 indexed disputeId, address indexed resolver, uint256 amount, uint8 round);
+    event SeedCheckpointed(uint256 indexed disputeId, uint8 round, bytes32 seed);
     event BondRefunded(uint256 indexed disputeId, address indexed raiser, uint256 amount);
     event RewardFunded(uint256 indexed disputeId, uint256 amount);
     event Swept(address indexed to, uint256 amount);
@@ -123,6 +134,8 @@ contract SweeftDisputeBoard {
     error TransferFailed();
     error AppealWindowClosed();
     error AppealWindowActive();
+    error TooLateForCheckpoint();
+    error SeedNotReady();
     error NotFinal();
     error NotParty();
 
@@ -156,6 +169,12 @@ contract SweeftDisputeBoard {
 
     uint256 public constant MAX_BOARD_SIZE = 3;
     uint256 public constant APPEAL_BOARD_SIZE = 5;
+
+    /// @notice Blocks after a dispute/appeal opens at which the seed block
+    ///         lands. The hash of this future block is unknowable when the
+    ///         dispute opens, so neither timing calls nor the raiser can
+    ///         choose a favorable panel (Phase 5).
+    uint64 public constant DRAW_BLOCK_DELAY = 16;
 
     uint64 public joinWindow = 6 hours;
     uint64 public votingPeriod = 48 hours;
@@ -332,8 +351,41 @@ contract SweeftDisputeBoard {
         d.votingEndsAt = d.joinEndsAt + votingPeriod;
         d.state = DisputeState.Open;
         d.bond = msg.value;
+        // Randomness commitment (Phase 5): fix the seed block NOW (16 blocks
+        // ahead — its hash is unknowable at this point) and capture the one
+        // prevrandao value as the liveness fallback.
+        d.drawBlock = uint64(block.number) + DRAW_BLOCK_DELAY;
+        d.captureSeed = bytes32(block.prevrandao);
 
         emit DisputeOpened(disputeId, escrowId, msg.sender, d.joinEndsAt, d.votingEndsAt, msg.value);
+    }
+
+    /// @notice Checkpoint the draw-block hash for the first panel. Permissionless
+    ///         and callable any time after `drawBlock` passes (blockhashes are
+    ///         only served for 256 blocks, so callers are urged to run this
+    ///         within that window — the capture-seed fallback keeps selection
+    ///         live if nobody does).
+    function checkpointSeed(uint256 disputeId) external returns (bytes32) {
+        Dispute storage d = disputes[disputeId];
+        if (d.drawBlock == 0) revert UnknownDispute();
+        if (d.drawSeed != bytes32(0)) return d.drawSeed;
+        bytes32 h = blockhash(d.drawBlock);
+        if (h == bytes32(0)) revert TooLateForCheckpoint();
+        d.drawSeed = h;
+        emit SeedCheckpointed(disputeId, 1, h);
+        return h;
+    }
+
+    /// @notice Same for the appeal panel's seed block.
+    function checkpointAppealSeed(uint256 disputeId) external returns (bytes32) {
+        Dispute storage d = disputes[disputeId];
+        if (d.appealDrawBlock == 0) revert UnknownDispute();
+        if (d.appealDrawSeed != bytes32(0)) return d.appealDrawSeed;
+        bytes32 h = blockhash(d.appealDrawBlock);
+        if (h == bytes32(0)) revert TooLateForCheckpoint();
+        d.appealDrawSeed = h;
+        emit SeedCheckpointed(disputeId, 2, h);
+        return h;
     }
 
     /// @notice Draw the first resolver panel from the staked pool after the
@@ -347,6 +399,16 @@ contract SweeftDisputeBoard {
         if (d.panelSelected) revert PanelAlreadySelected();
         if (block.timestamp < d.joinEndsAt) revert JoinWindowActive();
         if (block.timestamp >= d.votingEndsAt) revert VotingClosed();
+        if (block.number <= d.drawBlock) revert SeedNotReady();
+
+        // Opportunistically checkpoint the seed block while it is fresh.
+        if (d.drawSeed == bytes32(0)) {
+            bytes32 h = blockhash(d.drawBlock);
+            if (h != bytes32(0)) {
+                d.drawSeed = h;
+                emit SeedCheckpointed(disputeId, 1, h);
+            }
+        }
 
         d.panelSelected = true;
         SweeftVault.Escrow memory escrow = vault.getEscrow(d.escrowId);
@@ -447,24 +509,49 @@ contract SweeftDisputeBoard {
         if (msg.value < required) revert BondTooLow();
 
         d.state = DisputeState.Appealed;
-        d.appealSelected = true;
         d.appellant = msg.sender;
         d.appealBond = msg.value;
         d.appealVotingEndsAt = uint64(block.timestamp) + votingPeriod;
+        // Appeal seed commitment (Phase 5): same scheme as the first panel —
+        // the panel is drawn later by `drawAppealPanel`, never in this tx,
+        // so the appellant cannot grind randomness by choosing appeal timing.
+        d.appealDrawBlock = uint64(block.number) + DRAW_BLOCK_DELAY;
+        d.appealCaptureSeed = bytes32(block.prevrandao);
 
-        uint8 chosen = _drawPanel(d, escrow, APPEAL_BOARD_SIZE, 2);
-        if (chosen < APPEAL_BOARD_SIZE) revert PanelUnavailable();
-        d.appealMemberCount = chosen;
-
-        // Keep both panels' stake exposed while the appeal is decided.
+        // Keep the first panel's stake exposed while the appeal is decided.
         for (uint256 i = 0; i < d.memberCount; i++) {
             _extendLock(d.members[i], d.appealVotingEndsAt + appealWindow);
         }
+
+        emit AppealOpened(disputeId, d.escrowId, msg.sender, d.appealVotingEndsAt, msg.value);
+    }
+
+    /// @notice Draw the appeal panel after the appeal seed block passes.
+    ///         Permissionless; a full panel needs 5 eligible resolvers.
+    function drawAppealPanel(uint256 disputeId) external {
+        Dispute storage d = disputes[disputeId];
+        if (d.state != DisputeState.Appealed) revert DisputeNotOpen();
+        if (d.appealSelected) revert PanelAlreadySelected();
+        if (block.timestamp >= d.appealVotingEndsAt) revert VotingClosed();
+        if (block.number <= d.appealDrawBlock) revert SeedNotReady();
+
+        if (d.appealDrawSeed == bytes32(0)) {
+            bytes32 h = blockhash(d.appealDrawBlock);
+            if (h != bytes32(0)) {
+                d.appealDrawSeed = h;
+                emit SeedCheckpointed(disputeId, 2, h);
+            }
+        }
+
+        SweeftVault.Escrow memory escrow = vault.getEscrow(d.escrowId);
+        uint8 chosen = _drawPanel(d, escrow, APPEAL_BOARD_SIZE, 2);
+        d.appealSelected = true;
+        d.appealMemberCount = chosen;
+
         for (uint256 i = 0; i < chosen; i++) {
             _extendLock(d.appealMembers[i], d.appealVotingEndsAt + appealWindow);
         }
 
-        emit AppealOpened(disputeId, d.escrowId, msg.sender, d.appealVotingEndsAt, msg.value);
         emit AppealPanelSelected(disputeId, d.appealMembers, chosen);
     }
 
@@ -608,6 +695,20 @@ contract SweeftDisputeBoard {
         uint256 n = resolverPool.length;
         if (n == 0) return 0;
 
+        // Seed base (Phase 5): chained future-block hash when checkpointed,
+        // else the capture-time prevrandao. Caller timing (selectPanel when)
+        // never enters the seed, so panels cannot be ground by timing.
+        bytes32 seedBase;
+        if (round == 2) {
+            seedBase = d.appealDrawSeed == bytes32(0)
+                ? d.appealCaptureSeed
+                : keccak256(abi.encode(d.appealDrawSeed, d.appealCaptureSeed));
+        } else {
+            seedBase = d.drawSeed == bytes32(0)
+                ? d.captureSeed
+                : keccak256(abi.encode(d.drawSeed, d.captureSeed));
+        }
+
         // Bounded for-loop: at most min(n * MAX_DRAW_ATTEMPTS_PER_POOL,
         // MAX_DRAW_ATTEMPTS) iterations, whatever the pool contains
         // (parties/verifier/carrier are skipped).
@@ -615,7 +716,7 @@ contract SweeftDisputeBoard {
         if (maxAttempts > MAX_DRAW_ATTEMPTS) maxAttempts = MAX_DRAW_ATTEMPTS;
         for (uint256 attempts; attempts < maxAttempts && chosen < size; attempts++) {
             uint256 idx = uint256(
-                keccak256(abi.encode(block.prevrandao, d.escrowId, round, chosen, attempts))
+                keccak256(abi.encode(seedBase, d.escrowId, round, chosen, attempts))
             ) % n;
             address cand = resolverPool[idx];
 
