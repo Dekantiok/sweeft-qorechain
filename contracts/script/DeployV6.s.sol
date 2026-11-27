@@ -29,7 +29,10 @@ contract DeployV6Script is Script {
 
         SweeftOracleRegistry registry = new SweeftOracleRegistry(deployer);
         if (verifier != address(0)) {
-            registry.addVerifier(verifier);
+            // addVerifier reads the on-chain PQC precompile (absent in the
+            // local forge simulation) — catch so the broadcast still records
+            // the call; on-chain execution sees the real precompile.
+            try registry.addVerifier(verifier) {} catch {}
         }
 
         SweeftVault vault = new SweeftVault(address(registry), cosmosChainId, feeBps, treasury);

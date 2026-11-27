@@ -10,11 +10,11 @@
 <p class="mt-2 text-sm text-muted">Everything below is read live from QoreChain; nothing here is stored or cached.</p>
 
 {% if live_error %}
-<div class="mt-6 rounded-xl border border-accent/30 bg-[rgba(23,67,255,0.07)] p-4 text-sm text-ink">Chain read failed: {{ live_error }}</div>
+<div class="mt-6 rounded-xl border border-accent/30 bg-[rgba(239,68,68,0.10)] p-4 text-sm text-ink">Chain read failed: {{ live_error }}</div>
 {% endif %}
 
 {% if pqc_status %}
-<div class="mt-6 rounded-xl border border-accent/30 bg-[rgba(23,67,255,0.03)] p-5">
+<div class="mt-6 rounded-xl border border-accent/30 bg-[rgba(239,68,68,0.04)] p-5">
     <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-accent">
         <span class="h-2 w-2 rounded-full bg-red-400"></span> Buyer ML-DSA-87 key (registered on chain)
     </div>
@@ -33,7 +33,7 @@
 {% endif %}
 
 {% if live %}
-<div class="mt-6 rounded-xl border border-line bg-white p-5">
+<div class="mt-6 rounded-xl border border-line bg-black/60 p-5">
     <h2 class="text-sm font-semibold text-ink">Live contract state</h2>
     <dl class="mt-3 grid gap-x-8 gap-y-2 text-xs sm:grid-cols-3">
         <dt class="text-muted">buyer</dt><dd class="hash text-muted break-all">{{ live.buyer }}</dd>
@@ -51,7 +51,7 @@
 {% endif %}
 
 <div class="mt-6 grid gap-4 sm:grid-cols-2">
-    <div class="rounded-xl border border-line bg-white p-5">
+    <div class="rounded-xl border border-line bg-black/60 p-5">
         <h2 class="text-sm font-semibold text-ink">The release signature binds</h2>
         <p class="mt-2 text-xs leading-relaxed text-muted">
             <span class="hash">sweeft-release-v1|vault=…|escrow=…|buyer=…|recipient=…|amount=…|nonce=…</span>,
@@ -60,7 +60,7 @@
             <span class="hash">BadPqcSignature</span>: proven on testnet with the attack simulator.
         </p>
     </div>
-    <div class="rounded-xl border border-line bg-white p-5">
+    <div class="rounded-xl border border-line bg-black/60 p-5">
         <h2 class="text-sm font-semibold text-ink">Transactions</h2>
         <dl class="mt-2 space-y-1 text-xs">
             {% if escrow.create_tx %}<dt class="text-muted">created</dt><dd><a class="hash text-accent hover:text-accent" href="{% url 'blockchain:tx_proof' escrow.create_tx %}">{{ escrow.create_tx|truncatechars:26 }}</a></dd>{% endif %}

@@ -10,35 +10,35 @@
         signed with your QoreChain ML-DSA-87 key and verified on-chain: no hardware attestation needed.
     </p>
 
-    <form method="post" class="mt-6 space-y-4 rounded-xl border border-line bg-white p-6">
+    <form method="post" class="mt-6 space-y-4 rounded-xl border border-line bg-black/60 p-6">
         {% csrf_token %}
         <div class="grid gap-4 sm:grid-cols-2">
             <div>
                 <label class="text-xs uppercase tracking-wider text-muted">Company name *</label>
-                <input name="company_name" required class="mt-1 w-full rounded-lg border border-control bg-white px-3 py-2 text-sm focus:border-red-500 focus:outline-none">
+                <input name="company_name" required class="mt-1 w-full rounded-lg border border-control bg-black/60 px-3 py-2 text-sm focus:border-red-500 focus:outline-none">
             </div>
             <div>
                 <label class="text-xs uppercase tracking-wider text-muted">Provider ID</label>
-                <input name="provider_id" placeholder="LOG-EXAMPLE-001" class="mt-1 w-full rounded-lg border border-control bg-white px-3 py-2 text-sm focus:border-red-500 focus:outline-none">
+                <input name="provider_id" placeholder="LOG-EXAMPLE-001" class="mt-1 w-full rounded-lg border border-control bg-black/60 px-3 py-2 text-sm focus:border-red-500 focus:outline-none">
             </div>
         </div>
         <div class="grid gap-4 sm:grid-cols-2">
             <div>
                 <label class="text-xs uppercase tracking-wider text-muted">Contact email</label>
-                <input name="email" type="email" class="mt-1 w-full rounded-lg border border-control bg-white px-3 py-2 text-sm focus:border-red-500 focus:outline-none">
+                <input name="email" type="email" class="mt-1 w-full rounded-lg border border-control bg-black/60 px-3 py-2 text-sm focus:border-red-500 focus:outline-none">
             </div>
             <div>
                 <label class="text-xs uppercase tracking-wider text-muted">Settlement wallet (0x)</label>
-                <input name="settlement_wallet" placeholder="your QoreChain 0x account" class="mt-1 w-full rounded-lg border border-control bg-white px-3 py-2 text-sm focus:border-red-500 focus:outline-none">
+                <input name="settlement_wallet" placeholder="your QoreChain 0x account" class="mt-1 w-full rounded-lg border border-control bg-black/60 px-3 py-2 text-sm focus:border-red-500 focus:outline-none">
             </div>
         </div>
         <div>
             <label class="text-xs uppercase tracking-wider text-muted">Operating locations</label>
-            <input name="operating_locations" placeholder="Lagos, Abuja, Port Harcourt" class="mt-1 w-full rounded-lg border border-control bg-white px-3 py-2 text-sm focus:border-red-500 focus:outline-none">
+            <input name="operating_locations" placeholder="Lagos, Abuja, Port Harcourt" class="mt-1 w-full rounded-lg border border-control bg-black/60 px-3 py-2 text-sm focus:border-red-500 focus:outline-none">
         </div>
         <div>
             <label class="text-xs uppercase tracking-wider text-muted">Services (one per line)</label>
-            <textarea name="services" rows="3" placeholder="Same-day delivery: Lagos: 5 QOR / item" class="mt-1 w-full rounded-lg border border-control bg-white px-3 py-2 text-sm focus:border-red-500 focus:outline-none"></textarea>
+            <textarea name="services" rows="3" placeholder="Same-day delivery: Lagos: 5 QOR / item" class="mt-1 w-full rounded-lg border border-control bg-black/60 px-3 py-2 text-sm focus:border-red-500 focus:outline-none"></textarea>
         </div>
         <button class="w-full rounded-lg bg-ink text-white shadow-none px-4 py-3 font-semibold text-ink hover:bg-accent transition-colors">
             Submit for review

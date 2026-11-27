@@ -22,8 +22,8 @@
 
 <form method="get" class="mt-6 flex flex-wrap gap-3">
     <input type="text" name="q" value="{{ query }}" placeholder="Search listings…"
-           class="w-full sm:w-64 rounded-lg border border-control bg-white px-3 py-2 text-sm focus:border-red-500 focus:outline-none">
-    <select name="status" class="rounded-lg border border-control bg-white px-3 py-2 text-sm">
+           class="w-full sm:w-64 rounded-lg border border-control bg-black/60 px-3 py-2 text-sm focus:border-red-500 focus:outline-none">
+    <select name="status" class="rounded-lg border border-control bg-black/60 px-3 py-2 text-sm">
         <option value="active" {% if active_status == "active" %}selected{% endif %}>Active</option>
         <option value="sold" {% if active_status == "sold" %}selected{% endif %}>Sold</option>
         <option value="all" {% if active_status == "all" %}selected{% endif %}>All</option>
@@ -33,13 +33,13 @@
 
 <div class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
     {% for listing in listings %}
-    <a href="{% url 'marketplace:detail' listing.on_chain_id %}" class="group rounded-xl border border-line bg-white p-5 hover:border-ink/40 transition-colors">
+    <a href="{% url 'marketplace:detail' listing.on_chain_id %}" class="group rounded-xl border border-line bg-black/60 p-5 hover:border-ink/40 transition-colors">
         <div class="flex items-center justify-between">
             <span class="text-xs text-muted">#{{ listing.on_chain_id }}</span>
             <span class="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider
-                {% if listing.status == 'active' %}bg-[rgba(23,67,255,0.07)] text-accent
+                {% if listing.status == 'active' %}bg-[rgba(239,68,68,0.10)] text-accent
                 {% elif listing.status == 'sold' %}bg-wash text-muted
-                {% else %}bg-[rgba(23,67,255,0.07)] text-accent{% endif %}">
+                {% else %}bg-[rgba(239,68,68,0.10)] text-accent{% endif %}">
                 {{ listing.status }}
             </span>
         </div>

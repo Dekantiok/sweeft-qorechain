@@ -20,7 +20,7 @@
     <h2 class="text-sm font-semibold uppercase tracking-wider text-muted">Escrows</h2>
     <div class="mt-3 overflow-x-auto rounded-xl border border-line">
         <table class="w-full text-sm">
-            <thead class="bg-white text-left text-xs uppercase tracking-wider text-muted">
+            <thead class="bg-wash text-left text-xs uppercase tracking-wider text-muted">
                 <tr>
                     <th class="px-4 py-3">#</th>
                     <th class="px-4 py-3">Amount</th>
@@ -33,14 +33,14 @@
             </thead>
             <tbody class="divide-y divide-neutral-900">
                 {% for escrow in escrows %}
-                <tr class="hover:bg-white transition-colors">
+                <tr class="hover:bg-hover transition-colors">
                     <td class="px-4 py-3 font-mono text-muted">{{ escrow.on_chain_id }}</td>
                     <td class="px-4 py-3 text-accent">{{ escrow.amount_qor }} QOR</td>
                     <td class="px-4 py-3 hash text-muted max-w-[140px] truncate">{{ escrow.buyer.evm_address }}</td>
                     <td class="px-4 py-3 hash text-muted max-w-[140px] truncate">{{ escrow.seller.evm_address }}</td>
                     <td class="px-4 py-3">
                         <span class="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider
-                            {% if escrow.state == 'completed' %}bg-[rgba(23,67,255,0.07)] text-accent
+                            {% if escrow.state == 'completed' %}bg-[rgba(239,68,68,0.10)] text-accent
                             {% elif escrow.state == 'release_eligible' %}bg-amber-500/10 text-amber-400
                             {% else %}bg-wash text-muted{% endif %}">{{ escrow.state }}</span>
                     </td>
@@ -60,7 +60,7 @@
     <h2 class="text-sm font-semibold uppercase tracking-wider text-muted">Listings</h2>
     <div class="mt-3 overflow-x-auto rounded-xl border border-line">
         <table class="w-full text-sm">
-            <thead class="bg-white text-left text-xs uppercase tracking-wider text-muted">
+            <thead class="bg-wash text-left text-xs uppercase tracking-wider text-muted">
                 <tr>
                     <th class="px-4 py-3">#</th>
                     <th class="px-4 py-3">Title</th>
@@ -73,12 +73,12 @@
             </thead>
             <tbody class="divide-y divide-neutral-900">
                 {% for listing in listings %}
-                <tr class="hover:bg-white transition-colors">
+                <tr class="hover:bg-hover transition-colors">
                     <td class="px-4 py-3 font-mono text-muted">{{ listing.on_chain_id }}</td>
                     <td class="px-4 py-3 text-muted">{{ listing.title }}</td>
                     <td class="px-4 py-3 text-accent">{{ listing.price_qor }} QOR</td>
                     <td class="px-4 py-3 text-muted">{{ listing.quantity }}</td>
-                    <td class="px-4 py-3"><span class="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider {% if listing.status == 'active' %}bg-[rgba(23,67,255,0.07)] text-accent{% else %}bg-wash text-muted{% endif %}">{{ listing.status }}</span></td>
+                    <td class="px-4 py-3"><span class="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider {% if listing.status == 'active' %}bg-[rgba(239,68,68,0.10)] text-accent{% else %}bg-wash text-muted{% endif %}">{{ listing.status }}</span></td>
                     <td class="px-4 py-3 hash text-muted max-w-[140px] truncate">{{ listing.seller.evm_address }}</td>
                     <td class="px-4 py-3"><a href="{% url 'marketplace:detail' listing.on_chain_id %}" class="text-accent hover:text-accent text-xs">View →</a></td>
                 </tr>

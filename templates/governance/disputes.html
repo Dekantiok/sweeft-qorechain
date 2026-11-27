@@ -23,7 +23,7 @@
 
 <!-- Board stats + staking -->
 <div class="mt-6 grid gap-4 sm:grid-cols-3">
-    <div class="rounded-xl border border-line bg-white p-5">
+    <div class="rounded-xl border border-line bg-black/60 p-5">
         <div class="text-xs uppercase tracking-wider text-muted">Reward pool</div>
         <div class="mt-1 text-xl font-bold text-accent">
             {{ board_state.reward_pool_qor|default:0|floatformat:4 }} QOR
@@ -32,7 +32,7 @@
             Fee share, slashed non-voters and forfeited appeal bonds
         </div>
     </div>
-    <div class="rounded-xl border border-line bg-white p-5">
+    <div class="rounded-xl border border-line bg-black/60 p-5">
         <div class="text-xs uppercase tracking-wider text-muted">Your stake</div>
         {% if not wallet_attached %}
         <div class="mt-1 text-xl font-bold text-muted">connect wallet</div>
@@ -72,7 +72,7 @@
         </div>
         {% endif %}
     </div>
-    <div class="rounded-xl border border-line bg-white p-5">
+    <div class="rounded-xl border border-line bg-black/60 p-5">
         <div class="text-xs uppercase tracking-wider text-muted">Resolver pool</div>
         <div class="mt-1 text-xl font-bold text-muted">{{ board_state.pool_size|default:0 }} resolvers in pool</div>
         <div class="mt-1 text-[11px] text-muted">
@@ -87,12 +87,12 @@
 <!-- Disputes -->
 <div class="mt-8 space-y-4">
     {% for dispute in disputes %}
-    <div class="rounded-xl border border-line bg-white p-5">
+    <div class="rounded-xl border border-line bg-black/60 p-5">
         <div class="flex flex-wrap items-center justify-between gap-2">
             <div class="flex flex-wrap items-center gap-3">
                 <span class="text-sm font-semibold">Dispute #{{ dispute.on_chain_id }}</span>
                 <span class="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider
-                    {% if dispute.state == 'final' %}bg-[rgba(23,67,255,0.07)] text-accent
+                    {% if dispute.state == 'final' %}bg-[rgba(239,68,68,0.10)] text-accent
                     {% elif dispute.state == 'resolved' %}bg-sky-500/10 text-sky-400
                     {% elif dispute.state == 'appealed' %}bg-purple-500/10 text-purple-400
                     {% else %}bg-amber-500/10 text-amber-400{% endif %}">

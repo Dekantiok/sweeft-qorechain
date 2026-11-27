@@ -13,13 +13,13 @@
 
 <div class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
     {% for partner in partners %}
-    <div class="rounded-xl border border-line bg-white p-5">
+    <div class="rounded-xl border border-line bg-black/60 p-5">
         <div class="flex items-start justify-between">
             <div>
                 <div class="font-semibold">{{ partner.company_name }}</div>
                 <div class="mt-1 text-xs text-muted">{{ partner.provider_id }} · {{ partner.operating_locations|default:"-" }}</div>
             </div>
-            <span class="rounded-full bg-[rgba(23,67,255,0.07)] px-2 py-0.5 text-[10px] uppercase tracking-wider text-accent">{{ partner.status }}</span>
+            <span class="rounded-full bg-[rgba(239,68,68,0.10)] px-2 py-0.5 text-[10px] uppercase tracking-wider text-accent">{{ partner.status }}</span>
         </div>
         {% if partner.services %}<p class="mt-3 text-xs leading-relaxed text-muted">{{ partner.services|truncatechars:140 }}</p>{% endif %}
         <div class="mt-3 flex items-center justify-between text-xs">

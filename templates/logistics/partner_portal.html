@@ -9,7 +9,7 @@
 </div>
 
 {% for partner in partners %}
-<div class="mt-8 rounded-xl border border-line bg-white p-5">
+<div class="mt-8 rounded-xl border border-line bg-black/60 p-5">
     <div class="flex items-center justify-between">
         <div class="font-semibold">{{ partner.company_name }}</div>
         <span class="rounded-full bg-neutral-950 px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted">{{ partner.status }}</span>
@@ -42,7 +42,7 @@
     <h2 class="text-sm font-semibold uppercase tracking-wider text-muted">Shipments</h2>
     <div class="mt-3 overflow-x-auto rounded-xl border border-line">
         <table class="w-full text-sm">
-            <thead class="bg-white text-left text-xs uppercase tracking-wider text-muted">
+            <thead class="bg-wash text-left text-xs uppercase tracking-wider text-muted">
                 <tr><th class="px-4 py-3">Tracking</th><th class="px-4 py-3">Escrow</th><th class="px-4 py-3">Status</th><th class="px-4 py-3">Simulated</th></tr>
             </thead>
             <tbody class="divide-y divide-neutral-900">

@@ -9,14 +9,14 @@
 </div>
 
 {% if escrow %}
-<div class="mt-6 rounded-xl border border-accent/30 bg-[rgba(23,67,255,0.03)] p-4 text-sm">
+<div class="mt-6 rounded-xl border border-accent/30 bg-[rgba(239,68,68,0.04)] p-4 text-sm">
     <span class="text-ink">This transaction touches Sweeft escrow </span>
     <a href="{% url 'escrow:detail' escrow.on_chain_id %}" class="font-semibold text-accent hover:text-accent">#{{ escrow.on_chain_id }} →</a>
 </div>
 {% endif %}
 
 {% if evm %}
-<div class="mt-6 rounded-xl border border-line bg-white p-6">
+<div class="mt-6 rounded-xl border border-line bg-black/60 p-6">
     <h2 class="text-sm font-semibold text-ink">EVM transaction (the honest label)</h2>
     <dl class="mt-4 grid gap-x-8 gap-y-2 text-xs sm:grid-cols-2">
         <dt class="text-muted">Status</dt><dd class="{% if evm.status == 1 %}text-accent{% else %}text-accent{% endif %}">{% if evm.status == 1 %}success (1){% else %}reverted (0){% endif %}</dd>
@@ -37,7 +37,7 @@
 {% endif %}
 
 {% if cosmos %}
-<div class="mt-6 rounded-xl border border-line bg-white p-6">
+<div class="mt-6 rounded-xl border border-line bg-black/60 p-6">
     <h2 class="text-sm font-semibold text-ink">Native-lane record</h2>
     <dl class="mt-4 grid gap-x-8 gap-y-2 text-xs sm:grid-cols-2">
         <dt class="text-muted">Signature tier</dt><dd class="text-muted">{{ tier.tier }}</dd>
@@ -47,7 +47,7 @@
 </div>
 {% endif %}
 
-<div class="mt-6 rounded-xl border border-line bg-white p-6">
+<div class="mt-6 rounded-xl border border-line bg-black/60 p-6">
     <h2 class="panel-head">Try to replay it</h2>
     <p class="mt-2 text-xs leading-relaxed text-muted">
         Release and refund signatures bind the vault, escrow id, both parties, amount and the per-buyer

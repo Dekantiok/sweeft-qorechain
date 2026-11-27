@@ -19,11 +19,11 @@
 </div>
 
 {% if is_verifier %}
-<div class="mt-6 rounded-xl border border-accent/30 bg-[rgba(23,67,255,0.03)] p-4 text-sm text-ink">
+<div class="mt-6 rounded-xl border border-accent/30 bg-[rgba(239,68,68,0.04)] p-4 text-sm text-ink">
     Your wallet is an authorized verifier: review each submission and attest it on-chain.
 </div>
 {% elif wallet_attached %}
-<div class="mt-6 rounded-xl border border-control bg-white p-4 text-sm text-muted">
+<div class="mt-6 rounded-xl border border-control bg-black/60 p-4 text-sm text-muted">
     Your wallet is connected but not an authorized verifier. Only DAO-approved verifiers can attest
     (verifier accounts: <span class="hash">0x9E9745aABd5706291C0D4CA2FD2022B832a875c8</span>).
 </div>
@@ -32,13 +32,13 @@
 <div class="mt-8 space-y-4">
     {% for row in rows %}
     {% with item=row.evidence %}
-    <div class="rounded-xl border border-line bg-white p-5">
+    <div class="rounded-xl border border-line bg-black/60 p-5">
         <div class="flex flex-wrap items-center justify-between gap-2">
             <div class="flex items-center gap-3">
                 <span class="text-xs text-muted">Escrow #{{ item.escrow.on_chain_id }}</span>
                 <span class="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider
-                    {% if item.verification_status == 'verified' %}bg-[rgba(23,67,255,0.07)] text-accent
-                    {% elif item.verification_status == 'rejected' %}bg-[rgba(23,67,255,0.07)] text-accent
+                    {% if item.verification_status == 'verified' %}bg-[rgba(239,68,68,0.10)] text-accent
+                    {% elif item.verification_status == 'rejected' %}bg-[rgba(239,68,68,0.10)] text-accent
                     {% else %}bg-amber-500/10 text-amber-400{% endif %}">{{ item.verification_status }}</span>
                 <span class="rounded-full bg-neutral-950 px-2 py-0.5 text-[10px] text-muted">{{ item.get_evidence_type_display }}</span>
             </div>
