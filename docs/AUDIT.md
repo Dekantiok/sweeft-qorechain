@@ -274,8 +274,8 @@ re-checked at execute). Two model decisions, deliberate:
   the Sybil cost control. PQ voting was evaluated and rejected as
   unnecessary friction for the threat model.
 - **Admin execution does not require a separate ML-DSA provenance.**
-  Authorization is the quorum + timelock + veto chain itself; T-REX-style
-  key-provenance was evaluated and deferred because DAO execution already
+  Authorization is the quorum + timelock + veto chain itself; per-action
+  provenance was evaluated and deferred because DAO execution already
   composes PQ-verified inputs (escrow release/refund signatures are
   PQ-verified inside the Vault regardless of who executes proposals).
 
