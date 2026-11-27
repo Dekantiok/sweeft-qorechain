@@ -15,16 +15,19 @@ from verified outcomes.
 
 ## Deployment status
 
-- **Live on Diana: v8** — deployed 26 November 2026 (`docs/deployments.md`:
-  Vault `0x820C…869a`, DAO2 `0x91d0…ad9edb43Cf59b`) — credits-only
-  settlement + Stage 5/6 pattern removal. Two verified PQ releases
-  (credited 0.098 of 0.1 QOR after the 2% fee, escrow Completed, seller
-  withdrew on-chain). `.env` and the hosted demo point at v8.
-- **Superseded: v7/v6/v5** — previous live stacks (v7: push settlement;
-  v6/v5 buy-side identical until the credits-only change).
+- **Live on Diana: v9** — deployed 27 November 2026 (`docs/deployments.md`:
+  Vault `0x21b8…862ce`, DAO2 `0x4283…AC91A`) — PQ verifier attestations,
+  domain-separated carrier signatures, committed future-block seeds,
+  credits-only settlement. Two verified PQ releases (ML-DSA-87 attestation
+  relayed on-chain, credited 0.098 of 0.1 QOR after the 2% fee, seller
+  withdrew on-chain). `.env` and the hosted demo point at v9.
+- **Superseded: v8/v7/v6/v5** — previous live stacks (v8: msg.sender-only
+  attestations, pre-v2 carrier format; still settleable there).
 - **Audit scope:** Stage 3 (78/100) covers v5; Stage 4 (72/100) covers v6;
-  v7 == patched v6 source (Stage 5 bundle in `docs/audit/stage-5/`); v8 ==
-  Stage 6 bundle source (`docs/audit/stage-6/`), live since 26 Nov 2026.
+  v7 == patched v6 source (Stage 5 bundle in `docs/audit/stage-5/`); v8 == Stage
+  6 bundle source (`docs/audit/stage-6/`); v9 is the current hardened source
+  (Stage 4–6 findings fixed; re-audit bundle staged under `docs/audit/stage-6/`).
+  Deployment is two scripts + one cast send (see `docs/deployments.md`).
 
 ## Architecture
 

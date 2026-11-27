@@ -4,7 +4,48 @@
 **Deployer:** `qor1etuzhk8tmpmrfmakzzhx8fau788r4jrapjkzlp` / `0xcaF82Bd8EBd87634eFb610aE63a7bCf1CE3ac87D`
 **Explorer:** https://explore.qore.network
 
-## v8 — credits-only settlement (live; deployed 26 November 2026)
+## v9 — hardened stack (live; deployed 27 November 2026)
+
+Built from the hardening wave (carrier domain separation, PQ verifier
+attestations with relayer submissions, committed future-block seeds,
+credits-only settlement, typed registry reads). Deployment is **two
+scripts + one cast send**, because `addVerifier` reads the chain PQC
+precompile that forge's local simulation cannot reach:
+
+```bash
+# 1. core stack (no registry registration yet)
+forge script script/DeployStack.s.sol --rpc-url diana --broadcast
+# 2. register the verifier (pre-pinned to keyVersion 1 = ML-DSA-87)
+cast send $SWEEFT_ORACLE_REGISTRY_ADDRESS "addVerifier(address)" \
+  $SWEEFT_VERIFIER_ADDRESS --rpc-url diana --private-key $DEPLOYER_PRIVATE_KEY
+# 3. DAO + allowlist + ownership handover
+forge script script/Handover.s.sol --rpc-url diana --broadcast
+```
+
+| Contract | Address |
+|---|---|
+| **SweeftOracleRegistry (v9)** | `0x35720a83daaa400ae404b20b3769d9afc56253fc` |
+| **SweeftVault (v9)** | `0x21b8a243bf96340ebe5b78b296004f1bf76862ce` |
+| **SweeftMarketplace (v9)** | `0x1d60eb9325a9c3da7b95f21171a2187b1480fb55` |
+| **SweeftDisputeBoard (v9)** | `0x7f7c0f74f86dcc49e8373d2c140dfa5213b08001` |
+| **SweeftDAO2 (v9)** | `0x428370F58AbF859672EB4516ce81cF58EcDAC91A` |
+
+### v9 end-to-end evidence (27 November 2026)
+
+`tools/e2e_marketplace.py` against vault `0x21b8…862ce` — full PQ-gated
+release on v9 (run twice, both PASS), attesting with the verifier's
+ML-DSA-87 signature via the **relayed submission** path:
+
+| Step | Escrow #0 | Escrow #1 |
+|---|---|---|
+| release (ML-DSA-87 via `pqcVerify`) | `0xd24afb16…` | `0x0320db17…` |
+
+Observed both runs: seller credited 0.098 QOR (0.1 − 2% fee), withdrew
+on-chain, escrow **Completed**. Fixtures: escrow #2 (Funded), escrow #3
+(release-eligible). Playwright E2E **32/32** on v9. Indexer synced
+(0 handler failures).
+
+## v8 — credits-only settlement (superseded by v9; 26 November 2026)
 
 Same contracts as v7 plus the Stage 5 pattern-removal patch (credits-only
 settlement, named access modifiers, typed registry calls, fee-bps bound,
