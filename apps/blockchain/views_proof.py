@@ -117,6 +117,17 @@ def tx_proof(request, tx_hash: str):
 
 
 @require_GET
+def verify_tx_page(request):
+    """Public PQ verification: enter a Diana tx hash, verify live."""
+    tx_hash = (request.GET.get("tx") or "").strip()
+    result = None
+    if tx_hash:
+        from apps.blockchain.services.verify import verify_transaction
+        result = verify_transaction(tx_hash)
+    return render(request, "blockchain/verify.html", {"tx_hash": tx_hash, "result": result})
+
+
+@require_GET
 def escrow_proof(request, escrow_id: int):
     """The full PQ gate story for one escrow, read live from the chain."""
     escrow = get_object_or_404(

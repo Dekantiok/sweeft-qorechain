@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Verify a transaction: Sweeft{% endblock %}
+{% block content %}
+<div>
+<h1 class="font-serif text-[28px] leading-[1.1] lg:text-[34px]">Public PQ verification</h1>
+<p class="mt-2 text-sm text-muted">Enter any Diana transaction hash. Sweeft re-verifies the post-quantum gates against live chain state — buyer ML-DSA-87, carrier and verifier signatures, registration, settlement and fee recipients. No mocks.</p>
+<form method="get" class="mt-6 flex flex-col gap-3 sm:flex-row">
+<input name="tx" value="{{ tx_hash }}" placeholder="0x..." class="hash flex-1 rounded-lg border border-line bg-black/60 px-4 py-2 text-sm text-ink placeholder:text-muted" required>
+<button class="rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-black hover:bg-red-400" type="submit">Verify</button>
+</form>
+</div>
+
+{% if result %}
+<div class="mt-8 rounded-xl border border-line bg-black/60 p-6">
+<h2 class="text-sm font-semibold text-ink">Result</h2>
+<dl class="mt-4 grid gap-x-8 gap-y-2 text-xs sm:grid-cols-2">
+<dt class="text-muted">tx</dt><dd class="hash break-all text-muted">{{ result.tx_hash }}</dd>
+<dt class="text-muted">kind</dt><dd class="text-muted">{{ result.kind }}</dd>
+<dt class="text-muted">block</dt><dd class="text-muted">{{ result.block|default:"-" }}</dd>
+<dt class="text-muted">status</dt><dd class="text-muted">{{ result.status|default:"-" }}</dd>
+<dt class="text-muted">from</dt><dd class="hash break-all text-muted">{{ result.from|default:"-" }}</dd>
+<dt class="text-muted">to</dt><dd class="hash break-all text-muted">{{ result.to|default:"-" }}</dd>
+{% if result.escrow_id is not None %}<dt class="text-muted">escrow</dt><dd class="text-muted">#{{ result.escrow_id }}</dd>{% endif %}
+</dl>
+{% if result.error %}<p class="mt-4 text-xs text-red-400">{{ result.error }}</p>{% endif %}
+</div>
+
+{% if result.checks %}
+<div class="mt-6 rounded-xl border border-line bg-black/60 p-6">
+<h2 class="panel-head">PQ checks (live re-verification)</h2>
+<dl class="mt-4 grid gap-x-8 gap-y-2 text-xs sm:grid-cols-2">
+{% for k,v in result.checks.items %}<dt class="text-muted">{{ k }}</dt><dd class="text-muted">{{ v }}</dd>{% endfor %}
+</dl>
+</div>
+{% endif %}
+
+{% if result.settlement %}
+<div class="mt-6 rounded-xl border border-line bg-black/60 p-6">
+<h2 class="panel-head">Settlement</h2>
+<dl class="mt-4 grid gap-x-8 gap-y-2 text-xs sm:grid-cols-2">
+{% for k,v in result.settlement.items %}<dt class="text-muted">{{ k }}</dt><dd class="hash break-all text-muted">{{ v }}</dd>{% endfor %}
+</dl>
+{% if result.settlement.recipients %}
+<dl class="mt-4 grid gap-x-8 gap-y-2 text-xs sm:grid-cols-2">
+{% for k,v in result.settlement.recipients.items %}<dt class="text-muted">{{ k }}</dt><dd class="hash break-all text-muted">{{ v }}</dd>{% endfor %}
+</dl>
+{% endif %}
+</div>
+{% endif %}
+
+{% if result.events %}
+<div class="mt-6 rounded-xl border border-line bg-black/60 p-6">
+<h2 class="panel-head">Decoded events</h2>
+{% for e in result.events %}<p class="mt-2 hash break-all text-xs text-muted">{{ e.type }} — {{ e|dictsort:"" }}</p>{% endfor %}
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}

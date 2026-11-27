@@ -18,7 +18,9 @@ CSRF_TRUSTED_ORIGINS = [h for h in os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "").
 MIDDLEWARE.insert(MIDDLEWARE.index("django.middleware.security.SecurityMiddleware") + 1, "whitenoise.middleware.WhiteNoiseMiddleware")
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
-    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedStaticFilesStorage"},
+    # Hashed filenames: a CSS change gets a new URL, so browsers never serve
+    # a stale stylesheet after a deploy.
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
 }
 
 if os.getenv("DJANGO_DB_ENGINE") == "sqlite":
