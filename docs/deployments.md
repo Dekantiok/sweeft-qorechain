@@ -45,6 +45,33 @@ on-chain, escrow **Completed**. Fixtures: escrow #2 (Funded), escrow #3
 (release-eligible). Playwright E2E **32/32** on v9. Indexer synced
 (0 handler failures).
 
+Full release hashes (27 Nov 2026): escrow #0
+`0xd24afb1680f59de25bc22a0385bbd32d98f57d5838be35863f7e7dd6149118a8`,
+escrow #1 `0x0320db17d37d8f446e2d4a9ecc47c7fb885a011b8e42b2732ed95d2ec38f3617`.
+DeployStack txs include Vault `0xa0680fcf…` and Registry
+`0xf9c27d3e…`; Handover DAO2 deploy `0xcc92339a…` (see broadcast files
+under `contracts/broadcast/`).
+
+### Verify the deployment matches the source (27 Nov 2026)
+
+```bash
+cd contracts && forge build
+# compare on-chain code length to compiled deployedBytecode length
+# Registry + DAO2: byte-exact. Vault/Board/Marketplace: length-identical,
+# differ only by immutable injection (oracleRegistry/treasury/deployedAt
+# constructor args in DeployStack.s.sol / Handover.s.sol).
+cast call $SWEEFT_VAULT_ADDRESS "owner()(address)" --rpc-url diana        # DAO2
+cast call $SWEEFT_VAULT_ADDRESS "feeBps()(uint256)" --rpc-url diana      # 200
+cast call $SWEEFT_ORACLE_REGISTRY_ADDRESS "keyVersion(address)(uint8)" \
+  $SWEEFT_VERIFIER_ADDRESS --rpc-url diana                                # 1
+cast call $SWEEFT_VAULT_ADDRESS "isCarrier(address)(bool)" \
+  $SWEEFT_CARRIER_ADDRESS --rpc-url diana                                # true
+# Public PQ verification of a real release:
+curl "/verify/?tx=0xd24afb1680f59de25bc22a0385bbd32d98f57d5838be35863f7e7dd6149118a8"
+# Attack reproduction:
+.venv/bin/python tools/qday_attack_demo.py
+```
+
 ## v8 — credits-only settlement (superseded by v9; 26 November 2026)
 
 Same contracts as v7 plus the Stage 5 pattern-removal patch (credits-only

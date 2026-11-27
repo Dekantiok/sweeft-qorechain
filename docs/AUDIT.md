@@ -1,11 +1,12 @@
 # Sweeft — QCAI Audit Record
 
 **Network:** QoreChain Diana testnet · **EVM chain ID 9800**
-**Contracts:** `contracts/src/` (6 contracts) · **Tests:** 131 Foundry + 28 Django
+**Contracts:** `contracts/src/` (6 contracts) · **Tests:** 189 Foundry + 81 Django
 **Auditors:** QoreChain dashboard Contract Auditor (EVM/Solidity setting) **and**
-Slither 0.11.6. Latest QCAI score **78/100** (Stage 3, on **v5 only** — the
-current v6 source has not been audited; see the v6 section below). Slither
-0.11.6 reported **0 High / 0 Medium on v5**; neither result covers v6.
+Slither 0.11.6. Latest OBTAINED QCAI score **72/100 (Stage 6, on v8)**.
+**v9 (Stage 7) is NOT YET QCAI-AUDITED — no score claimed.** Slither 0.11.6
+on v9: Vault 0 High / 0 Medium; cross-contract arbitrary-send/reentrancy
+triaged in `docs/audit/stage-7/README.md`.
 
 > Stage 1 report: [`docs/audit/stage-1/`](audit/stage-1/)
 > Stage 2 report: [`docs/audit/stage-2/`](audit/stage-2/)

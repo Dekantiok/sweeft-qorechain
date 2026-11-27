@@ -24,10 +24,32 @@ from verified outcomes.
 - **Superseded: v8/v7/v6/v5** — previous live stacks (v8: msg.sender-only
   attestations, pre-v2 carrier format; still settleable there).
 - **Audit scope:** Stage 3 (78/100) covers v5; Stage 4 (72/100) covers v6;
-  v7 == patched v6 source (Stage 5 bundle in `docs/audit/stage-5/`); v8 == Stage
-  6 bundle source (`docs/audit/stage-6/`); v9 is the current hardened source
-  (Stage 4–6 findings fixed; re-audit bundle staged under `docs/audit/stage-6/`).
-  Deployment is two scripts + one cast send (see `docs/deployments.md`).
+  Stage 5 (72/100) covers patched v6; Stage 6 (72/100) covers v8;
+  **v9 is bundle-ready as Stage 7 (`docs/audit/stage-7/`) but NOT YET
+  QCAI-AUDITED — no score claimed.** Deployment is two scripts + one cast send
+  (see `docs/deployments.md`).
+
+## End-to-end workflow (v9, live on Diana)
+
+1. **Buyer** sets an AI budget (per-tx + daily cap) and optionally enables
+   **Autopilot** — the AI can only draft or, with Autopilot opted in,
+   submit a pre-signed release inside the budget.
+2. **AI** searches listings, negotiates against the seller floor, and drafts
+   a purchase; the wallet still signs (no signature, no movement).
+3. **Buyer** funds the escrow; the seller ships. A **carrier** signs a
+   domain-separated `sweeft-carrier-v2` delivery attestation and a
+   **verifier** signs `sweeft-verifier-v1` evidence — both ML-DSA-87,
+   verified on-chain against chain-registered keys.
+4. **Disputes** draw a random staked panel from a committed future-block
+   seed; either party can appeal to a larger 5-resolver panel.
+5. **Settlement** is PQ-authorized: the buyer's ML-DSA-87 release signature
+   is checked by `pqcVerify`; funds are credited (2% fee, 70% treasury /
+   30% dispute pool) and withdrawn via `withdrawCredits`.
+
+Verify any transaction live at `/verify/?tx=<hash>` (no mocks). Attack
+reproduction: `tools/qday_attack_demo.py` (5 LIVE Diana eth_call attacks +
+1 local Django mandate test; Foundry local sims in
+`contracts/test/SweeftQDayAttacks.t.sol`).
 
 ## Architecture
 

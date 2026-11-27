@@ -104,7 +104,14 @@ def verify_transaction(tx_hash: str) -> dict:
         return {"error": "transaction not found on Diana EVM RPC", "tx_hash": tx_hash}
 
     vault = _vault(w3)
-    data = tx.get("input", "0x") or "0x"
+    raw_input = tx.get("input", "0x") or "0x"
+    # web3 returns HexBytes; normalize to 0x-hex string for decoding.
+    if isinstance(raw_input, (bytes, bytearray)):
+        data = "0x" + bytes(raw_input).hex()
+    else:
+        data = str(raw_input)
+        if not data.startswith("0x"):
+            data = "0x" + data
     selector = data[2:10].lower() if len(data) >= 10 else ""
     if vault is None or w3.to_checksum_address(tx["to"]) != vault.address:
         return {
@@ -176,7 +183,7 @@ def _decode_call(w3, vault, data, selector):
     for name, types, sig in candidates:
         if sig == selector:
             try:
-                return name, abi.decode(raw, types)
+                return name, abi.decode(types, raw)
             except Exception:
                 return name, None
     return "other Vault call", None
@@ -332,13 +339,17 @@ def _verify_verifier_authorization(w3, vault, args) -> dict:
 
 def _decode_events(vault, receipt) -> list:
     events = []
-    topics = receipt.get("logs", []) or []
+    logs = receipt.get("logs", []) or []
     for name in ("FundsReleased", "FeeCollected", "DisputeResolved", "CarrierAttested", "EvidenceAttested"):
         try:
             kind = getattr(vault.events, name, None)
             if kind is None:
                 continue
-            for log in kind().process_receipt(receipt, errors="silent"):
+            for raw_log in logs:
+                try:
+                    log = kind().process_log(raw_log)
+                except Exception:
+                    continue
                 args = dict(log["args"])
                 entry = {"type": name}
                 for key in ("escrowId", "seller", "buyer", "amount", "nonce", "treasuryShare", "disputeShare"):
