@@ -7,6 +7,27 @@ def wallet(request):
     account = request.session.get("wallet_account") or {}
     evm = account.get("evm", "")
     qor = account.get("qor", "")
+    ai_mandate = None
+    ai_daily_spent_qor = 0
+    if evm:
+        try:
+            from apps.ai.models import Mandate
+            from apps.ai.services.tools import _daily_spend_uqor
+            from apps.participants.models import Participant
+
+            participant = Participant.objects.filter(evm_address__iexact=evm).first()
+            if participant:
+                ai_mandate = (
+                    Mandate.objects.filter(
+                        owner=participant, state__in=[Mandate.State.ACTIVE, Mandate.State.PAUSED]
+                    )
+                    .order_by("-created_at")
+                    .first()
+                )
+            if ai_mandate and ai_mandate.state == Mandate.State.ACTIVE:
+                ai_daily_spent_qor = _daily_spend_uqor(ai_mandate) / 1_000_000
+        except Exception:
+            ai_mandate = None
     return {
         "wallet_account": evm,
         "wallet_qor": qor,
@@ -14,6 +35,8 @@ def wallet(request):
         "wallet_method": account.get("method", ""),
         "is_staked_resolver": False,
         "is_logistics_provider": False,
+        "ai_mandate": ai_mandate,
+        "ai_daily_spent_qor": ai_daily_spent_qor,
     }
 
 

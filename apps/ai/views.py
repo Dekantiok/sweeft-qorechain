@@ -8,7 +8,6 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.http import JsonResponse
-from django.shortcuts import render
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
@@ -27,34 +26,29 @@ def _participant_for(request) -> Participant | None:
     return Participant.objects.filter(evm_address__iexact=wallet).first()
 
 
-def assistant(request):
+def assistant_context(request) -> dict:
+    """Chat data for the landing page assistant section."""
     participant = _participant_for(request)
     conversations = []
     recent_messages = []
-    mandate = None
-    daily_spent = 0
     if participant:
         conversations = list(participant.conversations.all()[:10])
         recent_messages = list(
             Message.objects.filter(conversation__participant=participant).select_related("conversation").order_by("-created_at")[:40]
         )[::-1]
-        from apps.ai.services.tools import _active_mandate, _daily_spend_uqor
+    return {
+        "conversations": conversations,
+        "recent_messages": recent_messages,
+        "wallet_attached": bool(participant),
+        "api_ready": bool(__import__("os").getenv("MODEL_API_KEY")),
+    }
 
-        mandate = _active_mandate((request.session.get("wallet_account") or {}).get("evm", ""))
-        if mandate:
-            daily_spent = _daily_spend_uqor(mandate)
-    return render(
-        request,
-        "ai/index.html",
-        {
-            "conversations": conversations,
-            "recent_messages": recent_messages,
-            "wallet_attached": bool(participant),
-            "api_ready": bool(__import__("os").getenv("MODEL_API_KEY")),
-            "mandate": mandate,
-            "daily_spent_qor": daily_spent / 1_000_000,
-        },
-    )
+
+def assistant(request):
+    """The assistant lives on the landing page now."""
+    from django.shortcuts import redirect
+
+    return redirect("/#ai-assistant")
 
 
 @require_POST

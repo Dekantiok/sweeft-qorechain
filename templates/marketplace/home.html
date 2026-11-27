@@ -59,7 +59,7 @@
                     <div class="mt-1 font-semibold group-hover:underline underline-offset-4">DAO</div>
                     <div class="mt-1 text-[12px] leading-[17px] text-muted">Stake-weighted governance</div>
                 </a>
-                <a href="/ai/" class="group border border-line bg-black/40 p-4 hover:border-control transition-colors">
+                <a href="#ai-assistant" class="group border border-line bg-black/40 p-4 hover:border-control transition-colors">
                     <div class="text-[11px] uppercase tracking-wider text-muted">06</div>
                     <div class="mt-1 font-semibold group-hover:underline underline-offset-4">AI assistant</div>
                     <div class="mt-1 text-[12px] leading-[17px] text-muted">Mandate-capped agent</div>
@@ -67,6 +67,15 @@
             </nav>
         </div>
     </div>
+</section>
+
+{# ---- AI assistant (chat lives here, budget lives in the wallet menu) ---- #}
+<section id="ai-assistant" class="border-t border-line mt-16 py-16 scroll-mt-24">
+    <div class="flex flex-col gap-5 max-w-[640px] mb-8">
+        <h2 class="font-serif text-[34px] leading-[1.06] lg:text-[44px]">Ask the assistant</h2>
+        <p class="text-[16px] leading-[24px]">Connect your wallet and chat right here. To set or change the AI budget, open the wallet menu at the top right after connecting.</p>
+    </div>
+    {% include "components/ai_chat.html" %}
 </section>
 
 {# ---- Story: Fund, Ship, Attest, Release (Meridian Story pattern) ---- #}

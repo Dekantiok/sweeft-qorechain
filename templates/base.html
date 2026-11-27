@@ -25,7 +25,7 @@
                     <a href="/marketplace/" class="text-ink underline decoration-line underline-offset-[5px] hover:decoration-accent transition-colors">Marketplace</a>
                     {% if wallet_account %}
                     <a href="/escrow/new/" class="text-ink underline decoration-line underline-offset-[5px] hover:decoration-accent transition-colors">New escrow</a>
-                    <a href="/ai/" class="text-ink underline decoration-line underline-offset-[5px] hover:decoration-accent transition-colors">AI Assistant</a>
+                    <a href="/#ai-assistant" class="text-ink underline decoration-line underline-offset-[5px] hover:decoration-accent transition-colors">AI Assistant</a>
                     {% endif %}
                     {% if is_staked_resolver %}
                     <a href="/dashboard/" class="text-ink underline decoration-line underline-offset-[5px] hover:decoration-accent transition-colors">Dashboard</a>
@@ -47,7 +47,7 @@
                             <span class="h-1.5 w-1.5 rounded-full bg-up"></span>
                             <span id="wallet-short" class="max-w-[9rem] truncate">{{ wallet_short }}</span>
                         </button>
-                        <div id="account-menu" class="hidden absolute right-0 mt-2 w-72 border border-line bg-black/60 p-3 shadow-lg z-50">
+                        <div id="account-menu" class="hidden absolute right-0 mt-2 w-80 border border-line bg-black/60 p-3 shadow-lg z-50">
                             <div class="px-1 text-[11px] uppercase tracking-wider text-muted mb-2">
                                 Connected with {{ wallet_method|default:"wallet"|upper }}
                             </div>
@@ -60,6 +60,47 @@
                                 <a href="https://explore.qore.network/account/{{ wallet_qor }}" target="_blank" class="border border-control px-3 py-2 text-center hover:bg-hover transition-colors">Explorer</a>
                                 <button id="copy-address" class="border border-control px-3 py-2 hover:bg-hover transition-colors">Copy address</button>
                                 <button id="disconnect-wallet" class="border border-down px-3 py-2 text-down hover:bg-[rgba(192,38,58,0.05)] transition-colors">Disconnect</button>
+                            </div>
+
+                            <div class="mt-3 border-t border-line pt-3">
+                                <div class="flex items-center justify-between px-1">
+                                    <span class="text-[11px] uppercase tracking-wider text-muted">AI assistant budget</span>
+                                    {% if ai_mandate %}<span class="text-[10px] uppercase tracking-wider text-ink">{{ ai_mandate.state }}</span>{% endif %}
+                                </div>
+                                {% if ai_mandate %}
+                                <p class="mt-2 px-1 text-[12px] leading-[18px] text-muted">
+                                    Per transaction <strong class="text-ink">{{ ai_mandate.per_tx_qor }} QOR</strong><br>
+                                    Daily <strong class="text-ink">{{ ai_mandate.daily_qor }} QOR</strong> · Spent today <strong class="text-ink">{{ ai_daily_spent_qor|floatformat:4 }} QOR</strong><br>
+                                    Expires {{ ai_mandate.expires_at|date:"M d, Y" }}
+                                </p>
+                                <div class="mt-2 grid grid-cols-2 gap-2 text-[13px]">
+                                    {% if ai_mandate.state == 'paused' %}
+                                    <button class="mandate-action border border-control px-3 py-2 hover:bg-hover transition-colors" data-id="{{ ai_mandate.pk }}" data-action="resume">Resume</button>
+                                    {% else %}
+                                    <button class="mandate-action border border-control px-3 py-2 hover:bg-hover transition-colors" data-id="{{ ai_mandate.pk }}" data-action="pause">Pause</button>
+                                    {% endif %}
+                                    <button class="mandate-action border border-control px-3 py-2 hover:bg-hover transition-colors" data-id="{{ ai_mandate.pk }}" data-action="revoke">Revoke</button>
+                                </div>
+                                {% endif %}
+                                <form id="mandate-form" class="mt-3 grid gap-2 text-[13px]">
+                                    <div class="grid grid-cols-3 gap-2">
+                                        <div>
+                                            <label class="label" for="m-pertx">Per tx QOR</label>
+                                            <input id="m-pertx" name="per_tx_qor" type="number" step="0.01" min="0.01" required class="input input-sm">
+                                        </div>
+                                        <div>
+                                            <label class="label" for="m-daily">Daily QOR</label>
+                                            <input id="m-daily" name="daily_qor" type="number" step="0.01" min="0.01" required class="input input-sm">
+                                        </div>
+                                        <div>
+                                            <label class="label" for="m-days">Days</label>
+                                            <input id="m-days" name="days" type="number" min="1" max="90" value="7" required class="input input-sm">
+                                        </div>
+                                    </div>
+                                    <label class="flex items-center gap-2 text-[11px] text-muted"><input type="checkbox" name="autopilot_allowed" value="on" class="accent-white"> Allow Autopilot execution</label>
+                                    <button type="submit" class="btn btn-sm w-full">{% if ai_mandate %}Update budget{% else %}Set AI budget{% endif %}</button>
+                                    <p id="mandate-status" class="text-[11px] text-muted">The AI refuses purchases above this budget. Setting a new one pauses the old one.</p>
+                                </form>
                             </div>
                         </div>
                     </div>
@@ -106,7 +147,7 @@
         <a href="/escrow/new/" class="flex h-[52px] flex-col items-center justify-center gap-1 text-[12px] text-muted">
             <span aria-hidden class="text-[15px] leading-none">▣</span>Escrow
         </a>
-        <a href="/ai/" class="flex h-[52px] flex-col items-center justify-center gap-1 text-[12px] text-muted">
+        <a href="/#ai-assistant" class="flex h-[52px] flex-col items-center justify-center gap-1 text-[12px] text-muted">
             <span aria-hidden class="text-[15px] leading-none">✦</span>AI
         </a>
         <a href="/security/" class="flex h-[52px] flex-col items-center justify-center gap-1 text-[12px] text-muted">
@@ -129,6 +170,44 @@
                 }
             });
         });
+        // AI mandate (budget) controls in the wallet menu
+        var csrfToken = document.querySelector('meta[name="csrf-token"]');
+        var mandateForm = document.getElementById("mandate-form");
+        var mandateStatus = document.getElementById("mandate-status");
+        if (mandateForm) {
+            mandateForm.addEventListener("submit", async function (event) {
+                event.preventDefault();
+                mandateStatus.textContent = "Activating";
+                try {
+                    var result = await fetch("/api/ai/mandate/", {
+                        method: "POST",
+                        headers: { "X-CSRFToken": csrfToken.content },
+                        body: new URLSearchParams(new FormData(mandateForm)),
+                    }).then(function (r) { return r.json(); });
+                    if (result.error) throw new Error(result.error);
+                    mandateStatus.textContent = "Budget active: " + result.per_tx_qor + " QOR per tx, " + result.daily_qor + " QOR daily.";
+                    setTimeout(function () { location.reload(); }, 1200);
+                } catch (err) {
+                    mandateStatus.textContent = "Budget failed: " + (err.message || err);
+                }
+            });
+        }
+        document.querySelectorAll(".mandate-action").forEach(function (button) {
+            button.addEventListener("click", async function () {
+                if (!window.confirm("Are you sure you want to " + button.dataset.action + " this budget?")) return;
+                try {
+                    var result = await fetch("/api/ai/mandate/" + button.dataset.id + "/" + button.dataset.action + "/", {
+                        method: "POST",
+                        headers: { "X-CSRFToken": csrfToken.content },
+                    }).then(function (r) { return r.json(); });
+                    if (result.error) throw new Error(result.error);
+                    location.reload();
+                } catch (err) {
+                    alert("Action failed: " + (err.message || err));
+                }
+            });
+        });
+
         var connect = document.getElementById("connect-wallet");
         if (connect && window.SweeftWallet) connect.addEventListener("click", function () { SweeftWallet.openModal(); });
         var copy = document.getElementById("copy-address");
