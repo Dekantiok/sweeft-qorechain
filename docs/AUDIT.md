@@ -324,4 +324,20 @@ the fixed behaviour; contracts and backend were revised together as "v5".
 | B-8 | Low-Med | Wallet-login hardening | **Fixed** — domain/expiry-bound challenge, single-use, session rotated on login |
 | B-9 | High (ops) | Key separation / blast radius | **Documented** — deployer mnemonic is testnet-only; secrets via env; separate relayer key. Production posture in README |
 | B-10 | Med | Server-signed carrier (Demo Carrier) | **Documented** — labelled simulated everywhere; real carriers sign with their own keys |
-| B-11 | High (claims) | Mandate was
+| B-11 | High (claims) | Mandate was a stub; prompt injection; float math | **Fixed** — mandate enforced in code (per-tx + rolling daily; refuses with none); Decimal amounts; tool allowlist via `TOOLS_REGISTRY`; listing text treated as data |
+| B-12 | Low-Med | Oracle page N chain reads | **Mitigated** — indexed DB state used where available |
+| B-13 | Med | uqor/wei unit mixing | **Tracked** — one documented unit per layer; round-trip tests planned |
+| B-14 | Low-Med | Pre-signed release is a bearer token | **Fixed** — TTL + clear-after-use + buyer revoke + active-authorization list |
+
+### Process
+
+- **D-1** dependency hygiene, **D-2** production settings (HSTS preload, CSP,
+  frame/referrer/cookie hardening, structured logs), **D-3** test gaps (new
+  Foundry DAO2/invariant suites + Django `tests/`), **D-4** deeper review of the
+  indexer/JS, and **D-5** claims/docs accuracy are reflected here and in the
+  README. `pip-audit`/Slither-in-CI remain recommended follow-ups.
+
+**Definition of done (from the review):** a regression test exists for each
+Critical/High finding and the README makes only claims the code backs. Foundry
+**121 passing**, Django **13 passing** (v5 era; current counts — 131 Foundry +
+28 Django — are in the v6 section above).
