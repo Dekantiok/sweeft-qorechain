@@ -62,6 +62,7 @@
                 <button type="submit" class="rounded-lg bg-ink text-white shadow-none px-4 py-2 text-sm font-semibold text-ink hover:bg-accent transition-colors">
                     Set mandate
                 </button>
+                <label class="flex items-center gap-2 text-xs text-neutral-300"><input type="checkbox" name="autopilot_allowed" value="on" class="accent-red-500"> Allow Autopilot execution (requires pre-signed release)</label>
                 <p id="mandate-status" class="text-[11px] text-neutral-400">
                     {% if wallet_attached %}Activates a bounded budget. Setting a new one pauses the old one. The AI refuses to model purchases above it.
                     {% else %}Connect your wallet above to set a budget.{% endif %}

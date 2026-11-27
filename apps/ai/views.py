@@ -91,6 +91,7 @@ def mandate_set(request):
         per_tx_limit_uqor=per_tx,
         daily_limit_uqor=daily,
         state=Mandate.State.ACTIVE,
+        autopilot_allowed=bool(request.POST.get("autopilot_allowed")),
         expires_at=timezone.now() + timedelta(days=days),
     )
     return JsonResponse({"ok": True, "mandate_id": mandate.pk, "per_tx_qor": per_tx / 1_000_000, "daily_qor": daily / 1_000_000})

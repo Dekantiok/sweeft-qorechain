@@ -72,6 +72,9 @@ class Mandate(models.Model):
     # Spending policy — mirrors the on-chain rule (uqor)
     per_tx_limit_uqor = models.DecimalField(max_digits=30, decimal_places=0)
     daily_limit_uqor = models.DecimalField(max_digits=30, decimal_places=0)
+    # Autopilot is opt-in per mandate: the AI may execute pre-signed
+    # releases only when the owner explicitly allowed autonomous execution.
+    autopilot_allowed = models.BooleanField(default=False)
 
     # Django-side policy
     allowed_categories = models.ManyToManyField("marketplace.Category", blank=True)

@@ -259,27 +259,39 @@ def tool_execute_autopilot(escrow_id: int, wallet: str | None = None) -> dict:
     if not escrow.autopilot_enabled or not escrow.autopilot_release_signature_b64:
         return {"error": "no pre-authorization stored — the buyer must sign once in QoreX first (Autopilot on the escrow page)"}
 
-    # Django-side mandate check (the chain rule is the hard cap)
-    amount_qor = float(escrow.amount_uqor) / 1e6  # uqor -> QOR
-    caps = tool_check_mandate("release", amount_qor, wallet=wallet)
-    if not caps.get("within_caps"):
-        from apps.ai.models import AgentAction, Mandate
-
-        mandate = _active_mandate(wallet)
-        if mandate:
-            AgentAction.objects.create(
-                mandate=mandate,
-                action="execute_autopilot",
-                payload={"escrow_id": int(escrow_id), "amount_uqor": int(escrow.amount_uqor)},
-                outcome=AgentAction.Outcome.REFUSED_POLICY,
-                detail=str(caps.get("reason", ""))[:500],
-            )
-        return {"error": f"outside mandate caps — refusing to execute: {caps.get('reason', '')}"}
-
+    # Live chain state first (G8): caps must be checked against the TRUE
+    # on-chain amount, never the indexer mirror, which can lag behind.
     try:
         state = escrow_state(int(escrow_id))
     except Exception as exc:
         return {"error": f"chain read failed: {exc}"}
+    live_amount_wei = int(state.get("amount_wei", 0))
+    live_amount_uqor = live_amount_wei // 10**12
+    live_amount_qor = live_amount_wei / 10**18
+
+    # Autopilot is opt-in per mandate: only runs when the owner explicitly
+    # enabled autonomous execution when setting the budget.
+    mandate = _active_mandate(wallet)
+    if mandate is None or not getattr(mandate, "autopilot_allowed", False):
+        return {
+            "error": "autopilot is not enabled on this mandate — set it in the AI page budget form (Autopilot: yes)",
+            "state": state,
+        }
+
+    # Django-side mandate check (the chain rule is the hard cap)
+    caps = tool_check_mandate("release", live_amount_qor, wallet=wallet)
+    if not caps.get("within_caps"):
+        from apps.ai.models import AgentAction
+
+        AgentAction.objects.create(
+            mandate=mandate,
+            action="execute_autopilot",
+            payload={"escrow_id": int(escrow_id), "amount_uqor": live_amount_uqor},
+            outcome=AgentAction.Outcome.REFUSED_POLICY,
+            detail=str(caps.get("reason", ""))[:500],
+        )
+        return {"error": f"outside mandate caps — refusing to execute: {caps.get('reason', '')}"}
+
     if state["status"] == 2:
         return {"ok": True, "already": True, "tx_hash": escrow.release_tx or escrow.autopilot_execute_tx}
     if not state["release_eligible"]:
@@ -301,12 +313,11 @@ def tool_execute_autopilot(escrow_id: int, wallet: str | None = None) -> dict:
 
     from apps.ai.models import AgentAction
 
-    mandate = _active_mandate(wallet)
     if mandate:
         AgentAction.objects.create(
             mandate=mandate,
             action="execute_autopilot",
-            payload={"escrow_id": int(escrow_id), "amount_uqor": int(escrow.amount_uqor)},
+            payload={"escrow_id": int(escrow_id), "amount_uqor": live_amount_uqor},
             outcome=AgentAction.Outcome.EXECUTED,
             tx_hash=result["tx_hash"],
             detail="pre-signed release submitted within mandate",
@@ -365,6 +376,18 @@ def tool_negotiate(listing_id: int, offered_qor: float = 0, details: str = "", w
             details=str(details)[:1000],
             state=Negotiation.State.ACCEPTED,
         )
+        # Reserve the agreed spend against the daily cap (PLANNED ledger).
+        mandate = _active_mandate(wallet)
+        if mandate:
+            from apps.ai.models import AgentAction
+
+            AgentAction.objects.create(
+                mandate=mandate,
+                action="negotiate_accepted",
+                payload={"listing_id": listing.on_chain_id, "amount_uqor": offered},
+                outcome=AgentAction.Outcome.PLANNED,
+                detail="accepted negotiation reserves daily budget until purchase resolves",
+            )
         return {
             "ok": True,
             "status": "accepted",
@@ -374,7 +397,9 @@ def tool_negotiate(listing_id: int, offered_qor: float = 0, details: str = "", w
             "note": "Seller has accepted. The buyer now purchases at this price (the seller updates the listing price first if needed).",
         }
 
-    # Below floor: counter at midpoint when close, reject when far
+    # Below floor: counter at midpoint when close, reject when far. The
+    # returned counter is banded (0.05 QOR) so it cannot be inverted into the
+    # seller's exact floor; the exact counter stays internal.
     distance_below = floor - offered
     if floor and distance_below <= floor // 5:  # within 20%
         counter = (offered + floor) // 2
@@ -386,13 +411,14 @@ def tool_negotiate(listing_id: int, offered_qor: float = 0, details: str = "", w
             details=str(details)[:1000],
             state=Negotiation.State.COUNTERED,
         )
+        coarse_counter = -(-counter // 50_000) * 50_000  # round up to a 0.05 QOR band (anti floor-leak)
         return {
             "ok": True,
             "status": "countered",
             "listing_id": listing.on_chain_id,
             "offered_qor": round(offered / 1e6, 6),
-            "counter_qor": round(counter / 1e6, 6),
-            "note": "Seller counter-offered. Accept and the AI drafts a purchase at this price — your wallet still signs.",
+            "counter_qor": round(coarse_counter / 1e6, 6),
+            "note": "Seller counter-offered somewhere up to this estimate. Accept and the AI drafts a purchase at the agreed price — your wallet still signs.",
         }
 
     Negotiation.objects.create(

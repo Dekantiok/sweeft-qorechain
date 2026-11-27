@@ -91,7 +91,8 @@ class ToolsUnitTests(TestCase):
         )
         # 0.035 is within 20% of the 0.04 floor -> counter at the midpoint 0.0375
         self.assertEqual(result["status"], "countered")
-        self.assertAlmostEqual(result["counter_qor"], 0.0375, places=6)
+        # Banded to a 0.05 QOR grid so it cannot be inverted into the floor.
+        self.assertEqual(result["counter_qor"], 0.05)
 
     def test_negotiate_far_below_floor_rejected(self):
         result = execute_tool(
