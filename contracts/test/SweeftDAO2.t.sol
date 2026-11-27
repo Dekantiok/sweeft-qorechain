@@ -262,6 +262,43 @@ contract SweeftDAO2Test is Test {
         assertEq(treasury.balance, treasuryBefore + 0.05 ether);
     }
 
+    function test_Veto_AfterTimelock_Reverts() public {
+        uint256 id = _propose(PERIOD);
+        _threeForVotes(id);
+        vm.warp(block.timestamp + PERIOD + 2 days + 1);
+        vm.expectRevert(SweeftDAO2.TimelockOver.selector);
+        dao.veto(id);
+    }
+
+    function test_Execute_RevokedCall_BlocksExecution() public {
+        // G6: allowlist re-check at execute — revoking a (target, selector)
+        // mid-flight makes the passed proposal un-executable.
+        uint256 id = _propose(PERIOD);
+        _threeForVotes(id);
+        // Owner revokes the selector after voting.
+        dao.setAllowedCall(address(registry), ADD_VERIFIER, false);
+        vm.warp(block.timestamp + PERIOD + 2 days + 1);
+        vm.expectRevert(SweeftDAO2.CallNotAllowed.selector);
+        dao.execute(id, "Adds 0xACE as an oracle verifier");
+        assertFalse(registry.isVerifier(address(0xACE)), "revoked call must not verify");
+    }
+
+    function test_Execute_RevokedTarget_BlocksExecution() public {
+        uint256 id = _propose(PERIOD);
+        _threeForVotes(id);
+        dao.setAllowedTarget(address(registry), false);
+        vm.warp(block.timestamp + PERIOD + 2 days + 1);
+        vm.expectRevert(SweeftDAO2.TargetNotAllowed.selector);
+        dao.execute(id, "Adds 0xACE as an oracle verifier");
+    }
+
+    function test_Direct_TreasuryChangeByNonOwner_Reverts() public {
+        // Treasury/classical admin paths stay behind ownership (DAO).
+        vm.prank(attacker);
+        vm.expectRevert(SweeftDAO2.NotOwner.selector);
+        dao.setTreasury(attacker);
+    }
+
     function test_Cancel_RefundsBond_AndUnlocksVoters() public {
         uint256 id = _propose(PERIOD);
         _vote(voterA, id, 1, VOTE);

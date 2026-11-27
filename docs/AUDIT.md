@@ -261,6 +261,28 @@ productive use of the remaining pre-deadline days. The audit trail
 (78 v5 → 72 v6 → 78 re-submission → 72 v8, every finding mapped) is the
 jury-facing evidence.
 
+## Governance authorization model (hardening note)
+
+Sensitive administration is reachable **only** through `SweeftDAO2.execute`:
+a passed, timelocked, stake-weighted proposal (quorum 0.03 QOR, critical
+0.05 QOR, proposer bond, guardian veto during the timelock, allowlist
+re-checked at execute). Two model decisions, deliberate:
+
+- **Voters do not produce per-vote PQ signatures.** Votes authenticate by
+  staked QOR escrow (capital at risk until the proposal finalizes); a stolen
+  classical key can only spend the victim's staked vote, and stake escrow is
+  the Sybil cost control. PQ voting was evaluated and rejected as
+  unnecessary friction for the threat model.
+- **Admin execution does not require a separate ML-DSA provenance.**
+  Authorization is the quorum + timelock + veto chain itself; T-REX-style
+  key-provenance was evaluated and deferred because DAO execution already
+  composes PQ-verified inputs (escrow release/refund signatures are
+  PQ-verified inside the Vault regardless of who executes proposals).
+
+Known residual: SweeftDAO (v1) is deployed but inert — it owns nothing
+(registry migrated to DAO2), and its target is immutable; any proposal
+against it cannot reach the live stack. Left for documentation only.
+
 ## External security review — response (v5 hardening)
 
 A line-by-line external review of `contracts/src/*` and the Django apps produced
@@ -302,20 +324,4 @@ the fixed behaviour; contracts and backend were revised together as "v5".
 | B-8 | Low-Med | Wallet-login hardening | **Fixed** — domain/expiry-bound challenge, single-use, session rotated on login |
 | B-9 | High (ops) | Key separation / blast radius | **Documented** — deployer mnemonic is testnet-only; secrets via env; separate relayer key. Production posture in README |
 | B-10 | Med | Server-signed carrier (Demo Carrier) | **Documented** — labelled simulated everywhere; real carriers sign with their own keys |
-| B-11 | High (claims) | Mandate was a stub; prompt injection; float math | **Fixed** — mandate enforced in code (per-tx + rolling daily; refuses with none); Decimal amounts; tool allowlist via `TOOLS_REGISTRY`; listing text treated as data |
-| B-12 | Low-Med | Oracle page N chain reads | **Mitigated** — indexed DB state used where available |
-| B-13 | Med | uqor/wei unit mixing | **Tracked** — one documented unit per layer; round-trip tests planned |
-| B-14 | Low-Med | Pre-signed release is a bearer token | **Fixed** — TTL + clear-after-use + buyer revoke + active-authorization list |
-
-### Process
-
-- **D-1** dependency hygiene, **D-2** production settings (HSTS preload, CSP,
-  frame/referrer/cookie hardening, structured logs), **D-3** test gaps (new
-  Foundry DAO2/invariant suites + Django `tests/`), **D-4** deeper review of the
-  indexer/JS, and **D-5** claims/docs accuracy are reflected here and in the
-  README. `pip-audit`/Slither-in-CI remain recommended follow-ups.
-
-**Definition of done (from the review):** a regression test exists for each
-Critical/High finding and the README makes only claims the code backs. Foundry
-**121 passing**, Django **13 passing** (v5 era; current counts — 131 Foundry +
-28 Django — are in the v6 section above).
+| B-11 | High (claims) | Mandate was

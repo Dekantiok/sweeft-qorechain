@@ -301,9 +301,14 @@ contract SweeftDAO2 {
     }
 
     /// @notice Execute a passed proposal after the timelock, or finalize it.
+    ///         The allowlist is re-checked at execution (not only at propose):
+    ///         revoking a (target, selector) mid-flight blocks the proposal
+    ///         instead of letting it run stale authorization (G6).
     function execute(uint256 proposalId, string calldata description) external nonReentrant returns (bytes memory result) {
         Proposal storage p = proposals[proposalId];
         if (p.state != ProposalState.Open) revert ProposalNotOpen();
+        if (!allowedTargets[p.target]) revert TargetNotAllowed();
+        if (!allowedCalls[p.target][bytes4(p.callData)]) revert CallNotAllowed();
         if (block.timestamp < p.executeAfter) revert TimelockActive();
         if (keccak256(bytes(description)) != p.descriptionHash) revert DescriptionMismatch();
 
