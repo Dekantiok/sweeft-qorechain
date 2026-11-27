@@ -3,10 +3,10 @@
 **Network:** QoreChain Diana testnet · **EVM chain ID 9800**
 **Contracts:** `contracts/src/` (6 contracts) · **Tests:** 189 Foundry + 81 Django
 **Auditors:** QoreChain dashboard Contract Auditor (EVM/Solidity setting) **and**
-Slither 0.11.6. Latest OBTAINED QCAI score **72/100 (Stage 6, on v8)**.
-**v9 (Stage 7) is NOT YET QCAI-AUDITED — no score claimed.** Slither 0.11.6
-on v9: Vault 0 High / 0 Medium; cross-contract arbitrary-send/reentrancy
-triaged in `docs/audit/stage-7/README.md`.
+Slither 0.11.6. Latest OBTAINED QCAI score **78/100, HIGH (Stage 7, on v9,
+27 Nov 2026)**. Slither 0.11.6 on v9: Vault 0 High / 0 Medium;
+cross-contract arbitrary-send/reentrancy triaged in
+`docs/audit/stage-7/FINDINGS.md`.
 
 > Stage 1 report: [`docs/audit/stage-1/`](audit/stage-1/)
 > Stage 2 report: [`docs/audit/stage-2/`](audit/stage-2/)
@@ -374,3 +374,32 @@ the fixed behaviour; contracts and backend were revised together as "v5".
 Critical/High finding and the README makes only claims the code backs. Foundry
 **121 passing**, Django **13 passing** (v5 era; current counts — 131 Foundry +
 28 Django — are in the v6 section above).
+
+## Stage 7 — QCAI on v9 (QCAI report, 78/100, HIGH, 2026-11-27)
+
+PDF: `docs/audit/stage-7/QoreChain_Audit_Contract_1795777556004.pdf`
+Generated 2026-11-27 12:05 UTC, Blockchain: ethereum, 7 vulnerabilities
+(2 High, 2 Medium, 2 Low, 1 Info). Quantum readiness: not scored for this
+setting (expected for EVM — our PQC design is in the threat model above).
+
+| ID | Severity | Report location | Finding | Status | Evidence (current v9) | Regression test |
+|---|---|---|---|---|---|---|
+| Q7-1 | HIGH | `SweeftVault.sol:490` | Potential reentrancy in funds release (`_settleRelease`) | **False positive** — flagged line is `attestCarrierEvidence`'s doc comment. `_settleRelease` (`SweeftVault.sol:709`) is credits-only: `_creditCarrier`/`_creditFees`/`_credit` make **zero external calls**. `release`/`refund` are `nonReentrant` with CEI (nonce + status set before settle). | `SweeftVault.invariant.t.sol` (credits ≤ escrowed), `test_ReentrantReceiverCannotDrainSettledEscrow` |
+| Q7-2 | HIGH | `SweeftVault.sol:134` | Missing access control on critical functions | **False positive** — flagged line is an `error` declaration. Every state-changing Vault function is gated: `onlyOwner` (`setFeeBps`, `setTreasury`, `registerCarrier`, `removeCarrier`, `transferOwnership`), `onlyDeployer` (`setDisputeBoard`, `setMarketplace`), `onlyDisputeBoard` (`raiseDispute`, `resolveDispute`), party checks (`fundEscrow`/`confirmReceipt`=buyer, `markFulfilled`/`markDelivered`=seller), registry+signature gates (`attestEvidence`, `attestCarrierEvidence`). | `test_Direct_TreasuryChangeByNonOwner_Reverts`, `SweeftGovernance.t.sol` |
+| Q7-3 | MEDIUM | `SweeftVault.sol:442` | Potential overflow in fee calculation | **Already fixed (Stage 5).** `_feeForAmount` (`SweeftVault.sol:691`) bounds `bps ≤ MAX_FEE_BPS` and checks `amount > type(uint256).max / bps` before multiplying. Flagged line is `attestEvidence` params. | `_feeForAmount` overflow tests in `SweeftVault.t.sol` |
+| Q7-4 | MEDIUM | `SweeftVault.sol:270,470` | Unchecked returns in external calls | **Already fixed.** No low-level `staticcall`/`call` remains in Vault settlement; registry reads are typed `IExcaliburOracleRegistry` calls (fail-closed). `setTreasury` (`SweeftVault.sol:273`) zero-checks; flagged line 470 is an emit. The only Vault `call` is `withdrawCredits` (checked + CEI zero-before-call). | typed-registry suites; `test_WithdrawCredits_*` |
+| Q7-5 | LOW | `SweeftDisputeBoard.sol:420` | Potential front-running in dispute resolution | **Already fixed (Phase 5).** No call-time `prevrandao`-only draw: panel seeds are committed to `drawBlock = block.number + 16` (`SweeftDisputeBoard.sol:357,518`) chained with capture-time prevrandao, checkpointed via `blockhash`. `castVote` (`SweeftDisputeBoard.sol:423`) is `nonReentrant` and vote-content front-running cannot change the committed draw. VRF/commit-reveal not needed for testnet stakes. | `SweeftDisputeBoard.t.sol` draw/commitment tests |
+| Q7-6 | LOW | `SweeftDisputeBoard.sol:517` | Unbounded loop in panel drawing | **Already fixed.** `_drawPanel` (`SweeftDisputeBoard.sol:688`) is hard-bounded: `min(n * MAX_DRAW_ATTEMPTS_PER_POOL(6), MAX_DRAW_ATTEMPTS(128))`. Flagged line is the appeal-seed commitment comment. | `test_DrawPanel_Bounded`, invariant draw tests |
+| Q7-7 | INFO | `SweeftVault.sol` | Missing ERC standards compliance | **Not applicable by design.** The Vault is an escrow vault, not a token — it holds no ERC-20 balance to expose. Interop is via `getEscrow`/`credits` views and the Marketplace/Board contracts. | — (documented) |
+
+**Why 78/100 (up from 72/100 on v8):** the automated template now
+credits the v9 pattern removals (credits-only settlement, typed registry,
+explicit bounds, committed randomness, bounded draw loop) that were
+uncredited before. The two HIGHs remain template-pattern flags at stale
+locations; each is disproven above with file:line evidence and passing
+regression tests. Risk label stays HIGH because QCAI weights "complex
+escrow + PQC surface" structurally, not because a fund-loss path was found.
+
+Local corroboration (same day): Slither 0.11.6 on v9 — Vault 0 High /
+0 Medium; the 3 cross-contract Highs are triaged in
+`docs/audit/stage-7/FINDINGS.md`. Foundry **189/189**, Django **81/81**.

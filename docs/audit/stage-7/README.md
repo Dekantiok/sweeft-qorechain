@@ -3,11 +3,12 @@
 **Scope:** v9 hardened stack (carrier domain separation v2, PQ verifier
 attestations with relayer submission, committed future-block dispute seeds,
 credits-only settlement, typed oracle reads, AI mandate hardening).
-**Status: NOT YET QCAI-AUDITED — no score claimed.**
+**Status: QCAI-AUDITED 27 Nov 2026 — 78/100, HIGH, 7 vulnerabilities.**
 
-Latest OBTAINED QCAI score remains **72/100 (Stage 6, on v8 source)**.
-Stage 7 is bundle-ready; the dashboard submission is a manual step
-(sign-in required) and has not been run at the time of writing.
+PDF: `QoreChain_Audit_Contract_1795777556004.pdf` (generated 2026-11-27
+12:05 UTC). Findings mapped in `docs/AUDIT.md` (Stage 7 section): 2 High
+both false positives at stale lines, 2 Medium already fixed, 2 Low
+already fixed, 1 Info not-applicable — each with file:line evidence.
 
 ## Bundle (generated 27 Nov 2026)
 
@@ -15,7 +16,12 @@ Stage 7 is bundle-ready; the dashboard submission is a manual step
   (`tools/bundle_contracts.py stage-7`)
 - `sweeft-contracts-7.tar.gz` — sources for dashboard upload
 
-## Submission (manual)
+## Submission (done 27 Nov 2026)
+
+PDF saved as `QoreChain_Audit_Contract_1795777556004.pdf` (new report ID,
+fresh timestamp — not a cached re-run). Result: **78/100, HIGH**.
+
+## Previous submission (manual)
 
 1. Dashboard Contract Auditor, **EVM/Solidity** (NOT CosmWasm+PQC).
 2. Fresh audit, paste `sweeft-combined.sol`.

@@ -1,8 +1,8 @@
 # Stage 7 (v9) — Local Audit Findings (Slither 0.11.6, 27 Nov 2026)
 
-> This is the **local static-analysis pass**, NOT a QCAI score. The QCAI
-> dashboard submission remains manual (see `README.md`). Latest obtained
-> QCAI score: **72/100 (Stage 6, v8)**. No Stage 7 QCAI score is claimed.
+> This is the **local static-analysis pass** (companion to the dashboard
+> run). QCAI Stage 7 (78/100, HIGH, 27 Nov 2026) is in `docs/AUDIT.md`;
+> the PDF is `QoreChain_Audit_Contract_1795777556004.pdf` in this folder.
 
 - Bundle: `sweeft-combined.sol` (124,142 bytes, sha256 `0c5a37c3…`),
   regenerated from HEAD at audit time.

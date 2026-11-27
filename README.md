@@ -23,11 +23,10 @@ from verified outcomes.
   withdrew on-chain). `.env` and the hosted demo point at v9.
 - **Superseded: v8/v7/v6/v5** — previous live stacks (v8: msg.sender-only
   attestations, pre-v2 carrier format; still settleable there).
-- **Audit scope:** Stage 3 (78/100) covers v5; Stage 4 (72/100) covers v6;
-  Stage 5 (72/100) covers patched v6; Stage 6 (72/100) covers v8;
-  **v9 is bundle-ready as Stage 7 (`docs/audit/stage-7/`) but NOT YET
-  QCAI-AUDITED — no score claimed.** Deployment is two scripts + one cast send
-  (see `docs/deployments.md`).
+- **Audit scope:** Stage 3 (78/100) v5; Stage 4 (72/100) v6; Stage 5 (72/100)
+  patched v6; Stage 6 (72/100) v8; **Stage 7 (78/100, HIGH) covers live v9,
+  audited 27 Nov 2026 (`docs/audit/stage-7/`, mapped in `docs/AUDIT.md`).**
+  Deployment is two scripts + one cast send (see `docs/deployments.md`).
 
 ## End-to-end workflow (v9, live on Diana)
 
