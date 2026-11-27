@@ -9,7 +9,7 @@
 </div>
 
 {% if escrow %}
-<div class="mt-6 rounded-xl border border-accent/30 bg-[rgba(239,68,68,0.04)] p-4 text-sm">
+<div class="mt-6 rounded-xl border border-accent/30 bg-[rgba(255,255,255,0.04)] p-4 text-sm">
     <span class="text-ink">This transaction touches Sweeft escrow </span>
     <a href="{% url 'escrow:detail' escrow.on_chain_id %}" class="font-semibold text-accent hover:text-accent">#{{ escrow.on_chain_id }} →</a>
 </div>

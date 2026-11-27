@@ -40,8 +40,8 @@
                     <td class="px-4 py-3 hash text-muted max-w-[140px] truncate">{{ escrow.seller.evm_address }}</td>
                     <td class="px-4 py-3">
                         <span class="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider
-                            {% if escrow.state == 'completed' %}bg-[rgba(239,68,68,0.10)] text-accent
-                            {% elif escrow.state == 'release_eligible' %}bg-amber-500/10 text-amber-400
+                            {% if escrow.state == 'completed' %}bg-[rgba(255,255,255,0.08)] text-accent
+                            {% elif escrow.state == 'release_eligible' %}bg-white/5 text-neutral-300
                             {% else %}bg-wash text-muted{% endif %}">{{ escrow.state }}</span>
                     </td>
                     <td class="px-4 py-3 text-muted text-xs">{{ escrow.delivery_deadline|date:"M d, H:i" }}</td>
@@ -78,7 +78,7 @@
                     <td class="px-4 py-3 text-muted">{{ listing.title }}</td>
                     <td class="px-4 py-3 text-accent">{{ listing.price_qor }} QOR</td>
                     <td class="px-4 py-3 text-muted">{{ listing.quantity }}</td>
-                    <td class="px-4 py-3"><span class="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider {% if listing.status == 'active' %}bg-[rgba(239,68,68,0.10)] text-accent{% else %}bg-wash text-muted{% endif %}">{{ listing.status }}</span></td>
+                    <td class="px-4 py-3"><span class="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider {% if listing.status == 'active' %}bg-[rgba(255,255,255,0.08)] text-accent{% else %}bg-wash text-muted{% endif %}">{{ listing.status }}</span></td>
                     <td class="px-4 py-3 hash text-muted max-w-[140px] truncate">{{ listing.seller.evm_address }}</td>
                     <td class="px-4 py-3"><a href="{% url 'marketplace:detail' listing.on_chain_id %}" class="text-accent hover:text-accent text-xs">View →</a></td>
                 </tr>

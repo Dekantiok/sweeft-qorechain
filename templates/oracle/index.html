@@ -19,7 +19,7 @@
 </div>
 
 {% if is_verifier %}
-<div class="mt-6 rounded-xl border border-accent/30 bg-[rgba(239,68,68,0.04)] p-4 text-sm text-ink">
+<div class="mt-6 rounded-xl border border-accent/30 bg-[rgba(255,255,255,0.04)] p-4 text-sm text-ink">
     Your wallet is an authorized verifier: review each submission and attest it on-chain.
 </div>
 {% elif wallet_attached %}
@@ -37,9 +37,9 @@
             <div class="flex items-center gap-3">
                 <span class="text-xs text-muted">Escrow #{{ item.escrow.on_chain_id }}</span>
                 <span class="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider
-                    {% if item.verification_status == 'verified' %}bg-[rgba(239,68,68,0.10)] text-accent
-                    {% elif item.verification_status == 'rejected' %}bg-[rgba(239,68,68,0.10)] text-accent
-                    {% else %}bg-amber-500/10 text-amber-400{% endif %}">{{ item.verification_status }}</span>
+                    {% if item.verification_status == 'verified' %}bg-[rgba(255,255,255,0.08)] text-accent
+                    {% elif item.verification_status == 'rejected' %}bg-[rgba(255,255,255,0.08)] text-accent
+                    {% else %}bg-white/5 text-neutral-300{% endif %}">{{ item.verification_status }}</span>
                 <span class="rounded-full bg-neutral-950 px-2 py-0.5 text-[10px] text-muted">{{ item.get_evidence_type_display }}</span>
             </div>
             <span class="text-xs text-muted">{{ item.submitted_at|date:"M d, H:i" }}</span>
@@ -59,7 +59,7 @@
 
         {% if is_verifier %}
             {% if row.state and row.state.status == 1 %}
-            <button class="attest-button mt-4 rounded-lg bg-ink text-white shadow-none px-4 py-2 text-sm font-semibold text-ink hover:bg-accent transition-colors"
+            <button class="attest-button mt-4 rounded-lg bg-ink text-white shadow-none px-4 py-2 text-sm font-semibold text-ink hover:bg-neutral-300 transition-colors"
                     data-escrow="{{ item.escrow.on_chain_id }}"
                     data-item="{{ item.pk }}"
                     data-hash="{{ item.content_hash }}">

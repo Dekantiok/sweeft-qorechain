@@ -14,7 +14,7 @@ module.exports = {
     extend: {
       colors: {
         ink: "#f5f5f5",
-        accent: "#ff4d4d",
+        accent: "#ffffff",
         line: "#2a2a2e",
         control: "#3a3a40",
         muted: "#a1a1aa",
@@ -22,10 +22,10 @@ module.exports = {
         panel: "#17171a",
         wash: "#17171a",
         disabled: "#52525b",
-        up: "#34d399",
-        "up-hover": "#10b981",
-        down: "#f87171",
-        "down-hover": "#ef4444",
+        up: "#e4e4e7",
+        "up-hover": "#d4d4d8",
+        down: "#71717a",
+        "down-hover": "#a1a1aa",
       },
       fontFamily: {
         serif: ["'Instrument Serif'", "Georgia", "'Times New Roman'", "serif"],

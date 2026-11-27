@@ -9,7 +9,7 @@
         <p class="mt-1 text-sm text-muted">{{ listings|length }} listing{{ listings|length|pluralize }}: every purchase settles through PQ-protected escrow</p>
     </div>
     <div class="flex items-center gap-3">
-        <a href="/marketplace/new/" class="rounded-lg bg-ink text-white shadow-none px-4 py-2 text-sm font-semibold text-ink hover:bg-accent transition-colors">
+        <a href="/marketplace/new/" class="rounded-lg bg-ink text-white shadow-none px-4 py-2 text-sm font-semibold text-ink hover:bg-neutral-300 transition-colors">
             + Sell an item
         </a>
         <button hx-post="/api/indexer/sync/" hx-swap="none"
@@ -22,7 +22,7 @@
 
 <form method="get" class="mt-6 flex flex-wrap gap-3">
     <input type="text" name="q" value="{{ query }}" placeholder="Search listings…"
-           class="w-full sm:w-64 rounded-lg border border-control bg-black/60 px-3 py-2 text-sm focus:border-red-500 focus:outline-none">
+           class="w-full sm:w-64 rounded-lg border border-control bg-black/60 px-3 py-2 text-sm focus:border-white focus:outline-none">
     <select name="status" class="rounded-lg border border-control bg-black/60 px-3 py-2 text-sm">
         <option value="active" {% if active_status == "active" %}selected{% endif %}>Active</option>
         <option value="sold" {% if active_status == "sold" %}selected{% endif %}>Sold</option>
@@ -37,9 +37,9 @@
         <div class="flex items-center justify-between">
             <span class="text-xs text-muted">#{{ listing.on_chain_id }}</span>
             <span class="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider
-                {% if listing.status == 'active' %}bg-[rgba(239,68,68,0.10)] text-accent
+                {% if listing.status == 'active' %}bg-[rgba(255,255,255,0.08)] text-accent
                 {% elif listing.status == 'sold' %}bg-wash text-muted
-                {% else %}bg-[rgba(239,68,68,0.10)] text-accent{% endif %}">
+                {% else %}bg-[rgba(255,255,255,0.08)] text-accent{% endif %}">
                 {{ listing.status }}
             </span>
         </div>

@@ -91,7 +91,7 @@
                 {% if escrow.create_tx %}<dt class="text-muted">created</dt><dd class="hash text-muted">{{ escrow.create_tx }}</dd>{% endif %}
                 {% if escrow.fund_tx %}<dt class="text-muted">funded</dt><dd class="hash text-muted">{{ escrow.fund_tx }}</dd>{% endif %}
                 {% if escrow.release_tx %}<dt class="text-muted">released</dt><dd class="hash text-accent">{{ escrow.release_tx }}</dd>{% endif %}
-                {% if escrow.refund_tx %}<dt class="text-muted">refunded</dt><dd class="hash text-blue-400">{{ escrow.refund_tx }}</dd>{% endif %}
+                {% if escrow.refund_tx %}<dt class="text-muted">refunded</dt><dd class="hash text-neutral-300">{{ escrow.refund_tx }}</dd>{% endif %}
             </dl>
         </div>
     </div>
@@ -118,7 +118,7 @@
             </div>
         </div>
 
-        <div class="rounded-xl border border-accent/30 bg-[rgba(239,68,68,0.04)] p-5">
+        <div class="rounded-xl border border-accent/30 bg-[rgba(255,255,255,0.04)] p-5">
             <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-accent">
                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
@@ -157,7 +157,7 @@
                 {% if escrow.autopilot_enabled %}
                 <div class="text-xs font-semibold text-ink">Autopilot enabled</div>
                 <p class="mt-1 text-[11px] text-muted">You pre-signed a release of <strong class="text-muted">{{ escrow.amount_qor }} QOR</strong>. The AI submits exactly that signature when the verifier attests: nothing more.</p>
-                <button id="autopilot-revoke" class="mt-2 rounded border border-ink/40 px-3 py-1 text-xs text-ink hover:bg-[rgba(239,68,68,0.10)] transition-colors">Revoke pre-authorization</button>
+                <button id="autopilot-revoke" class="mt-2 rounded border border-ink/40 px-3 py-1 text-xs text-ink hover:bg-[rgba(255,255,255,0.08)] transition-colors">Revoke pre-authorization</button>
                 <p id="autopilot-status" class="mt-2 text-[11px] text-muted"></p>
                 {% else %}
                 <button id="preauth-button" class="w-full rounded-lg bg-ink text-white shadow-none px-4 py-2 text-sm font-semibold text-ink hover:bg-accent transition-colors">Pre-authorize release (Autopilot)</button>
@@ -187,12 +187,12 @@
             <div class="text-xs font-semibold uppercase tracking-wider text-muted">Order actions</div>
 
             {% if is_seller %}
-            <button id="deliver-button" class="mt-3 w-full rounded-lg border border-ink/40 px-4 py-2 text-sm text-ink hover:bg-[rgba(239,68,68,0.10)] transition-colors">
+            <button id="deliver-button" class="mt-3 w-full rounded-lg border border-ink/40 px-4 py-2 text-sm text-ink hover:bg-[rgba(255,255,255,0.08)] transition-colors">
                 Mark delivered
             </button>
             <p class="mt-2 text-[11px] text-muted">Tells the contract the goods are on their way. After the delivery deadline (or the buyer's confirmation), release becomes eligible.</p>
             {% elif is_buyer %}
-            <button id="confirm-button" class="mt-3 w-full rounded-lg border border-ink/40 px-4 py-2 text-sm text-ink hover:bg-[rgba(239,68,68,0.10)] transition-colors">
+            <button id="confirm-button" class="mt-3 w-full rounded-lg border border-ink/40 px-4 py-2 text-sm text-ink hover:bg-[rgba(255,255,255,0.08)] transition-colors">
                 Confirm receipt
             </button>
             <p class="mt-2 text-[11px] text-muted">Satisfies the inspection condition immediately: the seller can then be paid against your PQ release signature.</p>
@@ -209,7 +209,7 @@
             <div class="mt-3 space-y-2 text-xs">
                 <div class="flex items-center justify-between">
                     <span class="font-mono text-muted">{{ shipment.tracking_number }}</span>
-                    <span class="rounded-full bg-[rgba(239,68,68,0.10)] px-2 py-0.5 text-[10px] uppercase tracking-wider text-accent">{{ shipment.status }}</span>
+                    <span class="rounded-full bg-[rgba(255,255,255,0.08)] px-2 py-0.5 text-[10px] uppercase tracking-wider text-accent">{{ shipment.status }}</span>
                 </div>
                 <div class="text-muted">provider: {{ shipment.provider.provider_id|default:"LOG-DEMO-001" }} · simulated: {{ shipment.simulated|yesno:"yes,no" }}</div>
                 <ul class="mt-2 space-y-1">
@@ -221,7 +221,7 @@
                     {% endfor %}
                 </ul>
                 {% if escrow.carrier_attested %}
-                <div class="rounded-lg bg-[rgba(239,68,68,0.10)] px-2 py-1 text-ink">✓ carrier-attested on-chain <span class="hash">{{ escrow.carrier_payload_hash|truncatechars:18 }}</span></div>
+                <div class="rounded-lg bg-[rgba(255,255,255,0.08)] px-2 py-1 text-ink">✓ carrier-attested on-chain <span class="hash">{{ escrow.carrier_payload_hash|truncatechars:18 }}</span></div>
                 {% endif %}
             </div>
             {% if is_seller or is_buyer %}
@@ -283,7 +283,7 @@
                     <div class="flex items-center justify-between">
                         <span class="text-muted">{{ item.get_evidence_type_display }}</span>
                         <span class="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider
-                            {% if item.verification_status == 'verified' %}bg-[rgba(239,68,68,0.10)] text-accent{% else %}bg-amber-500/10 text-amber-400{% endif %}">
+                            {% if item.verification_status == 'verified' %}bg-[rgba(255,255,255,0.08)] text-accent{% else %}bg-white/5 text-neutral-300{% endif %}">
                             {{ item.verification_status }}
                         </span>
                     </div>
@@ -299,12 +299,12 @@
 
         {% if live.status == 1 %}
         <div class="rounded-xl border border-amber-500/30 bg-amber-500/5 p-5">
-            <div class="text-xs font-semibold uppercase tracking-wider text-amber-400">Something wrong?</div>
+            <div class="text-xs font-semibold uppercase tracking-wider text-neutral-300">Something wrong?</div>
             <p class="mt-2 text-xs leading-relaxed text-muted">
                 Buyer or seller can freeze this escrow and open a dispute. A board of three staked
                 resolvers decides release or refund by 2-of-3 majority.
             </p>
-            <button id="dispute-button" class="mt-3 w-full rounded-lg border border-amber-500/40 px-4 py-2 text-sm text-amber-300 hover:bg-amber-500/10 transition-colors">
+            <button id="dispute-button" class="mt-3 w-full rounded-lg border border-neutral-600 px-4 py-2 text-sm text-neutral-300 hover:bg-white/5 transition-colors">
                 Raise dispute
             </button>
             <p id="dispute-status" class="mt-2 text-xs text-muted"></p>

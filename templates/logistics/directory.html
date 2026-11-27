@@ -19,7 +19,7 @@
                 <div class="font-semibold">{{ partner.company_name }}</div>
                 <div class="mt-1 text-xs text-muted">{{ partner.provider_id }} · {{ partner.operating_locations|default:"-" }}</div>
             </div>
-            <span class="rounded-full bg-[rgba(239,68,68,0.10)] px-2 py-0.5 text-[10px] uppercase tracking-wider text-accent">{{ partner.status }}</span>
+            <span class="rounded-full bg-[rgba(255,255,255,0.08)] px-2 py-0.5 text-[10px] uppercase tracking-wider text-accent">{{ partner.status }}</span>
         </div>
         {% if partner.services %}<p class="mt-3 text-xs leading-relaxed text-muted">{{ partner.services|truncatechars:140 }}</p>{% endif %}
         <div class="mt-3 flex items-center justify-between text-xs">
@@ -35,7 +35,7 @@
 </div>
 
 <div class="mt-8 flex flex-wrap gap-3">
-    <a href="{% url 'logistics:partner_register' %}" class="rounded-lg bg-ink text-white shadow-none px-4 py-2 text-sm font-semibold text-ink hover:bg-accent transition-colors">
+    <a href="{% url 'logistics:partner_register' %}" class="rounded-lg bg-ink text-white shadow-none px-4 py-2 text-sm font-semibold text-ink hover:bg-neutral-300 transition-colors">
         Register as a carrier
     </a>
     <a href="{% url 'logistics:partner_portal' %}" class="rounded-lg border border-control px-4 py-2 text-sm hover:border-ink/50 hover:text-accent transition-colors">
