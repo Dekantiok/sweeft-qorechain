@@ -80,6 +80,37 @@ contract SweeftVaultInvariantTest is Test {
         assertEq(e.carrierSigner, carrier);
     }
 
+    /// Invalid attestation attempts (wrong caller, garbage signature) never
+    /// increase the attestation count (Phase 9 verifier invariant).
+    function fuzz_invalidAttestNeverCounts(uint256 seed, bytes32 evidenceHash) public {
+        uint256 id = _fundLogistics(seed % 2 + 1);
+        address attacker = address(uint160(bound(seed, 2, type(uint16).max)));
+        if (attacker == carrier || attacker == buyer) return;
+        uint8 before = vault.verifierAttestCount(id);
+        vm.prank(attacker);
+        try vault.attestEvidence(id, attacker, evidenceHash, uint64(block.timestamp), uint64(block.timestamp + 7 days), hex"00") {
+            // MockVerify is permissive; distance comes from the caller not
+            // being a registered verifier. A count increase means the gate
+            // is broken.
+            assertEq(vault.verifierAttestCount(id), before, "invalid attestation counted");
+        } catch {
+            // Revert path: count must be untouched.
+            assertEq(vault.verifierAttestCount(id), before);
+        }
+    }
+
+    /// A settled escrow can never settle again (idempotency of release).
+    function fuzz_doubleSettleImpossible(uint256 seed) public {
+        uint256 id = _fundLogistics(seed % 2 + 1);
+        vm.prank(buyer);
+        vault.confirmReceipt(id);
+        vault.release(id, hex"deadbeef");
+        uint256 creditsBefore = vault.credits(seller);
+        vm.expectRevert(SweeftVault.InvalidStatus.selector);
+        vault.release(id, hex"deadbeef");
+        assertEq(vault.credits(seller), creditsBefore);
+    }
+
     function fuzz_marketPurchaseFunds(uint256 price) public {
         vm.assume(price > 0 && price < 2 ether);
         vm.prank(seller);
