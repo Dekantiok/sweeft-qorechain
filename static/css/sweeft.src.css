@@ -2,28 +2,138 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Sweeft — custom styles beyond Tailwind */
+/* Sweeft — design system (Meridian-style: ink on white, blue accent) */
 
-/* HTMX request indicator */
-.htmx-indicator {
-    opacity: 0;
-    transition: opacity 200ms ease-in;
-}
-.htmx-request .htmx-indicator,
-.htmx-request.htmx-indicator {
-    opacity: 1;
+@layer base {
+    :focus-visible {
+        outline: 2px solid #1743ff;
+        outline-offset: 2px;
+    }
 }
 
-/* Escrow status colors */
-.status-created  { @apply text-neutral-300; }
-.status-funded   { @apply text-amber-400; }
-.status-completed { @apply text-red-400; }
-.status-refunded { @apply text-blue-400; }
-.status-cancelled { @apply text-neutral-300; }
+@layer components {
+    /* Buttons (kit.tsx: CommitButton / SECONDARY) */
+    .btn {
+        @apply inline-flex h-[46px] items-center justify-center gap-2 px-9 text-[16px] text-white transition-all duration-200 enabled:active:scale-[0.96] disabled:cursor-not-allowed disabled:bg-disabled;
+        background-color: #1e1e1e;
+        border: 1px solid #1e1e1e;
+    }
+    .btn:hover { background-color: #1743ff; border-color: #1743ff; }
+    .btn-sm { @apply h-9 px-4 text-sm; }
+    .btn-accent { background-color: #1743ff; border-color: #1743ff; }
+    .btn-accent:hover { background-color: #0f33cc; border-color: #0f33cc; }
+    .btn-secondary {
+        @apply inline-flex h-10 items-center justify-center border bg-white px-3 text-[13px] text-ink transition-colors enabled:hover:bg-hover enabled:active:scale-[0.96] disabled:cursor-not-allowed disabled:border-line disabled:bg-wash disabled:text-control;
+        border-color: #949494;
+    }
+    .btn-danger {
+        @apply inline-flex h-10 items-center justify-center border bg-white px-3 text-[13px] transition-colors enabled:active:scale-[0.96];
+        color: #c0263a; border-color: #c0263a;
+    }
+    .btn-danger:hover { background-color: rgba(192,38,58,0.06); }
+    .btn-ghost {
+        @apply inline-flex items-center justify-center text-[13px] text-ink underline decoration-line underline-offset-[5px] transition-colors hover:decoration-accent;
+    }
 
-/* Monospace hashes */
-.hash {
-    font-family: ui-monospace, "SF Mono", Menlo, monospace;
-    font-size: 0.8em;
-    word-break: break-all;
+    /* Panels and cards */
+    .panel { @apply border border-line bg-white; }
+    .panel-head {
+        @apply flex h-10 items-center justify-between gap-3 border-b border-line px-4 text-[13px] text-ink;
+    }
+    .panel-head::before { content: "[ "; color: #5f5f5f; }
+    .panel-head::after { content: " ]"; color: #5f5f5f; }
+    .card { @apply rounded-xl border border-line bg-white p-5 transition-colors; }
+    .card:hover { border-color: #5f5f5f; }
+
+    /* Forms (kit.tsx: INPUT / Field) */
+    .input {
+        @apply w-full border bg-white text-ink placeholder:text-muted disabled:bg-hover;
+        border-color: #949494;
+        height: 2.75rem; padding: 0 0.75rem; font-size: 14px;
+    }
+    .input:focus {
+        outline: 2px solid #1743ff; outline-offset: -2px; border-color: #1743ff;
+        background-color: #fff;
+    }
+    .input-sm { height: 2.5rem; font-size: 13px; padding: 0 0.625rem; }
+    .label { @apply block text-[13px] text-muted mb-1.5; }
+    .note { @apply text-[13px] leading-[19px] text-muted; }
+    .note-alert { @apply text-[13px] leading-[19px]; color: #c0263a; }
+
+    /* Badges per status (semantic, not brand color) */
+    .badge { @apply rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider; }
+    .badge-active, .badge-funded, .badge-release_eligible, .badge-live {
+        background: rgba(11,125,79,0.10); color: #0b7d4f;
+    }
+    .badge-sold, .badge-completed {
+        background: rgba(23,67,255,0.08); color: #1743ff;
+    }
+    .badge-disputed, .badge-cancelled {
+        background: rgba(192,38,58,0.08); color: #c0263a;
+    }
+    .badge-refunded { background: rgba(193,125,30,0.10); color: #8a5a00; }
+    .badge-created, .badge-pending, .badge-open, .badge-default {
+        background: #f6f6f6; color: #5f5f5f;
+    }
+
+    /* Stat / line primitives from kit.tsx */
+    .stat-label { @apply truncate text-[13px] text-muted; }
+    .stat-value { @apply truncate tabular-nums text-[13px] text-ink; }
+    .stat-value-lg { @apply truncate font-serif tabular-nums text-[22px] leading-[26px] text-ink lg:text-[28px] lg:leading-[32px]; }
+    .line { @apply flex items-baseline justify-between gap-4 text-[13px]; }
+    .line dt { @apply text-muted; }
+    .line dd { @apply text-right tabular-nums text-ink; }
+    .empty { @apply flex flex-col items-center justify-center px-6 py-10 text-center text-[13px] text-muted; }
+
+    .kbd {
+        @apply inline-flex h-5 min-w-5 items-center justify-center border border-line px-1 text-[12px] leading-none text-muted no-underline;
+    }
+}
+
+@layer utilities {
+    .hash {
+        font-family: ui-monospace, "SF Mono", Menlo, monospace;
+        font-size: 0.8em;
+        word-break: break-all;
+    }
+    .htmx-indicator { opacity: 0; transition: opacity 200ms ease-in; }
+    .htmx-request .htmx-indicator, .htmx-request.htmx-indicator { opacity: 1; }
+
+    /* Escrow status colors (semantic) */
+    .status-created  { color: #5f5f5f; }
+    .status-funded   { color: #0b7d4f; }
+    .status-completed { color: #1743ff; }
+    .status-refunded { color: #8a5a00; }
+    .status-cancelled { color: #5f5f5f; }
+    .status-disputed  { color: #c0263a; }
+    .status-release_eligible { color: #0b7d4f; }
+
+    /* Meridian-style square range (portion sliders) */
+    .range { appearance: none; background: transparent; cursor: pointer; }
+    .range:disabled { cursor: not-allowed; }
+    .range::-webkit-slider-runnable-track {
+        height: 2px;
+        background: linear-gradient(to right, #1743ff var(--fill, 0%), #cecece var(--fill, 0%));
+    }
+    .range::-moz-range-track { height: 2px; background: #cecece; }
+    .range::-moz-range-progress { height: 2px; background: #1743ff; }
+    .range::-webkit-slider-thumb {
+        appearance: none; box-sizing: border-box; width: 14px; height: 14px; margin-top: -6px;
+        border: 2px solid #fff; background: #1e1e1e; box-shadow: 0 0 0 1px #1e1e1e;
+    }
+    .range::-moz-range-thumb {
+        box-sizing: border-box; width: 14px; height: 14px; border: 2px solid #fff;
+        background: #1e1e1e; box-shadow: 0 0 0 1px #1e1e1e;
+    }
+
+    .skeleton { @apply block bg-hover; animation: pulse 2s cubic-bezier(.4,0,.6,1) infinite; }
+
+    /* Story section: tiles and connectors */
+    .tile { @apply block h-3 w-3 shrink-0; }
+    .tile-used { background: #cecece; }
+    .tile-spare { background: #fff; box-shadow: inset 0 0 0 1px #949494; }
+    .tile-listed { background: #1743ff; }
+    .tile-bought { background: #1e1e1e; }
+    .story-step { opacity: 0.35; transition: opacity 400ms cubic-bezier(0.22,1,0.36,1); }
+    .story-step-on { opacity: 1; }
 }

@@ -4,8 +4,8 @@
 
 {% block content %}
 <div>
-    <h1 class="text-2xl font-bold">Logistics partners</h1>
-    <p class="mt-1 text-sm text-neutral-300">
+    <h1 class="font-serif text-[28px] leading-[1.1] lg:text-[34px]">Logistics partners</h1>
+    <p class="mt-1 text-sm text-muted">
         Approved carriers whose signed tracking feeds the escrow oracle. Each partner registers an ML-DSA-87
         key on QoreChain: their tracking payloads are verified **on-chain** by the vault.
     </p>
@@ -13,32 +13,32 @@
 
 <div class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
     {% for partner in partners %}
-    <div class="rounded-xl border border-neutral-900 bg-black/50 p-5">
+    <div class="rounded-xl border border-line bg-white p-5">
         <div class="flex items-start justify-between">
             <div>
                 <div class="font-semibold">{{ partner.company_name }}</div>
-                <div class="mt-1 text-xs text-neutral-300">{{ partner.provider_id }} · {{ partner.operating_locations|default:"-" }}</div>
+                <div class="mt-1 text-xs text-muted">{{ partner.provider_id }} · {{ partner.operating_locations|default:"-" }}</div>
             </div>
-            <span class="rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-red-400">{{ partner.status }}</span>
+            <span class="rounded-full bg-[rgba(23,67,255,0.07)] px-2 py-0.5 text-[10px] uppercase tracking-wider text-accent">{{ partner.status }}</span>
         </div>
-        {% if partner.services %}<p class="mt-3 text-xs leading-relaxed text-neutral-300">{{ partner.services|truncatechars:140 }}</p>{% endif %}
+        {% if partner.services %}<p class="mt-3 text-xs leading-relaxed text-muted">{{ partner.services|truncatechars:140 }}</p>{% endif %}
         <div class="mt-3 flex items-center justify-between text-xs">
-            <span class="hash text-neutral-300">{{ partner.settlement_wallet|truncatechars:18 }}</span>
-            <span class="text-neutral-300">{{ partner.shipments.count }} shipment{{ partner.shipments.count|pluralize }}</span>
+            <span class="hash text-muted">{{ partner.settlement_wallet|truncatechars:18 }}</span>
+            <span class="text-muted">{{ partner.shipments.count }} shipment{{ partner.shipments.count|pluralize }}</span>
         </div>
     </div>
     {% empty %}
-    <div class="col-span-full rounded-xl border border-dashed border-neutral-800 p-12 text-center text-neutral-300">
+    <div class="col-span-full rounded-xl border border-dashed border-control p-12 text-center text-muted">
         No approved partners yet. The Demo Carrier (simulated) is the default: register a partner to onboard a real carrier.
     </div>
     {% endfor %}
 </div>
 
 <div class="mt-8 flex flex-wrap gap-3">
-    <a href="{% url 'logistics:partner_register' %}" class="rounded-lg bg-red-500 shadow-lg shadow-red-500/25 px-4 py-2 text-sm font-semibold text-black hover:bg-red-400 transition-colors">
+    <a href="{% url 'logistics:partner_register' %}" class="rounded-lg bg-ink text-white shadow-none px-4 py-2 text-sm font-semibold text-ink hover:bg-accent transition-colors">
         Register as a carrier
     </a>
-    <a href="{% url 'logistics:partner_portal' %}" class="rounded-lg border border-neutral-800 px-4 py-2 text-sm hover:border-red-500/50 hover:text-red-300 transition-colors">
+    <a href="{% url 'logistics:partner_portal' %}" class="rounded-lg border border-control px-4 py-2 text-sm hover:border-ink/50 hover:text-accent transition-colors">
         Partner portal
     </a>
 </div>

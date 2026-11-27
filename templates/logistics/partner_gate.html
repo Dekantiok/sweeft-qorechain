@@ -3,9 +3,9 @@
 {% block title %}Carrier portal: Sweeft{% endblock %}
 
 {% block content %}
-<div class="rounded-xl border border-dashed border-neutral-800 p-12 text-center">
+<div class="rounded-xl border border-dashed border-control p-12 text-center">
     <h1 class="text-lg font-semibold">No carrier profile yet</h1>
-    <p class="mt-2 text-sm text-neutral-300">Register your logistics company and it will appear here after review.</p>
-    <a href="{% url 'logistics:partner_register' %}" class="mt-4 inline-block rounded-lg bg-red-500 shadow-lg shadow-red-500/25 px-4 py-2 text-sm font-semibold text-black hover:bg-red-400 transition-colors">Register as a carrier</a>
+    <p class="mt-2 text-sm text-muted">Register your logistics company and it will appear here after review.</p>
+    <a href="{% url 'logistics:partner_register' %}" class="mt-4 inline-block rounded-lg bg-ink text-white shadow-none px-4 py-2 text-sm font-semibold text-ink hover:bg-accent transition-colors">Register as a carrier</a>
 </div>
 {% endblock %}

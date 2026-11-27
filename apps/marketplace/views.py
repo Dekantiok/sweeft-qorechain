@@ -20,13 +20,25 @@ logger = logging.getLogger(__name__)
 
 
 def home(request):
+    """Landing page: live strip is indexed data only (chain reads are cached)."""
+    from django.db.models import Sum
+
+    from apps.escrow.models import Escrow
+
     recent = Listing.objects.filter(status=Listing.Status.ACTIVE).select_related("seller", "category")[:6]
+    completed = Escrow.objects.filter(state=Escrow.State.COMPLETED)
+    released = completed.aggregate(total=Sum("amount_uqor"))["total"] or 0
     return render(
         request,
         "marketplace/home.html",
         {
             "recent_listings": recent,
             "wallet_attached": bool(request.session.get("wallet_account")),
+            "stats": {
+                "listings_live": Listing.objects.filter(status=Listing.Status.ACTIVE).count(),
+                "escrows_settled": completed.count(),
+                "released_qor": f"{int(released) / 1_000_000:.4f}".rstrip("0").rstrip("."),
+            },
         },
     )
 

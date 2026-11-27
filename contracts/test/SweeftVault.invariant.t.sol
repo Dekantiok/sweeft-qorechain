@@ -73,7 +73,7 @@ contract SweeftVaultInvariantTest is Test {
     function fuzz_carrierAttestOnce(uint256 seed) public {
         uint256 id = _fundLogistics(seed % 2 + 1);
         vm.prank(carrier);
-        vault.attestCarrierEvidence(id, "DEMO-INV", "DELIVERED", uint64(block.timestamp), hex"deadbeef");
+        vault.attestCarrierEvidence(id, "DEMO-INV", "DELIVERED", bytes32(uint256(0x1234)), uint64(block.timestamp), uint64(block.timestamp + 7 days), hex"deadbeef");
         SweeftVault.Escrow memory e = vault.getEscrow(id);
         assertTrue(e.carrierAttested);
         assertTrue(e.delivered);

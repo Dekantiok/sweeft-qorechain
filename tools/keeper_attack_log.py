@@ -86,7 +86,9 @@ def main() -> None:
         return lib.send_evm(
             w3,
             buyer,
-            vault.functions.attestCarrierEvidence(escrow_id, "FAKE", "DELIVERED", int(time.time()), b"\x00" * 10),
+            vault.functions.attestCarrierEvidence(
+                escrow_id, "FAKE", "DELIVERED", bytes(32), int(time.time()), int(time.time()) + 7 * 24 * 3600, b"\x00" * 10
+            ),
             gas=600_000,
         )
 

@@ -109,4 +109,34 @@ contract SweeftMessageFormatTest is Test {
     function test_CosmosChainIdStored() public {
         assertEq(vault.cosmosChainId(), "qorechain-diana");
     }
+
+    /// @notice Carrier v2 format is pinned byte-for-byte (Phase 2), matching
+    ///         apps/logistics/carriers.py::canonical_carrier_attestation.
+    function test_CarrierMessageFormatV2() public {
+        bytes memory message = vault.buildCarrierMessage(
+            address(0xCA99),
+            2,
+            "DEMO-123",
+            "DELIVERED",
+            bytes32(uint256(0x1234)),
+            1_000,
+            1_000 + 7 days,
+            0
+        );
+        // provider is empty here (no carrier registered in the harness); the
+        // expected bytes below were produced by the Python builder with the
+        // same inputs (evidence=0x…1234, expires=605800).
+        assertEq(
+            string(message),
+            string.concat(
+                "sweeft-carrier-v2|chain=qorechain-diana|vault=",
+                vault.toHexString(address(vault)),
+                "|carrier=0x000000000000000000000000000000000000ca99|provider=|escrow=2",
+                "|trackingHash=0x859694e94e4d6e0a88de8752683e9552ea129abcb3b266ffb1548e2fff079f2d",
+                "|status=DELIVERED",
+                "|evidence=0x0000000000000000000000000000000000000000000000000000000000001234",
+                "|issued=1000|expires=605800|nonce=0"
+            )
+        );
+    }
 }

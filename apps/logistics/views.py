@@ -227,12 +227,26 @@ def api_carrier_attest(request, escrow_id: int):
         _, _, carrier_evm = carriers.demo_carrier_keypair()
         nonce = carrier_nonce(carrier_evm, escrow_id)
         issued_at = int(time.time())
+        expires_at = issued_at + 7 * 24 * 3600
+        # Evidence binding (Phase 2): attest to the latest submitted evidence
+        # content hash, or the zero hash for synthetic shipments.
+        from apps.oracle.models import FulfilmentEvidence
+
+        evidence = FulfilmentEvidence.objects.filter(escrow=shipment.escrow).order_by("-submitted_at").first()
+        evidence_hash = evidence.content_hash if evidence and evidence.content_hash else "0x" + "0" * 64
         signed = carriers.sign_carrier_attestation(
-            escrow_id, shipment.tracking_number, "DELIVERED", nonce, issued_at
+            escrow_id,
+            shipment.tracking_number,
+            "DELIVERED",
+            nonce,
+            issued_at,
+            vault=__import__("os").getenv("SWEEFT_VAULT_ADDRESS", ""),
+            carrier=carrier_evm,
+            evidence_hash=evidence_hash,
         )
         signature = bytes.fromhex(signed["signature"])
         result = attest_carrier_evidence(
-            escrow_id, shipment.tracking_number, "DELIVERED", issued_at, signature
+            escrow_id, shipment.tracking_number, "DELIVERED", issued_at, expires_at, evidence_hash, signature
         )
     except Exception as e:
         return JsonResponse({"ok": False, "error": str(e)}, status=500)

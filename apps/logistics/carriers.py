@@ -77,16 +77,31 @@ def canonical_carrier_attestation(
     status: str,
     issued_at: int,
     nonce: int,
+    *,
+    chain_id: str = "qorechain-diana",
+    vault: str = "",
+    carrier: str = "",
+    evidence_hash: str = "0x" + "0" * 64,
+    expires_at: int = 0,
 ) -> str:
-    """v5 on-chain attestation message — MUST match SweeftVault._carrierMessage.
+    """v2 on-chain attestation message — MUST match SweeftVault._carrierMessage.
 
-    The vault rebuilds this from (carrier, escrowId, tracking, status,
-    issuedAt, nonce) and verifies the carrier's ML-DSA-87 signature over it,
-    binding the attestation to one escrow, carrier, status and nonce.
+    Domain-separated (Phase 2): binds protocol+schema, chain, vault, carrier,
+    provider, escrow, tracking hash, status, evidence hash, issuance, expiry
+    and nonce. The vault rebuilds this from the same fields and verifies the
+    carrier's ML-DSA-87 signature over it.
     """
+    from eth_utils import keccak
+
+    if not expires_at:
+        expires_at = int(issued_at) + 7 * 24 * 3600  # MAX_ATTEST_AGE
+    tracking_hash = keccak(tracking_number.encode()).hex()
+    evidence = (evidence_hash or "").lower().replace("0x", "")
     return (
-        f"sweeft-carrier-v1|provider={provider_id}|tracking={tracking_number}"
-        f"|escrow={escrow_id}|status={status}|issued={issued_at}|nonce={nonce}"
+        f"sweeft-carrier-v2|chain={chain_id}|vault={vault.lower()}|carrier={carrier.lower()}"
+        f"|provider={provider_id}|escrow={escrow_id}|trackingHash=0x{tracking_hash}"
+        f"|status={status}|evidence=0x{evidence.rjust(64, '0')[-64:]}"
+        f"|issued={issued_at}|expires={expires_at}|nonce={nonce}"
     )
 
 
@@ -103,16 +118,31 @@ def sign_carrier_attestation(
     status: str,
     nonce: int,
     issued_at: int | None = None,
+    *,
+    vault: str = "",
+    carrier: str = "",
+    evidence_hash: str = "0x" + "0" * 64,
 ) -> dict:
-    """Sign the v5 on-chain attestation message with the Demo Carrier key.
+    """Sign the v2 on-chain attestation message with the Demo Carrier key.
 
-    `issued_at` is in **seconds** (the vault bounds it to the last 7 days).
+    `issued_at` is in **seconds** (the vault bounds it to the last 7 days);
+    `expires_at` is pinned to `issued_at + 7 days` by the vault.
     """
     if issued_at is None:
         issued_at = int(time.time())
+    expires_at = int(issued_at) + 7 * 24 * 3600
     keypair, _, _ = demo_carrier_keypair()
     message = canonical_carrier_attestation(
-        DemoCarrier.provider_id, tracking_number, escrow_id, status, issued_at, nonce
+        DemoCarrier.provider_id,
+        tracking_number,
+        escrow_id,
+        status,
+        issued_at,
+        nonce,
+        vault=vault,
+        carrier=carrier,
+        evidence_hash=evidence_hash,
+        expires_at=expires_at,
     )
     from qorsdk import pqc_sign
 
@@ -121,6 +151,8 @@ def sign_carrier_attestation(
         "message": message,
         "signature": signature,
         "issued_at": issued_at,
+        "expires_at": expires_at,
+        "evidence_hash": evidence_hash,
         "nonce": nonce,
         "provider_id": DemoCarrier.provider_id,
         "simulated": True,
@@ -159,6 +191,27 @@ def demo_carrier_keypair():
         raise ValueError("Demo Carrier key is not configured — set DEMO_CARRIER_MNEMONIC or SWEEFT_DEPLOYER_MNEMONIC")
     account = derive_unified_account(mnemonic.strip(), index=6)
     return account.pqc, account.cosmos, account.evm
+
+
+def demo_carrier_account():
+    """The Demo Carrier's full unified account (EVM key + PQC keypair).
+
+    The relayer signs the EVM transaction with THIS account, not the
+    deployer (owner) key — owner-key blast radius is contained to deployments
+    that have not yet configured a dedicated DEMO_CARRIER_MNEMONIC.
+    """
+    import os
+
+    from qorsdk import derive_unified_account
+
+    from integrations.qorechain.client import get_network
+
+    if get_network().network != "testnet":
+        raise ValueError("Demo Carrier is testnet-only")
+    mnemonic = os.getenv("DEMO_CARRIER_MNEMONIC", "") or os.getenv("SWEEFT_DEPLOYER_MNEMONIC", "")
+    if not mnemonic:
+        raise ValueError("Demo Carrier key is not configured — set DEMO_CARRIER_MNEMONIC")
+    return derive_unified_account(mnemonic.strip(), index=6)
 
 
 def sign_carrier_payload(payload: dict) -> dict:

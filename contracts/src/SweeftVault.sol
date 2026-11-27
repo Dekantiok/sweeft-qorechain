@@ -440,17 +440,24 @@ contract SweeftVault {
         }
     }
 
-    /// @notice Verify the carrier's ML-DSA-87 signature over a canonical
-    ///         tracking payload built on-chain, binding the attestation to this
-    ///         escrow, carrier, status and a per-shipment nonce. Only a
-    ///         `DELIVERED` status counts as proof of delivery; any other status
-    ///         is recorded (latest-status rule) and leaves the buyer's refund
-    ///         path open.
+    /// @notice Verify the carrier's ML-DSA-87 signature over a versioned,
+    ///         domain-separated authorization (`sweeft-carrier-v2`, Phase 2):
+    ///         chain, vault, carrier identity, provider, escrow, tracking
+    ///         hash, status, evidence hash, issuance, expiry and nonce are all
+    ///         bound into the signed bytes, so a signature is usable only for
+    ///         this deployment, this escrow, this evidence and this window.
+    ///         Only a `DELIVERED` status counts as proof of delivery; any
+    ///         other status is recorded (latest-status rule) and leaves the
+    ///         buyer's refund path open.
+    /// @param evidenceHash hash of the evidence content being delivered.
+    /// @param expiresAt must equal `issuedAt + MAX_ATTEST_AGE`.
     function attestCarrierEvidence(
         uint256 escrowId,
         string calldata trackingNumber,
         string calldata status,
+        bytes32 evidenceHash,
         uint64 issuedAt,
+        uint64 expiresAt,
         bytes calldata signature
     ) external {
         Escrow storage e = escrows[escrowId];
@@ -459,14 +466,23 @@ contract SweeftVault {
         // Bound carrier-supplied strings so they cannot bloat getEscrow() gas (N-7).
         if (bytes(status).length == 0 || bytes(status).length > MAX_STATUS_LEN) revert BadStatus();
         if (bytes(trackingNumber).length == 0 || bytes(trackingNumber).length > MAX_TRACKING_LEN) revert BadStatus();
-        // Only the escrow's assigned logistics partner may attest for it.
+        // The caller must be the escrow's assigned partner AND still
+        // registered (removing a carrier revokes attest authority, F8).
         if (e.logisticsPartner == address(0) || msg.sender != e.logisticsPartner) revert NotCarrier();
+        if (!isCarrier[msg.sender]) revert NotCarrier();
+        // Expiry is pinned to issuance + the max age: the signer cannot widen
+        // the signature's own window, and old signatures die after 7 days.
         if (issuedAt > block.timestamp) revert BadTimestamp();
-        if (block.timestamp - issuedAt > MAX_ATTEST_AGE) revert StaleAttestation();
+        if (expiresAt != issuedAt + MAX_ATTEST_AGE) revert StaleAttestation();
+        if (block.timestamp > expiresAt) revert StaleAttestation();
 
         uint256 nonce = carrierNonce[msg.sender][escrowId];
-        bytes memory message = _carrierMessage(msg.sender, escrowId, trackingNumber, status, issuedAt, nonce);
+        bytes memory message = _carrierMessage(
+            msg.sender, escrowId, trackingNumber, status, evidenceHash, issuedAt, expiresAt, nonce
+        );
         _requireCarrierSignature(msg.sender, message, signature);
+        // Consume the nonce only after every check above passed (the
+        // signature is the last gate), immediately before state changes.
         carrierNonce[msg.sender][escrowId] = nonce + 1;
 
         bool deliveredStatus = keccak256(bytes(status)) == keccak256(bytes("DELIVERED"));
@@ -718,30 +734,75 @@ contract SweeftVault {
         if (!PQC_VERIFY.pqcVerify(pubkey, signature, message)) revert BadCarrierSignature();
     }
 
+    /// @notice Public rebuild of the v2 carrier authorization message, so
+    ///         signing clients (Django, wallets, other integrators) can
+    ///         construct byte-identical payloads without reimplementing the
+    ///         string encoding.
+    function buildCarrierMessage(
+        address carrier,
+        uint256 escrowId,
+        string memory trackingNumber,
+        string memory status,
+        bytes32 evidenceHash,
+        uint64 issuedAt,
+        uint64 expiresAt,
+        uint256 nonce
+    ) external view returns (bytes memory) {
+        return _carrierMessage(carrier, escrowId, trackingNumber, status, evidenceHash, issuedAt, expiresAt, nonce);
+    }
+
+    /// @notice Versioned, domain-separated carrier authorization (Phase 2).
+    ///         Binds protocol+schema, chain, vault, carrier, provider, escrow,
+    ///         tracking hash, status, evidence hash, issuance window and nonce.
     function _carrierMessage(
         address carrier,
         uint256 escrowId,
         string memory trackingNumber,
         string memory status,
+        bytes32 evidenceHash,
         uint64 issuedAt,
+        uint64 expiresAt,
         uint256 nonce
     ) internal view returns (bytes memory) {
         return bytes(
             string.concat(
-                "sweeft-carrier-v1|provider=",
+                "sweeft-carrier-v2|chain=",
+                cosmosChainId,
+                "|vault=",
+                _toHexString(address(this)),
+                "|carrier=",
+                _toHexString(carrier),
+                "|provider=",
                 carrierProviderId[carrier],
-                "|tracking=",
-                trackingNumber,
                 "|escrow=",
                 _uintToString(escrowId),
+                "|trackingHash=",
+                _toHexBytes32(keccak256(bytes(trackingNumber))),
                 "|status=",
                 status,
+                "|evidence=",
+                _toHexBytes32(evidenceHash),
                 "|issued=",
                 _uintToString(uint256(issuedAt)),
+                "|expires=",
+                _uintToString(uint256(expiresAt)),
                 "|nonce=",
                 _uintToString(nonce)
             )
         );
+    }
+
+    function _toHexBytes32(bytes32 value) internal pure returns (string memory) {
+        bytes memory alphabet = "0123456789abcdef";
+        bytes32 b = value;
+        bytes memory out = new bytes(66);
+        out[0] = "0";
+        out[1] = "x";
+        for (uint256 i = 0; i < 32; i++) {
+            out[2 + i * 2] = alphabet[uint8(b[i] >> 4)];
+            out[3 + i * 2] = alphabet[uint8(b[i] & 0x0f)];
+        }
+        return string(out);
     }
 
     function _releaseMessage(uint256 escrowId, address buyer, address recipient, uint256 amount, uint256 nonce)

@@ -86,6 +86,20 @@ def escrow_detail(request, escrow_id: int):
     amount_wei = live_state.get("amount_wei") if live_state else int(escrow.amount_uqor) * 10**12
     dispute_bond_wei = max(10**17, int(amount_wei) // 100)  # 1% with a 0.1 QOR floor
 
+    # Know-before-you-sign ticket: 2% fee on the goods amount (amount minus
+    # any logistics allocation), split 70% treasury / 30% dispute pool.
+    goods_uqor = int(escrow.amount_uqor) - int(escrow.logistics_amount_uqor or 0)
+    fee_uqor = goods_uqor * 200 // 10_000
+    treasury_uqor = fee_uqor * 70_00 // 10_000
+    ticket = {
+        "goods_qor": goods_uqor / 1e6,
+        "fee_qor": fee_uqor / 1e6,
+        "treasury_qor": treasury_uqor / 1e6,
+        "pool_qor": (fee_uqor - treasury_uqor) / 1e6,
+        "seller_qor": (goods_uqor - fee_uqor) / 1e6,
+        "logistics_qor": int(escrow.logistics_amount_uqor or 0) / 1e6,
+    }
+
     my_credits_wei = 0
     if wallet:
         try:
@@ -112,6 +126,7 @@ def escrow_detail(request, escrow_id: int):
             "wallet_attached": bool(wallet),
             "my_credits_wei": my_credits_wei,
             "my_credits_qor": my_credits_wei / 10**18,
+            "ticket": ticket,
         },
     )
 

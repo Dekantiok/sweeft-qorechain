@@ -4,32 +4,32 @@
 
 {% block content %}
 <div>
-    <h1 class="text-2xl font-bold">Transaction proof</h1>
-    <p class="hash mt-2 break-all text-xs text-neutral-300">{{ tx_hash }}</p>
+    <h1 class="font-serif text-[28px] leading-[1.1] lg:text-[34px]">Transaction proof</h1>
+    <p class="hash mt-2 break-all text-xs text-muted">{{ tx_hash }}</p>
 </div>
 
 {% if escrow %}
-<div class="mt-6 rounded-xl border border-red-500/30 bg-red-500/5 p-4 text-sm">
-    <span class="text-red-300">This transaction touches Sweeft escrow </span>
-    <a href="{% url 'escrow:detail' escrow.on_chain_id %}" class="font-semibold text-red-400 hover:text-red-300">#{{ escrow.on_chain_id }} →</a>
+<div class="mt-6 rounded-xl border border-accent/30 bg-[rgba(23,67,255,0.03)] p-4 text-sm">
+    <span class="text-ink">This transaction touches Sweeft escrow </span>
+    <a href="{% url 'escrow:detail' escrow.on_chain_id %}" class="font-semibold text-accent hover:text-accent">#{{ escrow.on_chain_id }} →</a>
 </div>
 {% endif %}
 
 {% if evm %}
-<div class="mt-6 rounded-xl border border-neutral-900 bg-black/50 p-6">
-    <h2 class="text-sm font-semibold text-red-300">EVM transaction (the honest label)</h2>
+<div class="mt-6 rounded-xl border border-line bg-white p-6">
+    <h2 class="text-sm font-semibold text-ink">EVM transaction (the honest label)</h2>
     <dl class="mt-4 grid gap-x-8 gap-y-2 text-xs sm:grid-cols-2">
-        <dt class="text-neutral-300">Status</dt><dd class="{% if evm.status == 1 %}text-red-400{% else %}text-red-400{% endif %}">{% if evm.status == 1 %}success (1){% else %}reverted (0){% endif %}</dd>
-        <dt class="text-neutral-300">From</dt><dd class="hash text-neutral-300 break-all">{{ evm.from }}</dd>
-        <dt class="text-neutral-300">To</dt><dd class="hash text-neutral-300 break-all">{{ evm.to }}</dd>
-        <dt class="text-neutral-300">Value</dt><dd class="text-neutral-300">{{ evm.value }} wei</dd>
-        <dt class="text-neutral-300">Block</dt><dd class="text-neutral-300">{{ evm.block }}</dd>
-        <dt class="text-neutral-300">Signature tier</dt>
-        <dd class="text-neutral-300">classical (EVM lane)</dd>
+        <dt class="text-muted">Status</dt><dd class="{% if evm.status == 1 %}text-accent{% else %}text-accent{% endif %}">{% if evm.status == 1 %}success (1){% else %}reverted (0){% endif %}</dd>
+        <dt class="text-muted">From</dt><dd class="hash text-muted break-all">{{ evm.from }}</dd>
+        <dt class="text-muted">To</dt><dd class="hash text-muted break-all">{{ evm.to }}</dd>
+        <dt class="text-muted">Value</dt><dd class="text-muted">{{ evm.value }} wei</dd>
+        <dt class="text-muted">Block</dt><dd class="text-muted">{{ evm.block }}</dd>
+        <dt class="text-muted">Signature tier</dt>
+        <dd class="text-muted">classical (EVM lane)</dd>
     </dl>
-    <p class="mt-4 text-xs leading-relaxed text-neutral-300">
+    <p class="mt-4 text-xs leading-relaxed text-muted">
         EVM transactions carry no ML-DSA-87 layer: that's the chain's honest label, not a gap.
-        Sweeft's safety comes from <strong class="text-neutral-300">in-contract verification</strong>: the vault
+        Sweeft's safety comes from <strong class="text-muted">in-contract verification</strong>: the vault
         checks the buyer's registered ML-DSA-87 signature via the <span class="hash">pqcVerify</span> precompile
         before any funds move. The precompile call is visible in the transaction trace on the explorer.
     </p>
@@ -37,19 +37,19 @@
 {% endif %}
 
 {% if cosmos %}
-<div class="mt-6 rounded-xl border border-neutral-900 bg-black/50 p-6">
-    <h2 class="text-sm font-semibold text-red-300">Native-lane record</h2>
+<div class="mt-6 rounded-xl border border-line bg-white p-6">
+    <h2 class="text-sm font-semibold text-ink">Native-lane record</h2>
     <dl class="mt-4 grid gap-x-8 gap-y-2 text-xs sm:grid-cols-2">
-        <dt class="text-neutral-300">Signature tier</dt><dd class="text-neutral-300">{{ tier.tier }}</dd>
-        <dt class="text-neutral-300">Hybrid verified</dt><dd class="{% if tier.verified %}text-red-400{% else %}text-neutral-300{% endif %}">{{ tier.verified|yesno:"yes,no" }}</dd>
-        <dt class="text-neutral-300">Meaning</dt><dd class="text-neutral-300 leading-relaxed">{{ tier.label }}</dd>
+        <dt class="text-muted">Signature tier</dt><dd class="text-muted">{{ tier.tier }}</dd>
+        <dt class="text-muted">Hybrid verified</dt><dd class="{% if tier.verified %}text-accent{% else %}text-muted{% endif %}">{{ tier.verified|yesno:"yes,no" }}</dd>
+        <dt class="text-muted">Meaning</dt><dd class="text-muted leading-relaxed">{{ tier.label }}</dd>
     </dl>
 </div>
 {% endif %}
 
-<div class="mt-6 rounded-xl border border-neutral-900 bg-black/50 p-6">
-    <h2 class="text-sm font-semibold text-neutral-300">Try to replay it</h2>
-    <p class="mt-2 text-xs leading-relaxed text-neutral-300">
+<div class="mt-6 rounded-xl border border-line bg-white p-6">
+    <h2 class="panel-head">Try to replay it</h2>
+    <p class="mt-2 text-xs leading-relaxed text-muted">
         Release and refund signatures bind the vault, escrow id, both parties, amount and the per-buyer
         nonce. Submitting the same signature again fails <span class="hash">NotReleaseEligible</span>, and
         changing any field fails <span class="hash">BadPqcSignature</span>: both recorded as reverting

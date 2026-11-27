@@ -16,10 +16,24 @@ from qorsdk import pqc_sign  # noqa: E402
 PROVIDER_ID = "LOG-DEMO-001"
 
 
-def canonical_attestation(provider_id, tracking, escrow_id, status, issued_at, nonce):
+def canonical_attestation(provider_id, tracking, escrow_id, status, issued_at, nonce, *, vault="", carrier="", evidence_hash="0x" + "0" * 64):
+    """v2 carrier message — must match SweeftVault._carrierMessage byte-for-byte."""
+    import hashlib as _hashlib
+
+    tracking_hash = _hashlib.sha256(tracking.encode()).hexdigest()
+    # keccak256 of the tracking string (the vault hashes, not sha256s it)
+    try:
+        from eth_utils import keccak
+
+        tracking_hash = keccak(tracking.encode()).hex()
+    except Exception:
+        tracking_hash = _hashlib.sha256(tracking.encode()).hexdigest()
+    expires_at = issued_at + 7 * 24 * 3600
+    evidence = (evidence_hash or "").lower().replace("0x", "").rjust(64, "0")[-64:]
     return (
-        f"sweeft-carrier-v1|provider={provider_id}|tracking={tracking}"
-        f"|escrow={escrow_id}|status={status}|issued={issued_at}|nonce={nonce}"
+        f"sweeft-carrier-v2|chain=qorechain-diana|vault={vault.lower()}|carrier={carrier.lower()}"
+        f"|provider={provider_id}|escrow={escrow_id}|trackingHash=0x{tracking_hash}"
+        f"|status={status}|evidence=0x{evidence}|issued={issued_at}|expires={expires_at}|nonce={nonce}"
     )
 
 
@@ -57,11 +71,16 @@ def main():
     status = "DELIVERED"
     issued_at = int(time.time())
     nonce = vault.functions.carrierNonce(w3.to_checksum_address(carrier.evm)).call()
-    message = canonical_attestation(PROVIDER_ID, tracking, escrow_id, status, issued_at, nonce).encode()
+    message = canonical_attestation(
+        PROVIDER_ID, tracking, escrow_id, status, issued_at, nonce,
+        vault=lib.contract_address("SweeftVault"), carrier=w3.to_checksum_address(carrier.evm),
+    ).encode()
     sig = pqc_sign(carrier.pqc.secret_key, message)
     print("carrier sig len", len(sig))
     r = lib.send_evm_expect_success(
-        w3, carrier, vault.functions.attestCarrierEvidence(escrow_id, tracking, status, issued_at, sig), gas=1_500_000
+        w3, carrier, vault.functions.attestCarrierEvidence(
+            escrow_id, tracking, status, bytes(32), issued_at, issued_at + 7 * 24 * 3600, sig
+        ), gas=1_500_000
     )
     print("attestCarrierEvidence", r["hash"][:18])
     e = vault.functions.getEscrow(escrow_id).call()

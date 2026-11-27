@@ -112,28 +112,29 @@ def attest_carrier_evidence(
     tracking_number: str,
     status: str,
     issued_at: int,
+    expires_at: int,
+    evidence_hash: str,
     signature: bytes,
 ) -> dict:
-    """Submit the carrier's signed v5 attestation to the Vault (as the carrier).
+    """Submit the carrier's signed v2 attestation to the Vault (as the carrier).
 
-    The vault rebuilds the canonical message from (carrier, escrowId, tracking,
-    status, issuedAt, nonce) and verifies the ML-DSA-87 signature on-chain.
+    The vault rebuilds the domain-separated message (chain, vault, carrier,
+    provider, escrow, tracking hash, status, evidence, window, nonce) and
+    verifies the ML-DSA-87 signature on-chain. The EVM transaction is signed
+    by the carrier account itself — never the deployer (owner) key.
     """
-    from apps.logistics.carriers import demo_carrier_keypair
-
-    _, _, carrier_evm = demo_carrier_keypair()
     w3 = get_evm_client()
-    from qorsdk import derive_unified_account
+    from apps.logistics import carriers as carriers_module
 
-    import os
-
-    mnemonic = os.getenv("SWEEFT_DEPLOYER_MNEMONIC", "")
-    account = derive_unified_account(mnemonic, index=6)
+    account = carriers_module.demo_carrier_account()
+    carrier_evm = account.evm
     eth_account = w3.eth.account.from_key(account.private_key_hex)
     vault = _vault_contract(w3)
     ensure_relayer_window()  # opener for carrier too (best-effort)
 
-    fn = vault.functions.attestCarrierEvidence(escrow_id, tracking_number, status, issued_at, signature)
+    fn = vault.functions.attestCarrierEvidence(
+        escrow_id, tracking_number, status, bytes.fromhex(evidence_hash), issued_at, expires_at, signature
+    )
     tx = fn.build_transaction(
         {
             "from": eth_account.address,

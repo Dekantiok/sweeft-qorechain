@@ -69,7 +69,7 @@ contract SweeftLogisticsTest is Test {
 
     function _attestDelivered(uint256 id) internal {
         vm.prank(carrier);
-        vault.attestCarrierEvidence(id, "DEMO-123", "DELIVERED", uint64(block.timestamp), hex"deadbeef");
+        vault.attestCarrierEvidence(id, "DEMO-123", "DELIVERED", bytes32(uint256(0x1234)), uint64(block.timestamp), uint64(block.timestamp + 7 days), hex"deadbeef");
     }
 
     function test_registerCarrier_ownerOnly() public {
@@ -82,7 +82,7 @@ contract SweeftLogisticsTest is Test {
         uint256 id = _fundedLogisticsEscrow(1 ether, 0.1 ether);
 
         vm.prank(carrier);
-        vault.attestCarrierEvidence(id, "DEMO-123", "DELIVERED", uint64(block.timestamp), hex"deadbeef");
+        vault.attestCarrierEvidence(id, "DEMO-123", "DELIVERED", bytes32(uint256(0x1234)), uint64(block.timestamp), uint64(block.timestamp + 7 days), hex"deadbeef");
 
         SweeftVault.Escrow memory e = vault.getEscrow(id);
         assertTrue(e.carrierAttested);
@@ -96,7 +96,7 @@ contract SweeftLogisticsTest is Test {
         uint256 id = _fundedLogisticsEscrow(1 ether, 0.1 ether);
 
         vm.expectRevert(SweeftVault.NotCarrier.selector);
-        vault.attestCarrierEvidence(id, "DEMO-123", "DELIVERED", uint64(block.timestamp), hex"00");
+        vault.attestCarrierEvidence(id, "DEMO-123", "DELIVERED", bytes32(uint256(0x1234)), uint64(block.timestamp), uint64(block.timestamp + 7 days), hex"00");
     }
 
     function test_attestCarrierEvidence_otherCarrierRejected() public {
@@ -109,7 +109,7 @@ contract SweeftLogisticsTest is Test {
         uint256 id = _fundedLogisticsEscrow(1 ether, 0.1 ether);
         vm.prank(other);
         vm.expectRevert(SweeftVault.NotCarrier.selector);
-        vault.attestCarrierEvidence(id, "DEMO-123", "DELIVERED", uint64(block.timestamp), hex"00");
+        vault.attestCarrierEvidence(id, "DEMO-123", "DELIVERED", bytes32(uint256(0x1234)), uint64(block.timestamp), uint64(block.timestamp + 7 days), hex"00");
     }
 
     function test_attestCarrierEvidence_badSignature() public {
@@ -118,7 +118,7 @@ contract SweeftLogisticsTest is Test {
         MockVerify(0x0000000000000000000000000000000000000a01).setResult(false);
         vm.prank(carrier);
         vm.expectRevert(SweeftVault.BadCarrierSignature.selector);
-        vault.attestCarrierEvidence(id, "DEMO-123", "DELIVERED", uint64(block.timestamp), hex"00");
+        vault.attestCarrierEvidence(id, "DEMO-123", "DELIVERED", bytes32(uint256(0x1234)), uint64(block.timestamp), uint64(block.timestamp + 7 days), hex"00");
     }
 
     function test_attestCarrierEvidence_staleRejected() public {
@@ -127,14 +127,14 @@ contract SweeftLogisticsTest is Test {
         uint64 stale = uint64(block.timestamp - 8 days);
         vm.prank(carrier);
         vm.expectRevert(SweeftVault.StaleAttestation.selector);
-        vault.attestCarrierEvidence(id, "DEMO-123", "DELIVERED", stale, hex"00");
+        vault.attestCarrierEvidence(id, "DEMO-123", "DELIVERED", bytes32(uint256(0x1234)), stale, uint64(block.timestamp + 7 days), hex"00");
     }
 
     function test_nonDeliveredStatusDoesNotFulfil() public {
         uint256 id = _fundedLogisticsEscrow(1 ether, 0.1 ether);
 
         vm.prank(carrier);
-        vault.attestCarrierEvidence(id, "DEMO-123", "LOST", uint64(block.timestamp), hex"deadbeef");
+        vault.attestCarrierEvidence(id, "DEMO-123", "LOST", bytes32(uint256(0x1234)), uint64(block.timestamp), uint64(block.timestamp + 7 days), hex"deadbeef");
 
         SweeftVault.Escrow memory e = vault.getEscrow(id);
         assertTrue(e.carrierAttested);
@@ -240,14 +240,14 @@ contract SweeftLogisticsTest is Test {
         // 33-byte status exceeds MAX_STATUS_LEN (32).
         vm.prank(carrier);
         vm.expectRevert(SweeftVault.BadStatus.selector);
-        vault.attestCarrierEvidence(id, "DEMO-123", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", uint64(block.timestamp), hex"");
+        vault.attestCarrierEvidence(id, "DEMO-123", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", bytes32(uint256(0x1234)), uint64(block.timestamp), uint64(block.timestamp + 7 days), hex"");
 
         // 129-byte tracking exceeds MAX_TRACKING_LEN (128).
         bytes memory longTracking = new bytes(129);
         for (uint256 i = 0; i < 129; i++) longTracking[i] = "A";
         vm.prank(carrier);
         vm.expectRevert(SweeftVault.BadStatus.selector);
-        vault.attestCarrierEvidence(id, string(longTracking), "DELIVERED", uint64(block.timestamp), hex"");
+        vault.attestCarrierEvidence(id, string(longTracking), "DELIVERED", bytes32(uint256(0x1234)), uint64(block.timestamp), uint64(block.timestamp + 7 days), hex"");
     }
 
     function test_carrierNonceIsPerEscrow() public {
@@ -270,7 +270,7 @@ contract SweeftLogisticsTest is Test {
         // The same shipment is later reported LOST: the latest-status rule
         // clears the delivery proof (N-8) and reopens the refund path.
         vm.prank(carrier);
-        vault.attestCarrierEvidence(id, "DEMO-123", "LOST", uint64(block.timestamp), hex"deadbeef");
+        vault.attestCarrierEvidence(id, "DEMO-123", "LOST", bytes32(uint256(0x1234)), uint64(block.timestamp), uint64(block.timestamp + 7 days), hex"deadbeef");
 
         SweeftVault.Escrow memory e = vault.getEscrow(id);
         assertTrue(e.carrierAttested);
@@ -288,7 +288,7 @@ contract SweeftLogisticsTest is Test {
         uint256 id = _fundedLogisticsEscrow(total, log);
         _attestDelivered(id);
         vm.prank(carrier);
-        vault.attestCarrierEvidence(id, "DEMO-123", "IN_TRANSIT", uint64(block.timestamp), hex"deadbeef");
+        vault.attestCarrierEvidence(id, "DEMO-123", "IN_TRANSIT", bytes32(uint256(0x1234)), uint64(block.timestamp), uint64(block.timestamp + 7 days), hex"deadbeef");
         assertFalse(vault.getEscrow(id).carrierDelivered);
 
         vm.prank(buyer);

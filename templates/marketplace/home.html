@@ -1,91 +1,124 @@
 {% extends "base.html" %}
 
+{% block title %}Sweeft: Post-Quantum Commerce on QoreChain{% endblock %}
+
 {% block content %}
-<section class="py-16 text-center">
-    <h1 class="text-4xl sm:text-5xl font-bold tracking-tight">One ecosystem.
-        <span class="block text-red-400 mt-2">Every part settles on-chain.</span>
-    </h1>
-    <p class="mx-auto mt-6 max-w-2xl text-neutral-300">
-        Sweeft is a commerce and trust ecosystem on QoreChain: a marketplace for discovery,
-        escrow for settlement, verifiers for fulfilment, a dispute board for conflicts,
-        a DAO for governance and an AI that operates inside your limits.
-    </p>
-
-    <!-- Connect first: component actions unlock after connecting. -->
-    {% if not wallet_attached %}
-    <div class="mt-8 flex flex-col items-center">
-        <button id="hero-connect" class="rounded-lg bg-red-500 shadow-lg shadow-red-500/25 px-6 py-3 font-semibold text-black hover:bg-red-400 transition-colors">
-            Connect wallet
-        </button>
-        <p class="mt-3 text-xs text-neutral-400">Connect with QoreX or an EVM wallet to operate the system.</p>
-    </div>
-    {% endif %}
-
-    {% if wallet_attached %}
-    <div class="mt-8 flex flex-col items-center">
-        <div class="flex flex-wrap items-center justify-center gap-4">
-            <a href="/escrow/new/" class="rounded-lg bg-red-500 shadow-lg shadow-red-500/25 px-6 py-3 font-semibold text-black hover:bg-red-400 transition-colors">
-                New escrow
-            </a>
-            <a href="/marketplace/" class="rounded-lg border border-neutral-800 px-6 py-3 font-semibold hover:border-neutral-600 transition-colors">
-                Browse the marketplace
-            </a>
-            <a href="/dashboard/" class="rounded-lg border border-neutral-800 px-6 py-3 font-semibold hover:border-neutral-600 transition-colors">
-                View activity
-            </a>
+{# ---- Hero (Meridian pattern: serif display, one CTA, live strip) ---- #}
+<section class="pt-10 sm:pt-16 text-center">
+    <div class="flex flex-col items-center">
+        <h1 class="font-serif text-[clamp(48px,8vw,96px)] leading-[0.96] tracking-[-0.015em] motion-safe:animate-rise">
+            Every payment has<br>a signature. Money<br>settles on-chain.
+        </h1>
+        <p class="mt-7 max-w-[44ch] text-balance text-[17px] leading-[27px] motion-safe:animate-rise motion-safe:[animation-delay:120ms]">
+            A post-quantum marketplace on QoreChain. Buyers fund escrow, carriers and verifiers prove delivery, and every release needs the buyer's ML-DSA-87 signature. A stolen classical key moves nothing.
+        </p>
+        <div class="mt-10 flex flex-col sm:flex-row items-center gap-5 motion-safe:animate-rise motion-safe:[animation-delay:220ms]">
+            {% if wallet_attached %}
+            <a href="/escrow/new/" class="btn btn-accent">New escrow</a>
+            <a href="/marketplace/" class="btn-ghost">Browse the marketplace</a>
+            {% else %}
+            <button id="hero-connect" class="btn">Connect wallet</button>
+            <a href="/marketplace/" class="btn-ghost">Browse the marketplace</a>
+            {% endif %}
         </div>
-        <p class="mt-3 text-xs text-neutral-400">Wallet connected: every component is live for you.</p>
+        <div class="mt-10 flex flex-wrap justify-center gap-x-8 gap-y-2 text-[13px] text-muted motion-safe:animate-rise motion-safe:[animation-delay:320ms]">
+            <span><strong class="text-ink tabular-nums">{{ stats.listings_live }}</strong> listings live</span>
+            <span><strong class="text-ink tabular-nums">{{ stats.escrows_settled }}</strong> escrows settled</span>
+            <span><strong class="text-ink tabular-nums">{{ stats.released_qor }} QOR</strong> released on Diana</span>
+        </div>
     </div>
-    {% endif %}
 </section>
 
-<section class="py-8">
-    <h2 class="text-lg font-semibold">The components</h2>
-    <p class="mt-1 text-sm text-neutral-400">Each one enforces its rules on-chain. Together they form the system.</p>
-    <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <a href="/marketplace/" class="group rounded-xl border border-neutral-900 bg-black/50 p-5 hover:border-red-500/40 transition-colors">
-            <h3 class="font-semibold group-hover:text-red-300 transition-colors">Marketplace</h3>
-            <p class="mt-1 text-xs text-neutral-400">On-chain listings with prices pinned at purchase. Discovery, negotiation and hash-anchored metadata live here.</p>
-        </a>
-        <a href="/escrow/new/" class="group rounded-xl border border-neutral-900 bg-black/50 p-5 hover:border-red-500/40 transition-colors">
-            <h3 class="font-semibold group-hover:text-red-300 transition-colors">Escrow</h3>
-            <p class="mt-1 text-xs text-neutral-400">PQ-gated settlement. Funds move only on the buyer's ML-DSA-87 signature, with credits-only payouts.</p>
-        </a>
-        <a href="/oracle/" class="group rounded-xl border border-neutral-900 bg-black/50 p-5 hover:border-red-500/40 transition-colors">
-            <h3 class="font-semibold group-hover:text-red-300 transition-colors">Oracle</h3>
-            <p class="mt-1 text-xs text-neutral-400">DAO-governed verifiers attest fulfilment evidence. No single verifier can move an escrow alone.</p>
-        </a>
-        <a href="/disputes/" class="group rounded-xl border border-neutral-900 bg-black/50 p-5 hover:border-red-500/40 transition-colors">
-            <h3 class="font-semibold group-hover:text-red-300 transition-colors">Dispute board</h3>
-            <p class="mt-1 text-xs text-neutral-400">Staked, randomly drawn resolver panels decide frozen escrows, with a real appeal to a larger panel.</p>
-        </a>
-        <a href="/governance/" class="group rounded-xl border border-neutral-900 bg-black/50 p-5 hover:border-red-500/40 transition-colors">
-            <h3 class="font-semibold group-hover:text-red-300 transition-colors">DAO</h3>
-            <p class="mt-1 text-xs text-neutral-400">Stake-weighted governance owns the verifier registry and protocol parameters, with a timelock and guardian veto.</p>
-        </a>
-        <a href="/ai/" class="group rounded-xl border border-neutral-900 bg-black/50 p-5 hover:border-red-500/40 transition-colors">
-            <h3 class="font-semibold group-hover:text-red-300 transition-colors">AI assistant</h3>
-            <p class="mt-1 text-xs text-neutral-400">Finds, negotiates and buys inside your mandate. Caps enforced in code. The model never moves money itself.</p>
-        </a>
+{# ---- Story: Fund, Ship, Attest, Release (Meridian Story pattern) ---- #}
+<section aria-labelledby="story-title" class="border-t border-line mt-16 py-16 sm:py-20">
+    <div class="flex flex-col gap-5 max-w-[640px]">
+        <h2 id="story-title" class="font-serif text-[34px] leading-[1.06] lg:text-[44px]">From funding to a signed release</h2>
+        <p class="text-[16px] leading-[24px]">One escrow, four steps. The contract enforces every one of them, and the buyer's post-quantum key signs the last one.</p>
+    </div>
+
+    <div id="story" class="mt-10">
+        <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <div class="story-step border border-line bg-white p-4" data-step="0">
+                <div class="text-[12px] text-muted">Step 1</div>
+                <h3 class="mt-1 text-[15px] font-semibold">Buyer funds escrow</h3>
+                <p class="mt-1 text-[13px] leading-[19px] text-muted">Terms (parties, amount, deadline) freeze on-chain. The vault requires the buyer's registered ML-DSA-87 key.</p>
+                <div class="mt-3 grid grid-cols-5 gap-1">
+                    <span class="tile tile-bought"></span><span class="tile tile-bought"></span><span class="tile tile-bought"></span><span class="tile tile-bought"></span><span class="tile tile-bought"></span>
+                </div>
+                <p class="mt-2 text-[13px] tabular-nums">0.1 QOR held in escrow</p>
+            </div>
+            <div class="story-step border border-line bg-white p-4" data-step="1">
+                <div class="text-[12px] text-muted">Step 2</div>
+                <h3 class="mt-1 text-[15px] font-semibold">Seller ships, carrier attests</h3>
+                <p class="mt-1 text-[13px] leading-[19px] text-muted">The carrier signs a canonical tracking payload. The vault verifies it on-chain. Only DELIVERED counts as proof.</p>
+                <div class="mt-3 flex gap-2 text-[12px]"><span class="tile tile-listed"></span><span class="tile tile-listed"></span><span class="tile tile-listed"></span><span class="tile tile-listed"></span><span class="tile tile-listed"></span><span class="text-muted">DELIVERED ✓</span></div>
+                <p class="mt-2 text-[13px] tabular-nums">Signature verified by pqcVerify</p>
+            </div>
+            <div class="story-step border border-line bg-white p-4" data-step="2">
+                <div class="text-[12px] text-muted">Step 3</div>
+                <h3 class="mt-1 text-[15px] font-semibold">Verifier threshold met</h3>
+                <p class="mt-1 text-[13px] leading-[19px] text-muted">DAO-approved verifiers review fulfilment evidence. No single verifier can mark proof alone (M-of-N).</p>
+                <div class="mt-3 flex gap-2 text-[12px]"><span class="tile tile-spare"></span><span class="tile tile-spare"></span><span class="tile tile-bought"></span><span class="tile tile-bought"></span><span class="text-muted">2 of 2 attest</span></div>
+                <p class="mt-2 text-[13px] tabular-nums">evidenceAttested = true</p>
+            </div>
+            <div class="story-step border border-line bg-white p-4" data-step="3">
+                <div class="text-[12px] text-muted">Step 4</div>
+                <h3 class="mt-1 text-[15px] font-semibold">Buyer signs the release</h3>
+                <p class="mt-1 text-[13px] leading-[19px] text-muted">QoreX signs the release message with ML-DSA-87. The contract checks recipient, amount, and nonce, then pays out.</p>
+                <div class="mt-3 flex flex-col gap-1 text-[13px] tabular-nums">
+                    <span>Seller receives <strong>0.098 QOR</strong></span>
+                    <span class="text-muted">Fee 0.002 QOR (2%) → treasury + dispute pool</span>
+                </div>
+            </div>
+        </div>
+        <div class="mt-4 flex items-center gap-4">
+            <button id="story-play" class="btn-secondary" type="button">Play the story</button>
+            <div class="flex-1 h-[2px] bg-panel"><div id="story-progress" class="h-[2px] bg-ink w-0 transition-all duration-500"></div></div>
+            <span id="story-count" class="text-[13px] text-muted tabular-nums">1 / 4</span>
+        </div>
+    </div>
+</section>
+
+{# ---- Components as narrative sections ---- #}
+<section class="border-t border-line py-16">
+    <h2 class="font-serif text-[34px] leading-[1.06] lg:text-[44px] max-w-[640px]">Six parts. One rule: the chain decides.</h2>
+    <div class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="panel"><div class="panel-head">Marketplace</div><p class="p-4 text-[13px] leading-[19px] text-muted">On-chain listings pin price plus a metadata hash at purchase. Discovery, negotiation, and AI drafts live here.</p></div>
+        <div class="panel"><div class="panel-head">Escrow</div><p class="p-4 text-[13px] leading-[19px] text-muted">PQ-gated settlement. Funds move only on the buyer's ML-DSA-87 signature, with credits-only payouts and per-escrow nonces.</p></div>
+        <div class="panel"><div class="panel-head">Verifiers</div><p class="p-4 text-[13px] leading-[19px] text-muted">A DAO-governed allowlist attests fulfilment evidence. An M-of-N threshold means no single verifier can block a refund.</p></div>
+        <div class="panel"><div class="panel-head">Dispute board</div><p class="p-4 text-[13px] leading-[19px] text-muted">Staked, randomly drawn resolver panels decide frozen escrows, with a real appeal to a larger panel that can slash the first one.</p></div>
+        <div class="panel"><div class="panel-head">DAO</div><p class="p-4 text-[13px] leading-[19px] text-muted">Stake-weighted governance owns the registry, vault, and board. Allowlisted calls, a 2-day timelock, and a guardian veto.</p></div>
+        <div class="panel"><div class="panel-head">AI assistant</div><p class="p-4 text-[13px] leading-[19px] text-muted">Finds, negotiates, and buys inside your mandate. Caps are enforced in code, the signed release binds recipient, amount, and nonce, and the model never moves money itself.</p></div>
+    </div>
+</section>
+
+{# ---- Proof teaser ---- #}
+<section class="border-t border-line py-16">
+    <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+        <div class="max-w-[640px]">
+            <h2 class="font-serif text-[34px] leading-[1.06] lg:text-[44px]">Don't trust the page. Check the chain.</h2>
+            <p class="mt-3 text-[16px] leading-[24px]">Every gate on this site has a proof page that reads live state from Diana. Wrong-key and tampered releases revert on testnet, and the receipts are linked from the security page.</p>
+        </div>
+        <a href="/security/" class="btn shrink-0">See the security model</a>
     </div>
 </section>
 
 {% if recent_listings %}
-<section class="py-8">
+<section class="border-t border-line py-16">
     <div class="flex items-center justify-between">
-        <h2 class="text-lg font-semibold">Fresh listings</h2>
-        <a href="/marketplace/" class="text-sm text-red-400 hover:text-red-300">View all →</a>
+        <h2 class="font-serif text-[28px] leading-[1.1]">Fresh listings</h2>
+        <a href="/marketplace/" class="btn-ghost">View all</a>
     </div>
-    <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {% for listing in recent_listings %}
-        <a href="{% url 'marketplace:detail' listing.on_chain_id %}" class="group rounded-xl border border-neutral-900 bg-black/50 p-5 hover:border-red-500/40 transition-colors">
+        <a href="{% url 'marketplace:detail' listing.on_chain_id %}" class="card group block">
             <div class="flex items-center justify-between">
-                <span class="text-xs text-neutral-300">#{{ listing.on_chain_id }}</span>
-                <span class="rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-red-400">{{ listing.status }}</span>
+                <span class="text-[13px] text-muted">#{{ listing.on_chain_id }}</span>
+                <span class="badge badge-{{ listing.status }}">{{ listing.status }}</span>
             </div>
-            <h3 class="mt-2 font-semibold group-hover:text-red-300 transition-colors">{{ listing.title }}</h3>
-            <p class="mt-1 text-xs text-neutral-300">{{ listing.seller.display_name }}</p>
-            <p class="mt-3 font-mono text-sm text-red-400">{{ listing.price_qor }} QOR</p>
+            <h3 class="mt-2 font-semibold group-hover:text-accent transition-colors">{{ listing.title }}</h3>
+            <p class="mt-1 text-[13px] text-muted">{{ listing.seller.display_name }}</p>
+            <p class="mt-3 tabular-nums text-[15px]">{{ listing.price_qor }} QOR</p>
         </a>
         {% endfor %}
     </div>
@@ -98,6 +131,31 @@
     if (heroConnect && window.SweeftWallet) {
         heroConnect.addEventListener("click", function () { SweeftWallet.openModal(); });
     }
+    // Story player: auto-advance through the four steps until stepped through.
+    var steps = document.querySelectorAll("#story .story-step");
+    var progress = document.getElementById("story-progress");
+    var count = document.getElementById("story-count");
+    var play = document.getElementById("story-play");
+    var current = 0, timer = null, playing = false;
+    function show(i) {
+        current = i;
+        steps.forEach(function (el, idx) { el.classList.toggle("story-step-on", idx <= i); });
+        progress.style.width = ((i + 1) / steps.length * 100) + "%";
+        count.textContent = (i + 1) + " / " + steps.length;
+    }
+    function stop() { playing = false; clearInterval(timer); play.textContent = "Play the story"; }
+    play.addEventListener("click", function () {
+        if (playing) { stop(); return; }
+        playing = true; play.textContent = "Pause";
+        show(0);
+        timer = setInterval(function () {
+            if (current >= steps.length - 1) { stop(); return; }
+            show(current + 1);
+        }, 2200);
+    });
+    show(0);
+    // Respect reduced motion: never auto-start.
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) { show(steps.length - 1); }
 })();
 </script>
 {% endblock %}
