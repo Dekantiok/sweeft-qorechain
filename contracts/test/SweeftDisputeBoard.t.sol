@@ -62,6 +62,7 @@ contract SweeftDisputeBoardTest is Test {
         vm.etch(0x0000000000000000000000000000000000000a01, address(pv).code);
         MockKS(0x0000000000000000000000000000000000000a02).setRegistered(buyer, true, true);
         MockKS(0x0000000000000000000000000000000000000a02).setRegistered(carrier, true, true);
+        MockKS(0x0000000000000000000000000000000000000a02).setRegistered(verifier, true, true);
         MockPV(0x0000000000000000000000000000000000000a01).setResult(true);
 
         // Eight staked resolvers: first panel 3 + appeal panel 5.
@@ -272,7 +273,7 @@ contract SweeftDisputeBoardTest is Test {
         uint256 escrowId = _fundedEscrow();
         registry.addVerifier(verifier);
         vm.prank(verifier);
-        vault.attestEvidence(escrowId, keccak256("proof"));
+        vault.attestEvidence(escrowId, verifier, keccak256("proof"), uint64(block.timestamp), uint64(block.timestamp + 7 days), hex"deadbeef");
         assertTrue(vault.getEscrow(escrowId).evidenceAttested);
 
         vm.deal(buyer, BOND);

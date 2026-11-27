@@ -126,6 +126,11 @@ contract SweeftVault {
     error NotDisputable();
     error NotCarrier();
     error BadCarrierSignature();
+    error BadVerifierSignature();
+    error VerifierKeyNotRegistered();
+    error VerifierKeyNotProven();
+    error UnsupportedKeyAlgorithm();
+    error AlreadyAttested();
     error CarrierKeyNotRegistered();
     error CarrierKeyNotProven();
     error BadPayloadHash();
@@ -203,6 +208,9 @@ contract SweeftVault {
     ///         (mirrors the per-escrow release nonce fix, C-9/N-6).
     mapping(address => mapping(uint256 => uint256)) public carrierNonce;
 
+    /// @notice Per-(verifier, escrow) nonce: each verifier can attest each
+    ///         escrow at most once, and a signature can never be replayed.
+    mapping(address => mapping(uint256 => uint256)) public verifierNonce;
     /// @notice Distinct verifier attestations per escrow (M-of-N threshold).
     mapping(uint256 => mapping(address => bool)) public verifierAttested;
     mapping(uint256 => uint8) public verifierAttestCount;
@@ -415,28 +423,54 @@ contract SweeftVault {
         emit ReceiptConfirmed(escrowId, e.buyer);
     }
 
-    /// @notice Authorized verifier records a fulfilment attestation. The escrow
-    ///         only becomes `evidenceAttested` once the registry threshold is
-    ///         met (M-of-N), so one rogue or compromised verifier cannot on its
+    /// @notice Authorized verifier records a fulfilment attestation (Phase 3).
+    ///         The caller may be any relayer; authorization comes from the
+    ///         verifier's ML-DSA-87 signature, verified against its
+    ///         chain-registered key via the PQC precompile. A stolen classical
+    ///         key alone cannot manufacture an attestation. The signed
+    ///         message binds chain, vault, registry, verifier identity, pinned
+    ///         key version, escrow, evidence, issuance window and nonce.
+    ///         An escrow becomes `evidenceAttested` once the registry
+    ///         threshold is met (M-of-N), so one rogue verifier cannot on its
     ///         own block the buyer's refund path.
-    function attestEvidence(uint256 escrowId, bytes32 evidenceHash) external {
+    function attestEvidence(
+        uint256 escrowId,
+        address verifier,
+        bytes32 evidenceHash,
+        uint64 issuedAt,
+        uint64 expiresAt,
+        bytes calldata signature
+    ) external {
         Escrow storage e = escrows[escrowId];
         if (e.buyer == address(0)) revert InvalidEscrow();
         if (e.status != EscrowStatus.Funded) revert InvalidStatus();
-        if (!_isVerifier(msg.sender)) revert NotVerifier();
+        if (verifierAttested[escrowId][verifier]) revert AlreadyAttested();
+        IExcaliburOracleRegistry reg = IExcaliburOracleRegistry(oracleRegistry);
+        if (!reg.isVerifier(verifier)) revert NotVerifier();
+        // Fail closed when the registry pins no key (pre-hardening verifier).
+        uint8 pinnedVersion = reg.keyVersion(verifier);
+        if (pinnedVersion == 0) revert NotVerifier();
+        if (issuedAt > block.timestamp) revert BadTimestamp();
+        if (expiresAt != issuedAt + MAX_ATTEST_AGE) revert StaleAttestation();
+        if (block.timestamp > expiresAt) revert StaleAttestation();
 
-        if (!verifierAttested[escrowId][msg.sender]) {
-            verifierAttested[escrowId][msg.sender] = true;
-            uint8 count = e.verifierAttestations + 1;
-            e.verifierAttestations = count;
-            verifierAttestCount[escrowId] = count;
-            emit EvidenceAttested(escrowId, msg.sender, evidenceHash);
+        uint256 nonce = verifierNonce[verifier][escrowId];
+        bytes memory message = _verifierMessage(verifier, pinnedVersion, escrowId, evidenceHash, issuedAt, expiresAt, nonce);
+        _requireVerifierSignature(verifier, message, signature);
+        // Nonce consumed only after every check above passed, just before the
+        // state transition (a revert never leaves it consumed).
+        verifierNonce[verifier][escrowId] = nonce + 1;
+        verifierAttested[escrowId][verifier] = true;
 
-            if (count >= _verifierThreshold()) {
-                e.evidenceAttested = true;
-                e.verifier = msg.sender;
-                emit VerifierThresholdReached(escrowId, count);
-            }
+        uint8 count = e.verifierAttestations + 1;
+        e.verifierAttestations = count;
+        verifierAttestCount[escrowId] = count;
+        emit EvidenceAttested(escrowId, verifier, evidenceHash);
+
+        if (count >= _verifierThreshold()) {
+            e.evidenceAttested = true;
+            e.verifier = verifier;
+            emit VerifierThresholdReached(escrowId, count);
         }
     }
 
@@ -715,12 +749,6 @@ contract SweeftVault {
     /// @notice Typed registry reads (Stage 5 QC4-5): the low-level
     ///         `staticcall` pattern is gone; calls go through an interface and
     ///         fail closed if the registry cannot be read.
-    function _isVerifier(address account) internal view returns (bool) {
-        // Typed call (Stage 5 QC4-5): a registry failure reverts the
-        // attestation instead of silently treating it as valid (fail closed).
-        return IExcaliburOracleRegistry(oracleRegistry).isVerifier(account);
-    }
-
     function _verifierThreshold() internal view returns (uint8) {
         uint8 t = IExcaliburOracleRegistry(oracleRegistry).threshold();
         // Fail closed (N-9): a registry reporting 0 means "any".
@@ -749,6 +777,66 @@ contract SweeftVault {
         uint256 nonce
     ) external view returns (bytes memory) {
         return _carrierMessage(carrier, escrowId, trackingNumber, status, evidenceHash, issuedAt, expiresAt, nonce);
+    }
+
+    /// @notice Public rebuild of the v1 verifier attestation message.
+    function buildVerifierMessage(
+        address verifier,
+        uint8 keyVersion,
+        uint256 escrowId,
+        bytes32 evidenceHash,
+        uint64 issuedAt,
+        uint64 expiresAt,
+        uint256 nonce
+    ) external view returns (bytes memory) {
+        return _verifierMessage(verifier, keyVersion, escrowId, evidenceHash, issuedAt, expiresAt, nonce);
+    }
+
+    /// @notice Versioned, domain-separated verifier authorization (Phase 3):
+    ///         verifier ML-DSA-87 signature over chain, vault, registry,
+    ///         verifier identity, pinned key version, escrow, evidence,
+    ///         issuance window and nonce.
+    function _verifierMessage(
+        address verifier,
+        uint8 keyVersion,
+        uint256 escrowId,
+        bytes32 evidenceHash,
+        uint64 issuedAt,
+        uint64 expiresAt,
+        uint256 nonce
+    ) internal view returns (bytes memory) {
+        return bytes(
+            string.concat(
+                "sweeft-verifier-v1|chain=",
+                cosmosChainId,
+                "|vault=",
+                _toHexString(address(this)),
+                "|registry=",
+                _toHexString(oracleRegistry),
+                "|verifier=",
+                _toHexString(verifier),
+                "|keyVersion=",
+                _uintToString(uint256(keyVersion)),
+                "|escrow=",
+                _uintToString(escrowId),
+                "|evidence=",
+                _toHexBytes32(evidenceHash),
+                "|issued=",
+                _uintToString(uint256(issuedAt)),
+                "|expires=",
+                _uintToString(uint256(expiresAt)),
+                "|nonce=",
+                _uintToString(nonce)
+            )
+        );
+    }
+
+    function _requireVerifierSignature(address verifier, bytes memory message, bytes calldata signature) internal view {
+        (bool registered, uint8 algorithmId, bytes memory pubkey, bool proven) = PQC_KEYS.pqcKeyStatus(verifier);
+        if (!registered || pubkey.length == 0) revert VerifierKeyNotRegistered();
+        if (!proven) revert VerifierKeyNotProven();
+        if (algorithmId != 1) revert UnsupportedKeyAlgorithm();
+        if (!PQC_VERIFY.pqcVerify(pubkey, signature, message)) revert BadVerifierSignature();
     }
 
     /// @notice Versioned, domain-separated carrier authorization (Phase 2).
@@ -900,6 +988,7 @@ contract SweeftVault {
 interface IExcaliburOracleRegistry {
     function isVerifier(address account) external view returns (bool);
     function threshold() external view returns (uint8);
+    function keyVersion(address verifier) external view returns (uint8);
 }
 
 interface IPQCVerify {

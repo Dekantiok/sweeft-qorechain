@@ -42,10 +42,11 @@ print("escrow", escrow_id, "funded")
 
 lib.send_evm_expect_success(w3, seller, vault.functions.markDelivered(escrow_id), gas=200_000)
 print("marked delivered")
-lib.send_evm_expect_success(
-    w3, verifier, vault.functions.attestEvidence(escrow_id, hashlib.sha256(b"e2e-eligible").digest()), gas=300_000
+registry = lib.contract(w3, "SweeftOracleRegistry")
+result = lib.submit_pq_attestation(
+    w3, vault, registry, verifier, escrow_id, hashlib.sha256(b"e2e-eligible").digest(), submitter=buyer
 )
-print("attested")
+print("attested", result["hash"][:18])
 lib.send_evm_expect_success(w3, buyer, vault.functions.confirmReceipt(escrow_id), gas=200_000)
 print("confirmed")
 

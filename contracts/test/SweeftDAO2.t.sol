@@ -10,6 +10,14 @@ import { SweeftOracleRegistry } from "../src/SweeftOracleRegistry.sol";
 ///         measured in escrowed stake, a timelock and proposer bond apply, a
 ///         guardian may veto during the timelock, and vote stake is locked
 ///         until the proposal is final.
+contract MockRegKeyStatus2 {
+    mapping(address => bool) internal reg;
+    function setReg(address a, bool r) external { reg[a] = r; }
+    function pqcKeyStatus(address a) external view returns (bool, uint8, bytes memory, bool) {
+        return (reg[a], 1, reg[a] ? bytes(hex"aa") : bytes(""), true);
+    }
+}
+
 contract SweeftDAO2Test is Test {
     SweeftOracleRegistry internal registry;
     SweeftDAO2 internal dao;
@@ -28,6 +36,9 @@ contract SweeftDAO2Test is Test {
     bytes4 internal constant ADD_VERIFIER = bytes4(keccak256("addVerifier(address)"));
 
     function setUp() public {
+        MockRegKeyStatus2 ks = new MockRegKeyStatus2();
+        vm.etch(0x0000000000000000000000000000000000000a02, address(ks).code);
+        MockRegKeyStatus2(0x0000000000000000000000000000000000000a02).setReg(newVerifier, true);
         registry = new SweeftOracleRegistry(address(this));
         address[] memory targets = new address[](1);
         targets[0] = address(registry);

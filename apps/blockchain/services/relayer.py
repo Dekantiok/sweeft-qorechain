@@ -107,6 +107,33 @@ def submit_refund(escrow_id: int, signature: bytes) -> dict:
     return _send(w3, account, vault.functions.refundAfterDeadline(escrow_id, signature))
 
 
+def submit_verifier_attestation(
+    escrow_id: int,
+    verifier: str,
+    evidence_hash: bytes,
+    issued_at: int,
+    expires_at: int,
+    signature: bytes,
+) -> dict:
+    """Relay a verifier's PQ-signed attestation.
+
+    The submitter needs no authority (the Vault verifies the verifier's
+    ML-DSA-87 signature); the relayer account simply pays gas.
+    """
+    if not _valid_signature(signature):
+        raise RelayerError("signature is not a plausible ML-DSA-87 signature")
+    w3 = get_evm_client()
+    account = w3.eth.account.from_key(relayer_private_key_hex())
+    vault = _vault_contract(w3)
+    ensure_relayer_window()
+    logger.info("relaying verifier attestation for escrow %s", escrow_id)
+    return _send(
+        w3,
+        account,
+        vault.functions.attestEvidence(escrow_id, verifier, evidence_hash, issued_at, expires_at, signature),
+    )
+
+
 def attest_carrier_evidence(
     escrow_id: int,
     tracking_number: str,

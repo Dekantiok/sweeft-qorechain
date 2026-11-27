@@ -81,7 +81,6 @@
 
 <script nonce="{{ csp_nonce }}">
 const VAULT = "{{ vault_address }}";
-const ATTEST_SELECTOR = "a688ceb3"; // attestEvidence(uint256,bytes32)
 
 function pad32(hexValue) {
     return hexValue.replace(/^0x/, "").padStart(64, "0");
@@ -90,23 +89,60 @@ function pad32(hexValue) {
 document.querySelectorAll(".attest-button").forEach((button) => {
     button.addEventListener("click", async () => {
         const escrowId = parseInt(button.dataset.escrow, 10);
-        const contentHash = button.dataset.hash.replace(/^0x/, "");
         const status = document.getElementById("attest-status-" + button.dataset.item);
+        const qorex = window.qorex?.native;
+        if (!qorex || !(qorex.capabilities || []).includes("signArbitrary")) {
+            alert("QoreX with signArbitrary not found. Verifier attestations need your registered ML-DSA-87 key.");
+            return;
+        }
         try {
-            // attestEvidence(uint256 escrowId, bytes32 evidenceHash)
-            const data = "0x" + ATTEST_SELECTOR + pad32(escrowId.toString(16)) + pad32(contentHash);
-            status.textContent = "Confirm in your wallet…";
-            const txHash = await window.SweeftWallet.sendTx({ to: VAULT, data });
-            status.textContent = "Attested on-chain: " + txHash;
+            // 1. Build the exact domain-separated message from Django.
+            status.textContent = "Building attestation…";
+            const reqData = await fetch(
+                `/api/oracle/attest-request/?escrow_id=${escrowId}&evidence_id=${button.dataset.item}`,
+                { headers: { Accept: "application/json" } }
+            ).then((r) => r.json());
+            if (reqData.error) throw new Error(reqData.error);
+
+            // 2. Sign it with the verifier's registered ML-DSA-87 key.
+            status.textContent = "Sign the attestation in QoreX…";
+            const signature = await qorex.signArbitrary("qorechain-diana", reqData.verifier, reqData.message);
+            const pqB64 = signature && signature.pq && signature.pq.signature;
+            if (!pqB64) throw new Error("QoreX returned no ML-DSA-87 signature part");
+            // signArbitrary returns base64; decode to hex for the relay.
+            const binary = atob(pqB64.trim() + "=".repeat((4 - (pqB64.trim().length % 4)) % 4));
+            let hex = "";
+            for (let i = 0; i < binary.length; i++) hex += binary.charCodeAt(i).toString(16).padStart(2, "0");
+
+            // 3. Relay the signed attestation (submitter has no authority).
+            status.textContent = "Submitting on-chain…";
+            const result = await fetch("/api/oracle/attest-submit/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": document.querySelector('meta[name="csrf-token"]').content,
+                },
+                body: JSON.stringify({
+                    escrow_id: escrowId,
+                    verifier: reqData.verifier,
+                    evidence_hash: reqData.evidence_hash,
+                    issued_at: reqData.issued_at,
+                    expires_at: reqData.expires_at,
+                    evidence_id: parseInt(button.dataset.item, 10),
+                    signature_pq_hex: "0x" + hex,
+                }),
+            }).then((r) => r.json());
+            if (result.error) throw new Error(result.error);
+            status.textContent = "Attested on-chain: " + result.tx_hash;
             setTimeout(async () => {
-                await fetch("/api/indexer/sync/", { method: "POST" });
+                await fetch("/api/indexer/sync/", { method: "POST" }).catch(() => {});
                 location.reload();
             }, 5000);
         } catch (err) {
             status.textContent = "";
             alert("Attestation failed: " + (err.message || err) +
-                  "\n\nOnly an authorized verifier wallet can attest, and the escrow must still be funded. " +
-                  "An EVM window must be open on that account.");
+                  "\n\nOnly an authorized verifier with a registered ML-DSA-87 key can attest, " +
+                  "and the escrow must still be funded.");
         }
     });
 });

@@ -338,3 +338,50 @@ def transfer_qor(w3: Web3, sender_unified, to_address: str, amount_uqor: int, *,
         except Exception:
             time.sleep(8)
     die(f"transfer never mined: {to_address}")
+
+
+def verifier_attestation_message(
+    vault: str,
+    registry: str,
+    verifier: str,
+    key_version: int,
+    escrow_id: int,
+    evidence_hash: bytes,
+    issued_at: int,
+    expires_at: int,
+    nonce: int,
+) -> bytes:
+    """v1 verifier attestation — must match SweeftVault._verifierMessage."""
+    return (
+        f"sweeft-verifier-v1|chain={CHAIN_ID}|vault={vault.lower()}|registry={registry.lower()}"
+        f"|verifier={verifier.lower()}|keyVersion={key_version}|escrow={escrow_id}"
+        f"|evidence=0x{evidence_hash.hex()}|issued={issued_at}|expires={expires_at}|nonce={nonce}"
+    ).encode()
+
+
+def submit_pq_attestation(w3, vault, registry, verifier_acct, escrow_id, evidence_hash: bytes, submitter=None):
+    """Sign a PQ verifier attestation with the verifier's ML-DSA-87 key and
+    submit it (the submitter may be any relayer — the signature authorizes).
+
+    Returns the transaction result dict.
+    """
+    from qorsdk import pqc_sign
+
+    verifier_evm = w3.to_checksum_address(verifier_acct.evm)
+    vault_addr = contract_address("SweeftVault")
+    registry_addr = contract_address("SweeftOracleRegistry")
+    key_version = registry.functions.keyVersion(verifier_evm).call()
+    nonce = vault.functions.verifierNonce(verifier_evm, escrow_id).call()
+    issued_at = int(w3.eth.get_block("latest")["timestamp"])
+    expires_at = issued_at + 7 * 24 * 3600
+    message = verifier_attestation_message(
+        vault_addr, registry_addr, verifier_evm, key_version, escrow_id, evidence_hash, issued_at, expires_at, nonce
+    )
+    signature = pqc_sign(verifier_acct.pqc.secret_key, message)
+    assert len(signature) == 4627, f"unexpected signature length {len(signature)}"
+    return send_evm_expect_success(
+        w3,
+        submitter or verifier_acct,
+        vault.functions.attestEvidence(escrow_id, verifier_evm, evidence_hash, issued_at, expires_at, signature),
+        gas=600_000,
+    )

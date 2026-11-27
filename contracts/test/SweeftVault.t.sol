@@ -23,6 +23,11 @@ contract MockOracleRegistry {
     function isVerifier(address account) external view returns (bool) {
         return verifiers[account];
     }
+
+    /// @dev Mirrors the real registry's key pinning (1 = ML-DSA-87).
+    function keyVersion(address account) external view returns (uint8) {
+        return verifiers[account] ? uint8(1) : uint8(0);
+    }
 }
 
 contract MockPQCKeyStatus {
@@ -96,6 +101,8 @@ contract SweeftVaultTest is Test {
         vm.etch(PQC_VERIFY_ADDR, address(verifier).code);
 
         MockPQCKeyStatus(PQC_KEY_STATUS_ADDR).setKey(buyer, buyerPqcKey, true, true);
+        MockPQCKeyStatus(PQC_KEY_STATUS_ADDR).setKey(oracleVerifier, hex"aa", true, true);
+        MockPQCKeyStatus(PQC_KEY_STATUS_ADDR).setKey(address(0x0B2), hex"bb", true, true);
         MockPQCVerify(PQC_VERIFY_ADDR).setResult(true);
     }
 
@@ -283,7 +290,7 @@ contract SweeftVaultTest is Test {
         oracle.setVerifier(oracleVerifier, true);
 
         vm.prank(oracleVerifier);
-        vault.attestEvidence(id, keccak256("proof"));
+        vault.attestEvidence(id, oracleVerifier, keccak256("proof"), uint64(block.timestamp), uint64(block.timestamp + 7 days), hex"deadbeef");
 
         vm.warp(block.timestamp + 7 days);
         assertTrue(vault.isReleaseEligible(id));
@@ -388,7 +395,7 @@ contract SweeftVaultTest is Test {
         oracle.setVerifier(oracleVerifier, true);
 
         vm.prank(oracleVerifier);
-        vault.attestEvidence(id, keccak256("proof"));
+        vault.attestEvidence(id, oracleVerifier, keccak256("proof"), uint64(block.timestamp), uint64(block.timestamp + 7 days), hex"deadbeef");
 
         vm.warp(block.timestamp + 7 days);
 
@@ -416,11 +423,11 @@ contract SweeftVaultTest is Test {
 
         vm.prank(stranger);
         vm.expectRevert(SweeftVault.NotVerifier.selector);
-        vault.attestEvidence(id, keccak256("proof"));
+        vault.attestEvidence(id, oracleVerifier, keccak256("proof"), uint64(block.timestamp), uint64(block.timestamp + 7 days), hex"deadbeef");
 
         oracle.setVerifier(oracleVerifier, true);
         vm.prank(oracleVerifier);
-        vault.attestEvidence(id, keccak256("proof"));
+        vault.attestEvidence(id, oracleVerifier, keccak256("proof"), uint64(block.timestamp), uint64(block.timestamp + 7 days), hex"deadbeef");
 
         assertTrue(vault.getEscrow(id).evidenceAttested);
     }
@@ -459,7 +466,7 @@ contract SweeftVaultTest is Test {
         oracle.setVerifier(oracleVerifier, true);
         vm.prank(oracleVerifier);
         vm.expectRevert(SweeftVault.InvalidEscrow.selector);
-        vault.attestEvidence(999, keccak256("proof"));
+        vault.attestEvidence(999, oracleVerifier, keccak256("proof"), uint64(block.timestamp), uint64(block.timestamp + 7 days), hex"deadbeef");
     }
 
     // ------------------------------------------------------------------
@@ -528,11 +535,11 @@ contract SweeftVaultTest is Test {
         oracle.setThreshold(2);
 
         vm.prank(oracleVerifier);
-        vault.attestEvidence(id, keccak256("proof-a"));
+        vault.attestEvidence(id, oracleVerifier, keccak256("proof-a"), uint64(block.timestamp), uint64(block.timestamp + 7 days), hex"deadbeef");
         assertFalse(vault.getEscrow(id).evidenceAttested); // 1 of 2
 
         vm.prank(v2);
-        vault.attestEvidence(id, keccak256("proof-b"));
+        vault.attestEvidence(id, v2, keccak256("proof-b"), uint64(block.timestamp), uint64(block.timestamp + 7 days), hex"deadbeef");
         assertTrue(vault.getEscrow(id).evidenceAttested); // threshold met
     }
 

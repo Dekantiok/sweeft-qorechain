@@ -22,6 +22,27 @@ def refund_message(vault: str, escrow_id: int, buyer: str, recipient: str, amoun
     )
 
 
+def verifier_attestation_message(
+    chain_id: str,
+    vault: str,
+    registry: str,
+    verifier: str,
+    key_version: int,
+    escrow_id: int,
+    evidence_hash: str,
+    issued_at: int,
+    expires_at: int,
+    nonce: int,
+) -> str:
+    """Verifier PQ attestation (v1) — must match SweeftVault._verifierMessage
+    byte-for-byte, including the pinned key version from the registry."""
+    return (
+        f"sweeft-verifier-v1|chain={chain_id}|vault={vault.lower()}|registry={registry.lower()}"
+        f"|verifier={verifier.lower()}|keyVersion={key_version}|escrow={escrow_id}"
+        f"|evidence={evidence_hash.lower()}|issued={issued_at}|expires={expires_at}|nonce={nonce}"
+    )
+
+
 def signing_payload(message: str, chain_id: str) -> bytes:
     """The bytes QoreX signs for a dApp message (UTF-8)."""
     return f"qorechain-msg-v1|{chain_id}|{message}".encode("utf-8")

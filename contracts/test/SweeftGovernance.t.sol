@@ -5,6 +5,15 @@ import { Test } from "forge-std/Test.sol";
 import { SweeftOracleRegistry } from "../src/SweeftOracleRegistry.sol";
 import { SweeftDAO } from "../src/SweeftDAO.sol";
 
+
+contract MockRegKeyStatus {
+    mapping(address => bool) internal reg;
+    function setReg(address a, bool r) external { reg[a] = r; }
+    function pqcKeyStatus(address a) external view returns (bool, uint8, bytes memory, bool) {
+        return (reg[a], 1, reg[a] ? bytes(hex"aa") : bytes(""), true);
+    }
+}
+
 contract SweeftOracleRegistryTest is Test {
     SweeftOracleRegistry internal registry;
 
@@ -12,7 +21,13 @@ contract SweeftOracleRegistryTest is Test {
     address internal verifier = address(0xACE);
     address internal stranger = address(0xCAFE);
 
+    MockRegKeyStatus internal ks;
+
     function setUp() public {
+        ks = new MockRegKeyStatus();
+        vm.etch(0x0000000000000000000000000000000000000a02, address(ks).code);
+        MockRegKeyStatus(0x0000000000000000000000000000000000000a02).setReg(verifier, true);
+        MockRegKeyStatus(0x0000000000000000000000000000000000000a02).setReg(address(0xACE2), true);
         registry = new SweeftOracleRegistry(owner);
     }
 
@@ -83,7 +98,12 @@ contract SweeftDAOTest is Test {
 
     uint64 internal constant VOTING_PERIOD = 1 days;
 
+    MockRegKeyStatus internal ks;
+
     function setUp() public {
+        ks = new MockRegKeyStatus();
+        vm.etch(0x0000000000000000000000000000000000000a02, address(ks).code);
+        MockRegKeyStatus(0x0000000000000000000000000000000000000a02).setReg(newVerifier, true);
         registry = new SweeftOracleRegistry(address(this));
         dao = new SweeftDAO(address(registry));
         // The DAO must own the registry for executed proposals to take effect.

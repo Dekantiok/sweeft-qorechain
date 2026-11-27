@@ -172,12 +172,10 @@ def main() -> None:
     result = lib.send_evm_expect_success(w3, seller, vault.functions.markDelivered(escrow_id), gas=200_000)
     print(f"      tx {result['hash']}")
 
-    print("[oracle] verifier attests fulfilment evidence on-chain")
+    print("[oracle] verifier PQ-attests fulfilment evidence on-chain")
     evidence_hash = hashlib.sha256(b"delivery photo + carrier receipt").digest()
-    result = lib.send_evm_expect_success(
-        w3, verifier, vault.functions.attestEvidence(escrow_id, evidence_hash), gas=300_000
-    )
-    print(f"      tx {result['hash']}")
+    result = lib.submit_pq_attestation(w3, vault, registry, verifier, escrow_id, evidence_hash, submitter=buyer)
+    print(f"      tx {result['hash']} (signed by verifier, submitted by buyer)")
 
     # ------------------------------------------------------------------
     print()
