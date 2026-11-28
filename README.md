@@ -23,9 +23,9 @@ from verified outcomes.
 - **Superseded: v9/v8/v7/v6/v5** — previous live stacks (v9: PQ verifier
   attestations, committed seeds; still settleable there).
 - **Audit scope:** Stage 3 (78/100) v5; Stage 4 (72/100) v6; Stage 5 (72/100)
-  patched v6; Stage 6 (72/100) v8; **Stage 7 (78/100, HIGH) covers v9
-  (superseded by v10, not yet re-audited),
-  audited 27 Nov 2026 (`docs/audit/stage-7/`, mapped in `docs/AUDIT.md`).**
+  patched v6; Stage 6 (72/100) v8; Stage 7 (78/100, HIGH) covers v9;
+  **Stage 8 (78/100, MEDIUM) covers live v10**,
+  audited 28 Nov 2026 (`docs/audit/stage-8/`, mapped in `docs/AUDIT.md`).
   Deployment is two scripts + one cast send (see `docs/deployments.md`).
 
 ## End-to-end workflow (v9, live on Diana)

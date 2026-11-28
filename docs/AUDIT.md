@@ -403,3 +403,22 @@ escrow + PQC surface" structurally, not because a fund-loss path was found.
 Local corroboration (same day): Slither 0.11.6 on v9 — Vault 0 High /
 0 Medium; the 3 cross-contract Highs are triaged in
 `docs/audit/stage-7/FINDINGS.md`. Foundry **189/189**, Django **81/81**.
+
+## Stage 8 — QCAI re-audit of v10 (78/100, MEDIUM), 28 Nov 2026
+
+Report: `docs/audit/stage-8/QoreChain_Audit_Contract_1795867840392.pdf`
+(bundle `sweeft-combined.sol` + `sweeft-contracts-8.tar.gz`).
+Six findings, same template as Stage 7, same dispositions:
+
+| # | Severity | Location | Finding | Disposition |
+|---|---|---|---|---|
+| Q8-1 | HIGH | `SweeftVault.sol:194-209` | Missing access control on `setDisputeBoard`/`setMarketplace` | Known one-shot limitation, documented in README. Only the deployer may wire, once. DAO rewiring is future work |
+| Q8-2 | MEDIUM | fee calculation | Potential overflow | Already fixed (Stage 5). `_feeForAmount` bounds bps and checks `amount > max/bps` |
+| Q8-3/Q8-4 | MEDIUM | external call sites | Unchecked returns / potential reentrancy in credit system | Already fixed. Settlement is credits-only with zero external calls; `withdrawCredits` is checked + CEI |
+| Q8-5 | LOW | `SweeftDisputeBoard.sol` panel drawing | Unbounded loop | Already fixed. `_drawPanel` hard-bounded at `min(n*6, 128)` attempts (Stage 7 Q7-6) |
+| Q8-6 | INFO | all contracts | Missing ERC standards | Not applicable by design (escrow vault, no token balance) |
+
+**Why the score holds at 78 while risk drops to MEDIUM:** the new
+seller-quote surface (`purchaseWithQuote`) introduced no new findings.
+The one HIGH is the documented Vault wiring constraint, unchanged from
+v9. No fund-loss path was found.

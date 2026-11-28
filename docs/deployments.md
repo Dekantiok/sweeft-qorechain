@@ -26,8 +26,10 @@ Live quote proof: listing #2 (asking 0.06 QOR) settled via
 Django side: `SellerAgentMandate` (floor/target/strategy, auto-accept),
 `evaluate_offer` (accept/counter/reject, banded counters, no floor
 leak), `/api/ai/seller-mandate/{set,status,quote/}` endpoints.
-198 Foundry + 94 Django tests green. **Not yet QCAI-audited** (Stage 7
-78/100 covers v9); re-audit bundle must be regenerated for v10.
+198 Foundry + 94 Django tests green. **QCAI Stage 8 scored 78/100
+(MEDIUM) on the v10 bundle**, 28 Nov 2026
+(`docs/audit/stage-8/QoreChain_Audit_Contract_1795867840392.pdf`),
+mapped below and in `docs/AUDIT.md`.
 
 ## v9 — hardened stack (superseded by v10; 27 November 2026)
 
