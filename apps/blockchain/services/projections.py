@@ -191,7 +191,14 @@ def _handle_listing_created(event) -> dict:
         if listing_contract is not None:
             on_chain = listing_contract.functions.getListing(int(args["listingId"])).call()
             metadata_uri = on_chain[4]
-            metadata = _fetch_verified_metadata(metadata_uri, metadata_hash)
+            # Catalog slugs (demo fixtures + seeded products) resolve locally
+            # with no HTTP fetch — critical on Render where the URI points at
+            # the app's own not-yet-booted origin (104 × 8s wedges the seed).
+            catalog = _catalog_entry(metadata_uri)
+            if catalog.get("title"):
+                metadata = catalog
+            else:
+                metadata = _fetch_verified_metadata(metadata_uri, metadata_hash)
             # v4 struct: [seller, price, qty, status, uri, hash, createdAt, updatedAt, partner, fee]
             if len(on_chain) > 9:
                 logistics_partner = on_chain[8] or ""
