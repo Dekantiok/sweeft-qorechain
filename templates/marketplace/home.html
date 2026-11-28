@@ -4,7 +4,8 @@
 
 {% block content %}
 {# ---- Hero: intro left, paths grid right (Meridian pattern, monochrome) ---- #}
-<section class="pt-10 sm:pt-16">
+<section class="relative pt-10 sm:pt-16">
+    <div class="hero-lines" aria-hidden="true"></div>
     <div class="grid gap-10 md:grid-cols-2 md:gap-12">
         <div class="flex flex-col">
             <h1 class="font-serif leading-[1.02] tracking-[-0.015em] motion-safe:animate-rise" style="font-size: clamp(48px, 5vw, 72px);">
@@ -30,32 +31,32 @@
                 <p class="mt-2 text-[14px] leading-[21px] text-muted">Every path enforces its rules on-chain. Pick one.</p>
             </div>
             <nav aria-label="Sweeft paths" class="grid grid-cols-2 gap-3 p-4">
-                <a href="/marketplace/" class="group border border-line bg-black/40 p-4 hover:border-control transition-colors">
+                <a href="/marketplace/" class="group rounded-2xl border border-line bg-black/40 p-4 hover:border-control transition-colors">
                     <div class="text-[11px] uppercase tracking-wider text-muted">01</div>
                     <div class="mt-1 font-semibold group-hover:underline underline-offset-4">Marketplace</div>
                     <div class="mt-1 text-[12px] leading-[17px] text-muted">On-chain listings</div>
                 </a>
-                <a href="/escrow/new/" class="group border border-line bg-black/40 p-4 hover:border-control transition-colors">
+                <a href="/escrow/new/" class="group rounded-2xl border border-line bg-black/40 p-4 hover:border-control transition-colors">
                     <div class="text-[11px] uppercase tracking-wider text-muted">02</div>
                     <div class="mt-1 font-semibold group-hover:underline underline-offset-4">Escrow</div>
                     <div class="mt-1 text-[12px] leading-[17px] text-muted">PQ-gated settlement</div>
                 </a>
-                <a href="/oracle/" class="group border border-line bg-black/40 p-4 hover:border-control transition-colors">
+                <a href="/oracle/" class="group rounded-2xl border border-line bg-black/40 p-4 hover:border-control transition-colors">
                     <div class="text-[11px] uppercase tracking-wider text-muted">03</div>
                     <div class="mt-1 font-semibold group-hover:underline underline-offset-4">Verifiers</div>
                     <div class="mt-1 text-[12px] leading-[17px] text-muted">Fulfilment attestation</div>
                 </a>
-                <a href="/disputes/" class="group border border-line bg-black/40 p-4 hover:border-control transition-colors">
+                <a href="/disputes/" class="group rounded-2xl border border-line bg-black/40 p-4 hover:border-control transition-colors">
                     <div class="text-[11px] uppercase tracking-wider text-muted">04</div>
                     <div class="mt-1 font-semibold group-hover:underline underline-offset-4">Dispute board</div>
                     <div class="mt-1 text-[12px] leading-[17px] text-muted">Staked resolver panels</div>
                 </a>
-                <a href="/governance/" class="group border border-line bg-black/40 p-4 hover:border-control transition-colors">
+                <a href="/governance/" class="group rounded-2xl border border-line bg-black/40 p-4 hover:border-control transition-colors">
                     <div class="text-[11px] uppercase tracking-wider text-muted">05</div>
                     <div class="mt-1 font-semibold group-hover:underline underline-offset-4">DAO</div>
                     <div class="mt-1 text-[12px] leading-[17px] text-muted">Stake-weighted governance</div>
                 </a>
-                <a href="#ai-assistant" class="group border border-line bg-black/40 p-4 hover:border-control transition-colors">
+                <a href="#ai-assistant" class="group rounded-2xl border border-line bg-black/40 p-4 hover:border-control transition-colors">
                     <div class="text-[11px] uppercase tracking-wider text-muted">06</div>
                     <div class="mt-1 font-semibold group-hover:underline underline-offset-4">AI assistant</div>
                     <div class="mt-1 text-[12px] leading-[17px] text-muted">Mandate-capped agent</div>
@@ -83,7 +84,7 @@
 
     <div id="story" class="mt-10">
         <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-            <div class="story-step border border-line bg-black/60 p-4" data-step="0">
+            <div class="story-step rounded-2xl border border-line bg-black/60 p-4" data-step="0">
                 <div class="text-[12px] uppercase tracking-wider text-muted">Marketplace</div>
                 <h3 class="mt-1 text-[15px] font-semibold">Found and funded</h3>
                 <p class="mt-1 text-[13px] leading-[19px] text-muted">A listed item is pinned at purchase price and hash. The buyer funds the vault, where terms freeze on-chain.</p>
@@ -92,21 +93,21 @@
                 </div>
                 <p class="mt-2 text-[13px] tabular-nums">0.1 QOR held safely</p>
             </div>
-            <div class="story-step border border-line bg-black/60 p-4" data-step="1">
+            <div class="story-step rounded-2xl border border-line bg-black/60 p-4" data-step="1">
                 <div class="text-[12px] uppercase tracking-wider text-muted">Logistics and verifiers</div>
                 <h3 class="mt-1 text-[15px] font-semibold">Delivery proven, twice</h3>
                 <p class="mt-1 text-[13px] leading-[19px] text-muted">The carrier signs the tracking payload and the vault verifies it on-chain. DAO-approved verifiers then review the evidence. Only real proof counts.</p>
                 <div class="mt-3 flex gap-2 text-[12px]"><span class="tile tile-listed"></span><span class="tile tile-listed"></span><span class="tile tile-listed"></span><span class="tile tile-listed"></span><span class="tile tile-listed"></span><span class="text-muted">DELIVERED ✓</span></div>
                 <p class="mt-2 text-[13px] tabular-nums">Carrier signed. Verifiers review.</p>
             </div>
-            <div class="story-step border border-line bg-black/60 p-4" data-step="2">
+            <div class="story-step rounded-2xl border border-line bg-black/60 p-4" data-step="2">
                 <div class="text-[12px] uppercase tracking-wider text-muted">Escrow release</div>
                 <h3 class="mt-1 text-[15px] font-semibold">Signed, then settled</h3>
                 <p class="mt-1 text-[13px] leading-[19px] text-muted">The buyer signs the release with ML-DSA-87 in QoreX. The contract checks recipient, amount, and nonce, then pays the seller, the carrier, and the fee.</p>
                 <div class="mt-3 flex gap-2 text-[12px]"><span class="tile tile-spare"></span><span class="tile tile-spare"></span><span class="tile tile-bought"></span><span class="tile tile-bought"></span><span class="text-muted">2 of 2 attest</span></div>
                 <p class="mt-2 text-[13px] tabular-nums">Seller gets 0.098 of 0.1 QOR</p>
             </div>
-            <div class="story-step border border-line bg-black/60 p-4" data-step="3">
+            <div class="story-step rounded-2xl border border-line bg-black/60 p-4" data-step="3">
                 <div class="text-[12px] uppercase tracking-wider text-muted">Reputation and AI</div>
                 <h3 class="mt-1 text-[15px] font-semibold">Trust that compounds</h3>
                 <p class="mt-1 text-[13px] leading-[19px] text-muted">The completion feeds reputation that only counts verified outcomes, so no one can fake it. The AI can then find, negotiate, and buy the next item inside your mandate.</p>

@@ -14,7 +14,7 @@
     {% block extra_head %}{% endblock %}
 </head>
 <body class="h-full bg-black text-ink antialiased font-sans">
-    <nav class="border-b border-line bg-black/90 sticky top-0 z-40">
+    <nav class="glass-nav sticky top-0 z-40">
         <div class="mx-auto max-w-[1120px] px-4 lg:px-6">
             <div class="flex h-16 items-center justify-between gap-4">
                 <a href="/" class="flex items-baseline gap-2 shrink-0">
@@ -43,23 +43,23 @@
                     {% if wallet_account %}
                     <div class="relative">
                         <button id="account-menu-button" data-toggle-target="account-menu"
-                                class="flex items-center gap-2 border border-ink bg-black/60 px-3 py-1.5 text-[13px] hover:bg-hover transition-colors">
+                                class="flex items-center gap-2 rounded-full border border-ink bg-black/60 px-3 py-1.5 text-[13px] hover:bg-hover transition-colors">
                             <span class="h-1.5 w-1.5 rounded-full bg-up"></span>
                             <span id="wallet-short" class="max-w-[9rem] truncate">{{ wallet_short }}</span>
                         </button>
-                        <div id="account-menu" class="hidden absolute right-0 mt-2 w-80 border border-line bg-black/60 p-3 shadow-lg z-50">
+                        <div id="account-menu" class="glass hidden absolute right-0 mt-2 w-80 rounded-2xl p-3 z-50">
                             <div class="px-1 text-[11px] uppercase tracking-wider text-muted mb-2">
                                 Connected with {{ wallet_method|default:"wallet"|upper }}
                             </div>
-                            <div class="bg-wash px-3 py-2 mb-2">
+                            <div class="rounded-xl bg-wash px-3 py-2 mb-2">
                                 <div class="hash text-[11px] text-ink break-all" id="wallet-evm">{{ wallet_account }}</div>
                                 <div class="hash text-[10px] text-muted break-all mt-1">{{ wallet_qor }}</div>
                             </div>
                             <div class="grid grid-cols-2 gap-2 text-[13px]">
-                                <a href="/dashboard/?address={{ wallet_account }}" class="border border-control px-3 py-2 text-center hover:bg-hover transition-colors">My activity</a>
-                                <a href="https://explore.qore.network/account/{{ wallet_qor }}" target="_blank" class="border border-control px-3 py-2 text-center hover:bg-hover transition-colors">Explorer</a>
-                                <button id="copy-address" class="border border-control px-3 py-2 hover:bg-hover transition-colors">Copy address</button>
-                                <button id="disconnect-wallet" class="border border-down px-3 py-2 text-down hover:bg-[rgba(192,38,58,0.05)] transition-colors">Disconnect</button>
+                                <a href="/dashboard/?address={{ wallet_account }}" class="rounded-xl border border-control px-3 py-2 text-center hover:bg-hover transition-colors">My activity</a>
+                                <a href="https://explore.qore.network/account/{{ wallet_qor }}" target="_blank" class="rounded-xl border border-control px-3 py-2 text-center hover:bg-hover transition-colors">Explorer</a>
+                                <button id="copy-address" class="rounded-xl border border-control px-3 py-2 hover:bg-hover transition-colors">Copy address</button>
+                                <button id="disconnect-wallet" class="rounded-xl border border-down px-3 py-2 text-down hover:bg-[rgba(192,38,58,0.05)] transition-colors">Disconnect</button>
                             </div>
 
                             <div class="mt-3 border-t border-line pt-3">
@@ -75,11 +75,11 @@
                                 </p>
                                 <div class="mt-2 grid grid-cols-2 gap-2 text-[13px]">
                                     {% if ai_mandate.state == 'paused' %}
-                                    <button class="mandate-action border border-control px-3 py-2 hover:bg-hover transition-colors" data-id="{{ ai_mandate.pk }}" data-action="resume">Resume</button>
+                                    <button class="mandate-action rounded-xl border border-control px-3 py-2 hover:bg-hover transition-colors" data-id="{{ ai_mandate.pk }}" data-action="resume">Resume</button>
                                     {% else %}
-                                    <button class="mandate-action border border-control px-3 py-2 hover:bg-hover transition-colors" data-id="{{ ai_mandate.pk }}" data-action="pause">Pause</button>
+                                    <button class="mandate-action rounded-xl border border-control px-3 py-2 hover:bg-hover transition-colors" data-id="{{ ai_mandate.pk }}" data-action="pause">Pause</button>
                                     {% endif %}
-                                    <button class="mandate-action border border-control px-3 py-2 hover:bg-hover transition-colors" data-id="{{ ai_mandate.pk }}" data-action="revoke">Revoke</button>
+                                    <button class="mandate-action rounded-xl border border-control px-3 py-2 hover:bg-hover transition-colors" data-id="{{ ai_mandate.pk }}" data-action="revoke">Revoke</button>
                                 </div>
                                 {% endif %}
                                 <form id="mandate-form" class="mt-3 grid gap-2 text-[13px]">
@@ -118,7 +118,7 @@
     {% if messages %}
     <div class="mx-auto max-w-[1120px] px-4 lg:px-6 mt-4">
         {% for message in messages %}
-        <div class="border px-4 py-3 text-sm mb-2
+        <div class="rounded-xl border px-4 py-3 text-sm mb-2
             {% if message.tags == 'error' %}border-down bg-[rgba(192,38,58,0.05)] text-down
             {% elif message.tags == 'success' %}border-up bg-[rgba(11,125,79,0.05)] text-up
             {% else %}border-line bg-wash text-muted{% endif %}">
@@ -140,7 +140,7 @@
     </footer>
 
     {# Mobile bottom tabs (Meridian MobileTabs pattern) #}
-    <div class="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-line bg-black/60 md:hidden" role="group" aria-label="Sections">
+    <div class="glass-nav fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 md:hidden" role="group" aria-label="Sections">
         <a href="/marketplace/" class="flex h-[52px] flex-col items-center justify-center gap-1 text-[12px] text-muted">
             <span aria-hidden class="text-[15px] leading-none">▤</span>Market
         </a>
