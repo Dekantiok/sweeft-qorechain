@@ -3,7 +3,7 @@
 
 Parses the full hashes in docs/proofs/tx-inventory.md plus the keeper attack
 log (docs/proofs/keeper-2026-11-23.md), fetches each receipt over public RPC,
-and checks the expected status. Also checks that the v8 contract addresses
+and checks the expected status. Also checks that the live v9 contract addresses
 in docs/deployments.md still have bytecode. Prints a summary like
 "41 passed, 0 failed". Exit code is non-zero on any failure.
 
@@ -20,21 +20,27 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 RPC = os.getenv("QORECHAIN_EVM_RPC_URL", "https://evm-testnet.qore.host")
 
-# v8 stack, from docs/deployments.md
+# v9 stack (live since 27 Nov 2026), from docs/deployments.md
 CONTRACTS = {
-    "SweeftOracleRegistry": "0x76D4F6D164C688b319eE0A16003a9c06f5b1AB7A",
-    "SweeftVault": "0x820CE1C670D26A2fF6ca5ce53f5a9EFdf3dC869a",
-    "SweeftMarketplace": "0xf5cC7Bf4EECC160E23b4fF615E68D716bEFCd47C",
-    "SweeftDisputeBoard": "0x50a74dD32647bcf456DcE09b76849C5EBD2A0508",
-    "SweeftDAO2": "0x91d0eCCE908bec0FcF06fB8d419ad9edb43Cf59b",
+    "SweeftOracleRegistry": "0x35720a83daaa400ae404b20b3769d9afc56253fc",
+    "SweeftVault": "0x21b8a243bf96340ebe5b78b296004f1bf76862ce",
+    "SweeftMarketplace": "0x1d60eb9325a9c3da7b95f21171a2187b1480fb55",
+    "SweeftDisputeBoard": "0x7f7c0f74f86dcc49e8373d2c140dfa5213b08001",
+    "SweeftDAO2": "0x428370F58AbF859672EB4516ce81cF58EcDAC91A",
 }
+
+# v9 end-to-end releases (full hashes in docs/deployments.md)
+V9_RELEASE_TXS = [
+    "0xd24afb1680f59de25bc22a0385bbd32d98f57d5838be35863f7e7dd6149118a8",
+    "0x0320db17d37d8f446e2d4a9ecc47c7fb885a011b8e42b2732ed95d2ec38f3617",
+]
 
 # Keeper attack log: these are REFUSED transactions (status 0) on purpose.
 ATTACK_TXS = {"0x531f3ba7561f669e0480f7124cebbe5a41425a998282e48d4618eb8cd92d0a66"}
 
 
 def recorded_hashes() -> list[str]:
-    hashes = set()
+    hashes = set(V9_RELEASE_TXS)
     for name in ("tx-inventory.md", "keeper-2026-11-23.md"):
         text = (REPO / "docs" / "proofs" / name).read_text()
         hashes.update(re.findall(r"0x[0-9a-f]{64}", text))
