@@ -20,10 +20,27 @@ logger = logging.getLogger(__name__)
 
 
 def _participant_for(request) -> Participant | None:
-    wallet = (request.session.get("wallet_account") or {}).get("evm", "")
+    """Participant for the connected wallet, provisioned on first use.
+
+    A freshly connected wallet may have no row yet (the indexer only creates
+    rows for wallets it has seen on chain). Without provisioning, the landing
+    page would keep showing Connect wallet and the budget form would 401.
+    """
+    account = request.session.get("wallet_account") or {}
+    wallet = account.get("evm", "")
     if not wallet:
         return None
-    return Participant.objects.filter(evm_address__iexact=wallet).first()
+    participant = Participant.objects.filter(evm_address__iexact=wallet).first()
+    if participant is None and account.get("qor"):
+        participant = Participant.objects.filter(qor_address__iexact=account["qor"]).first()
+    if participant is None:
+        participant = Participant.objects.create(
+            display_name=f"Wallet {wallet[:6]}...{wallet[-4:]}",
+            evm_address=wallet.lower(),
+            qor_address=account.get("qor") or None,
+            wallet_linked_at=timezone.now(),
+        )
+    return participant
 
 
 def assistant_context(request) -> dict:
@@ -39,7 +56,9 @@ def assistant_context(request) -> dict:
     return {
         "conversations": conversations,
         "recent_messages": recent_messages,
-        "wallet_attached": bool(participant),
+        # Session is the source of truth for connection, not the participant
+        # row, so a connected wallet never sees the Connect prompt again.
+        "wallet_attached": bool((request.session.get("wallet_account") or {}).get("evm")),
         "api_ready": bool(__import__("os").getenv("MODEL_API_KEY")),
     }
 

@@ -47,6 +47,23 @@ class AiLandingTests(TestCase):
         self.assertContains(r, "AI assistant budget")
         self.assertContains(r, "0.5 QOR")
 
+    def test_fresh_wallet_without_participant_row_sees_chat(self):
+        # Regression: a connected wallet with no Participant row (indexer has
+        # not seen it on chain) was shown the Connect prompt and no chat.
+        fresh = "0xfreshwallet000000000000000000000000001"
+        self.assertFalse(Participant.objects.filter(evm_address__iexact=fresh).exists())
+        session = self.client.session
+        session["wallet_account"] = {"evm": fresh, "qor": "qor1fresh", "method": "evm"}
+        session.save()
+        r = self.client.get("/")
+        self.assertContains(r, 'id="chat-input"')
+        self.assertNotContains(r, "Connect your wallet to chat")
+        # First AI use provisions the participant so the budget form works.
+        r = self.client.post(
+            "/api/ai/mandate/", {"per_tx_qor": "0.5", "daily_qor": "2", "days": "7"}
+        )
+        self.assertEqual(r.status_code, 200)
+
     def test_ai_page_redirects_to_landing_anchor(self):
         r = self.client.get("/ai/")
         self.assertEqual(r.status_code, 302)
