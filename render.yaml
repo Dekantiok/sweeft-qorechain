@@ -9,7 +9,7 @@ services:
     # SQLite on the demo: ephemeral by default, so `seed_from_chain`
     # rebuilds the projection from the v9 deployment block on every boot
     # (idempotent, ~tens of thousands of blocks — seconds, not minutes).
-    startCommand: python manage.py migrate && (python manage.py seed_from_chain --from-block 10842200 || echo "seed failed, starting with an empty projection that will sync on demand") && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
+    startCommand: python manage.py migrate && (python manage.py seed_from_chain --from-block 10907600 || echo "seed failed, starting with an empty projection that will sync on demand") && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
     healthCheckPath: /
     envVars:
       - key: DJANGO_SETTINGS_MODULE
@@ -37,17 +37,17 @@ services:
       - key: QORECHAIN_EXPLORER_URL
         value: https://explore.qore.network
       - key: SWEEFT_VAULT_ADDRESS
-        value: 0x21b8a243bf96340ebe5b78b296004f1bf76862ce
+        value: 0x7B6ecF4a3038ecd2c0C9a028dE68bcA44081Cdbc
       - key: SWEEFT_MARKETPLACE_ADDRESS
-        value: 0x1d60eb9325a9c3da7b95f21171a2187b1480fb55
+        value: 0x7843a4e21a3B73A53299A01322AB5367C6Af85E9
       - key: SWEEFT_ORACLE_REGISTRY_ADDRESS
-        value: 0x35720a83daaa400ae404b20b3769d9afc56253fc
+        value: 0x4ca539bdA9FFaac9C93Ff57b7eE265bB49369aEC
       - key: SWEEFT_DISPUTE_BOARD_ADDRESS
-        value: 0x7f7c0f74f86dcc49e8373d2c140dfa5213b08001
+        value: 0xa78dA76AfDF565de9d7DF1B9dAAb353d72267a64
       - key: SWEEFT_DAO2_ADDRESS
-        value: 0x428370F58AbF859672EB4516ce81cF58EcDAC91A
+        value: 0x4acFeB7E15B96d163D1c9291edFfA5b0ACB0871C
       - key: SWEEFT_DAO_ADDRESS
-        value: 0x428370F58AbF859672EB4516ce81cF58EcDAC91A
+        value: 0x4acFeB7E15B96d163D1c9291edFfA5b0ACB0871C
       - key: MODEL_API_KEY
         sync: false
       - key: SWEEFT_INTERNAL_TOKEN

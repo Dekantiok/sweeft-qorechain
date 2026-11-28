@@ -15,16 +15,16 @@ from verified outcomes.
 
 ## Deployment status
 
-- **Live on Diana: v9** — deployed 27 November 2026 (`docs/deployments.md`:
-  Vault `0x21b8…862ce`, DAO2 `0x4283…AC91A`) — PQ verifier attestations,
-  domain-separated carrier signatures, committed future-block seeds,
-  credits-only settlement. Two verified PQ releases (ML-DSA-87 attestation
-  relayed on-chain, credited 0.098 of 0.1 QOR after the 2% fee, seller
-  withdrew on-chain). `.env` and the hosted demo point at v9.
-- **Superseded: v8/v7/v6/v5** — previous live stacks (v8: msg.sender-only
-  attestations, pre-v2 carrier format; still settleable there).
+- **Live on Diana: v10** — deployed 28 November 2026 (`docs/deployments.md`:
+  Vault `0x7B6e…bC`, Marketplace `0x7843…E9` with seller-signed
+  `purchaseWithQuote`) — seller AI reps with floor/target auto-accept
+  negotiate discounts verified by ML-DSA-87 quote signatures on-chain.
+  Live proof: discounted quote settlement at 0.05 vs 0.06 asking.
+- **Superseded: v9/v8/v7/v6/v5** — previous live stacks (v9: PQ verifier
+  attestations, committed seeds; still settleable there).
 - **Audit scope:** Stage 3 (78/100) v5; Stage 4 (72/100) v6; Stage 5 (72/100)
-  patched v6; Stage 6 (72/100) v8; **Stage 7 (78/100, HIGH) covers live v9,
+  patched v6; Stage 6 (72/100) v8; **Stage 7 (78/100, HIGH) covers v9
+  (superseded by v10, not yet re-audited),
   audited 27 Nov 2026 (`docs/audit/stage-7/`, mapped in `docs/AUDIT.md`).**
   Deployment is two scripts + one cast send (see `docs/deployments.md`).
 

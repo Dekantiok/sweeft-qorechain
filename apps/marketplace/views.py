@@ -77,12 +77,15 @@ def listing_detail(request, listing_id: int):
     )
     import os
 
+    wallet = request.session.get("wallet_account")
+    is_seller = bool(wallet and listing.seller and wallet.lower() == (listing.seller.evm_address or "").lower())
     return render(
         request,
         "marketplace/detail.html",
         {
             "listing": listing,
             "marketplace_address": os.getenv("SWEEFT_MARKETPLACE_ADDRESS", ""),
+            "is_seller": is_seller,
         },
     )
 

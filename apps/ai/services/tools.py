@@ -366,6 +366,94 @@ def tool_negotiate(listing_id: int, offered_qor: float = 0, details: str = "", w
     if not caps.get("within_caps"):
         return {"error": "offer outside mandate caps — refusing to negotiate"}
 
+    # Seller-agent path: an active auto-accept mandate decides deterministically.
+    # Expired mandates are transitioned and fall through to the legacy path.
+    from apps.ai.models import SellerAgentMandate
+    from apps.ai.services.seller_agent import _is_expired, evaluate_offer
+
+    seller_mandate = (
+        SellerAgentMandate.objects.filter(
+            listing=listing,
+            seller=listing.seller,
+            state=SellerAgentMandate.State.ACTIVE,
+            auto_accept=True,
+        )
+        .order_by("-created_at")
+        .first()
+    )
+    if seller_mandate is not None and _is_expired(seller_mandate):
+        seller_mandate.state = SellerAgentMandate.State.EXPIRED
+        seller_mandate.save(update_fields=["state", "updated_at"])
+        seller_mandate = None
+
+    if seller_mandate is not None:
+        rounds_used = Negotiation.objects.filter(listing=listing, buyer=buyer).count()
+        decision = evaluate_offer(listing, offered, rounds_used=rounds_used)
+        decision_status = decision.get("status", "rejected")
+
+        state_map = {
+            "accepted": Negotiation.State.ACCEPTED,
+            "countered": Negotiation.State.COUNTERED,
+            "rejected": Negotiation.State.REJECTED,
+        }
+        kwargs = {
+            "listing": listing,
+            "buyer": buyer,
+            "proposed_uqor": offered,
+            "details": str(details)[:1000],
+            "state": state_map.get(decision_status, Negotiation.State.REJECTED),
+        }
+        if decision_status == "countered" and decision.get("counter_uqor") is not None:
+            kwargs["counter_uqor"] = int(decision["counter_uqor"])
+        negotiation = Negotiation.objects.create(**kwargs)
+
+        result = {
+            "ok": True,
+            "status": decision_status,
+            "negotiation_id": negotiation.pk,
+            "listing_id": listing.on_chain_id,
+            "offered_qor": round(offered / 1e6, 6),
+            "rounds_used": int(decision.get("rounds_used", rounds_used)),
+            "max_rounds": int(decision.get("max_rounds", seller_mandate.max_rounds)),
+            "seller_agent": {
+                "status": decision_status,
+                "reason": decision.get("reason", ""),
+                "active": bool(decision.get("active", True)),
+            },
+            "auto_accept": False,
+        }
+        if decision_status == "accepted":
+            result["auto_accept"] = True
+            result["note"] = (
+                "Seller agent has auto-accepted. The buyer now purchases at this price "
+                "(the seller updates the listing price first if needed)."
+            )
+            mandate = _active_mandate(wallet)
+            if mandate:
+                from apps.ai.models import AgentAction
+
+                AgentAction.objects.create(
+                    mandate=mandate,
+                    action="negotiate_accepted",
+                    payload={"listing_id": listing.on_chain_id, "amount_uqor": offered},
+                    outcome=AgentAction.Outcome.PLANNED,
+                    detail="accepted negotiation reserves daily budget until purchase resolves",
+                )
+        elif decision_status == "countered":
+            if decision.get("counter_qor") is not None:
+                result["counter_qor"] = decision["counter_qor"]
+            result["note"] = (
+                "Seller agent counter-offered somewhere up to this estimate. "
+                "Accept and the AI drafts a purchase at the agreed price — your wallet still signs."
+            )
+        else:
+            if decision.get("distance_bucket"):
+                result["distance_bucket"] = decision["distance_bucket"]
+            if decision.get("reason"):
+                result["reason"] = decision["reason"]
+            result["note"] = "Offer rejected by the seller agent — try closer to the list price, or buy directly."
+        return result
+
     floor = int(listing.floor_price_uqor or 0)
     # No floor (or seller auto-accepts): any offer inside mandate is a deal.
     if not floor or (listing.auto_accept_floor and offered >= floor):

@@ -11,7 +11,7 @@ from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
-from apps.ai.models import Conversation, Mandate, Message
+from apps.ai.models import Conversation, Mandate, Message, SellerAgentMandate
 from apps.participants.models import Participant
 
 from .services.orchestrator import run_chat
@@ -129,6 +129,176 @@ def mandate_pause_revoke(request, mandate_id: int, action: str):
         return JsonResponse({"error": "unknown action"}, status=400)
     mandate.save(update_fields=["state"])
     return JsonResponse({"ok": True, "state": mandate.state})
+
+
+def _parse_json_body(request):
+    try:
+        return json.loads(request.body or b"{}")
+    except json.JSONDecodeError:
+        return {}
+
+
+@require_POST
+def seller_mandate_set(request):
+    """Set a seller-agent mandate for the connected wallet's own listing.
+
+    Accepts JSON or form fields: listing_id, floor_qor/floor_uqor,
+    target_qor/target_uqor, strategy, max_rounds, auto_accept, days.
+    Floor/target are never echoed back.
+    """
+    from apps.marketplace.models import Listing
+
+    participant = _participant_for(request)
+    if not participant:
+        return JsonResponse({"error": "connect your wallet first"}, status=401)
+
+    data = _parse_json_body(request)
+    if not data and request.POST:
+        data = dict(request.POST)
+
+    def _get(key, *alts):
+        for k in (key, *alts):
+            if data.get(k) not in (None, ""):
+                return data.get(k)
+        return None
+
+    try:
+        listing_id = int(_get("listing_id", "listing_id"))
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "listing_id is required"}, status=400)
+
+    listing = Listing.objects.filter(on_chain_id=listing_id).first()
+    if not listing:
+        return JsonResponse({"error": "listing not found"}, status=404)
+    if listing.seller_id != participant.id:
+        return JsonResponse({"error": "not your listing"}, status=403)
+
+    try:
+        if _get("floor_uqor"):
+            floor_uqor = int(_get("floor_uqor"))
+        else:
+            floor_uqor = int(Decimal(str(_get("floor_qor", "0"))) * 1_000_000)
+        if _get("target_uqor"):
+            target_uqor = int(_get("target_uqor"))
+        elif _get("target_qor"):
+            target_uqor = int(Decimal(str(_get("target_qor"))) * 1_000_000)
+        else:
+            target_uqor = floor_uqor
+    except Exception:
+        return JsonResponse({"error": "floor/target must be numbers"}, status=400)
+
+    if floor_uqor <= 0 or target_uqor < floor_uqor:
+        return JsonResponse({"error": "floor must be > 0 and target >= floor"}, status=400)
+
+    try:
+        max_rounds = int(_get("max_rounds") or 5)
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "max_rounds must be a number"}, status=400)
+    if max_rounds < 1 or max_rounds > 20:
+        return JsonResponse({"error": "max_rounds must be 1-20"}, status=400)
+
+    strategy = str(_get("strategy") or SellerAgentMandate.Strategy.BALANCED).lower()
+    if strategy not in {c.value for c in SellerAgentMandate.Strategy}:
+        return JsonResponse({"error": "unknown strategy"}, status=400)
+
+    raw_auto = _get("auto_accept")
+    auto_accept = raw_auto is True or str(raw_auto).lower() in ("1", "true", "yes", "on", "y") if raw_auto is not None else True
+    # Default: auto-accept ON for a fresh seller mandate so negotiations
+    # can auto-accept; callers may pass auto_accept=false to disable.
+    try:
+        days = int(_get("days") or 30)
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "days must be a number"}, status=400)
+    if days < 1 or days > 365:
+        return JsonResponse({"error": "days must be 1-365"}, status=400)
+
+    # Supersede any previous active mandate for this listing+seller.
+    previous = SellerAgentMandate.objects.filter(
+        listing=listing, seller=participant, state=SellerAgentMandate.State.ACTIVE
+    )
+    previous.update(state=SellerAgentMandate.State.PAUSED)
+
+    mandate = SellerAgentMandate.objects.create(
+        listing=listing,
+        seller=participant,
+        floor_uqor=floor_uqor,
+        target_uqor=target_uqor,
+        strategy=strategy,
+        max_rounds=max_rounds,
+        auto_accept=bool(auto_accept),
+        state=SellerAgentMandate.State.ACTIVE,
+        expires_at=timezone.now() + timedelta(days=days),
+    )
+    return JsonResponse(
+        {
+            "ok": True,
+            "mandate_id": mandate.pk,
+            "listing_id": listing.on_chain_id,
+            "state": mandate.state,
+            "strategy": mandate.strategy,
+            "max_rounds": mandate.max_rounds,
+            "auto_accept": mandate.auto_accept,
+            "expires_at": mandate.expires_at.isoformat(),
+        }
+    )
+
+
+@require_GET
+def seller_mandate_status(request, listing_id: int):
+    """Status of the seller-agent mandate for a listing (no floor/target leak)."""
+    from apps.marketplace.models import Listing
+
+    listing = Listing.objects.filter(on_chain_id=int(listing_id)).first()
+    if not listing:
+        return JsonResponse({"error": "listing not found"}, status=404)
+    mandate = (
+        SellerAgentMandate.objects.filter(listing=listing, seller=listing.seller)
+        .order_by("-created_at")
+        .first()
+    )
+    if mandate is None:
+        return JsonResponse(
+            {"ok": True, "listing_id": listing.on_chain_id, "state": "none", "active": False}
+        )
+    if mandate.state == SellerAgentMandate.State.ACTIVE and mandate.expires_at < timezone.now():
+        mandate.state = SellerAgentMandate.State.EXPIRED
+        mandate.save(update_fields=["state", "updated_at"])
+    return JsonResponse(
+        {
+            "ok": True,
+            "listing_id": listing.on_chain_id,
+            "mandate_id": mandate.pk,
+            "state": mandate.state,
+            "active": mandate.state == SellerAgentMandate.State.ACTIVE,
+            "strategy": mandate.strategy,
+            "max_rounds": mandate.max_rounds,
+            "auto_accept": mandate.auto_accept,
+            "expires_at": mandate.expires_at.isoformat(),
+        }
+    )
+
+
+@require_GET
+def seller_quote(request, listing_id: int):
+    """Build a seller quote for purchaseWithQuote (buyer wallet required)."""
+    from apps.marketplace.models import Listing
+
+    participant = _participant_for(request)
+    if not participant:
+        return JsonResponse({"error": "connect your wallet first"}, status=401)
+    listing = Listing.objects.filter(on_chain_id=int(listing_id)).first()
+    if not listing:
+        return JsonResponse({"error": "listing not found"}, status=404)
+    try:
+        price_uqor = int(float(request.GET.get("price_qor", "0")) * 1e6)
+    except (TypeError, ValueError):
+        price_uqor = 0
+    if price_uqor <= 0:
+        # Default to current asking price (accepted outcome of negotiation).
+        price_uqor = int(listing.price_uqor or 0)
+    from .services.seller_agent import build_quote
+
+    return JsonResponse(build_quote(listing, participant.evm_address, price_uqor))
 
 
 @require_POST

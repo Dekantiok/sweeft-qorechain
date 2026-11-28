@@ -104,6 +104,56 @@ class Mandate(models.Model):
         return f"Mandate for {self.owner.display_name} ({self.state})"
 
 
+class SellerAgentMandate(models.Model):
+    """Seller-granted, bounded authorization for autonomous negotiation.
+
+    Floor/target are private to the seller and must never be returned to
+    buyers. The agent evaluates offers deterministically against them
+    (see services/seller_agent.py) and the buyer wallet still signs any
+    purchase — the mandate never moves money.
+    """
+
+    class State(models.TextChoices):
+        ACTIVE = "active", "Active"
+        PAUSED = "paused", "Paused"
+        REVOKED = "revoked", "Revoked"
+        EXPIRED = "expired", "Expired"
+
+    class Strategy(models.TextChoices):
+        BALANCED = "balanced", "Balanced"
+        FIRM = "firm", "Firm"
+        FLEXIBLE = "flexible", "Flexible"
+
+    listing = models.ForeignKey(
+        "marketplace.Listing", on_delete=models.CASCADE, related_name="seller_mandates"
+    )
+    seller = models.ForeignKey(
+        Participant, on_delete=models.CASCADE, related_name="seller_mandates"
+    )
+    # Private negotiation bounds in uqor (1 QOR = 10^6 uqor). Never returned.
+    floor_uqor = models.DecimalField(max_digits=30, decimal_places=0)
+    target_uqor = models.DecimalField(max_digits=30, decimal_places=0)
+    strategy = models.CharField(
+        max_length=16, choices=Strategy.choices, default=Strategy.BALANCED
+    )
+    max_rounds = models.PositiveSmallIntegerField(default=5)
+    auto_accept = models.BooleanField(default=False)
+    state = models.CharField(max_length=16, choices=State.choices, default=State.ACTIVE)
+    expires_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["listing", "state"]),
+            models.Index(fields=["seller", "state"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"SellerAgentMandate listing={self.listing_id} seller={self.seller_id} ({self.state})"
+
+
 class AgentAction(models.Model):
     """Audit log of every autonomous action the agent took or attempted."""
 

@@ -49,6 +49,26 @@
             {% endif %}
         </div>
 
+        {% if is_seller %}
+        <div class="rounded-xl border border-line bg-black/60 p-5">
+            <div class="font-semibold text-sm mb-2">AI sales rep</div>
+            <form id="sales-rep-form" class="grid gap-2 text-[13px]">
+                <label class="text-muted">Floor (QOR) <input id="sr-floor" class="input input-sm mt-1" required placeholder="e.g. 0.08"></label>
+                <label class="text-muted">Target (QOR) <input id="sr-target" class="input input-sm mt-1" required placeholder="e.g. 0.10"></label>
+                <label class="text-muted">Strategy
+                    <select id="sr-strategy" class="input input-sm mt-1">
+                        <option value="balanced">Balanced</option>
+                        <option value="firm">Firm</option>
+                        <option value="flexible">Flexible</option>
+                    </select>
+                </label>
+                <label class="flex items-center gap-2 text-muted text-xs"><input type="checkbox" id="sr-auto" checked> Automatically accept at/above target</label>
+                <button type="submit" class="btn btn-sm w-full">Enable sales rep</button>
+                <p id="sr-status" class="text-[11px] text-muted"></p>
+            </form>
+        </div>
+        {% endif %}
+
         <div class="rounded-xl border border-line bg-black/60 p-5 text-xs text-muted leading-relaxed">
             <div class="font-semibold text-muted mb-2">How buying works</div>
             <ol class="list-decimal list-inside space-y-1">
@@ -62,6 +82,30 @@
 </div>
 
 <script nonce="{{ csp_nonce }}">
+document.getElementById("sales-rep-form")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const statusEl = document.getElementById("sr-status");
+    statusEl.textContent = "Enabling…";
+    const body = JSON.stringify({
+        listing_id: LISTING_ID,
+        floor_qor: document.getElementById("sr-floor").value,
+        target_qor: document.getElementById("sr-target").value,
+        strategy: document.getElementById("sr-strategy").value,
+        auto_accept: document.getElementById("sr-auto").checked,
+        days: 30,
+    });
+    try {
+        const result = await fetch("/api/ai/seller-mandate/", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-CSRFToken": document.querySelector('meta[name="csrf-token"]').content },
+            body,
+        }).then((r) => r.json());
+        if (result.error) throw new Error(result.error);
+        statusEl.textContent = result.active ? "Sales rep active: auto-accept on." : "Sales rep saved.";
+    } catch (err) {
+        statusEl.textContent = "Failed: " + (err.message || err);
+    }
+});
 // Buy flow: EVM wallet purchase inside an open scoped EVM window.
 // purchase(uint256 listingId, uint64 deliveryDeadline) payable: selector 0xb79bd650
 const buyButton = document.getElementById("buy-button");

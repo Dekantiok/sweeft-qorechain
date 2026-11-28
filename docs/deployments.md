@@ -4,7 +4,32 @@
 **Deployer:** `qor1etuzhk8tmpmrfmakzzhx8fau788r4jrapjkzlp` / `0xcaF82Bd8EBd87634eFb610aE63a7bCf1CE3ac87D`
 **Explorer:** https://explore.qore.network
 
-## v9 — hardened stack (live; deployed 27 November 2026)
+## v10 — seller-agent quotes (live; deployed 28 November 2026)
+
+Adds Phase 3 seller-agent negotiation: `purchaseWithQuote` in
+`SweeftMarketplace` accepts a seller-signed ML-DSA-87 discounted quote
+(`sweeft-quote-v1`, per-(listing,buyer) nonce, expiry, price ≤ asking),
+verified on-chain via `pqcVerify` — agents can agree below asking
+without a second `updatePrice` round-trip.
+
+| Contract | Address |
+|---|---|
+| **SweeftOracleRegistry (v10)** | `0x4ca539bdA9FFaac9C93Ff57b7eE265bB49369aEC` |
+| **SweeftVault (v10)** | `0x7B6ecF4a3038ecd2c0C9a028dE68bcA44081Cdbc` |
+| **SweeftMarketplace (v10)** | `0x7843a4e21a3B73A53299A01322AB5367C6Af85E9` |
+| **SweeftDisputeBoard (v10)** | `0xa78dA76AfDF565de9d7DF1B9dAAb353d72267a64` |
+| **SweeftDAO2 (v10)** | `0x4acFeB7E15B96d163D1c9291edFfA5b0ACB0871C` |
+
+Live quote proof: listing #2 (asking 0.06 QOR) settled via
+`purchaseWithQuote` at **0.05 QOR** with the seller's ML-DSA-87 quote
+(nonce 0), tx `0xb1ddf102…` — discounted price, no price-update needed.
+Django side: `SellerAgentMandate` (floor/target/strategy, auto-accept),
+`evaluate_offer` (accept/counter/reject, banded counters, no floor
+leak), `/api/ai/seller-mandate/{set,status,quote/}` endpoints.
+198 Foundry + 94 Django tests green. **Not yet QCAI-audited** (Stage 7
+78/100 covers v9); re-audit bundle must be regenerated for v10.
+
+## v9 — hardened stack (superseded by v10; 27 November 2026)
 
 Built from the hardening wave (carrier domain separation, PQ verifier
 attestations with relayer submissions, committed future-block seeds,

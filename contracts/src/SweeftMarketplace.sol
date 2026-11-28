@@ -67,6 +67,11 @@ contract SweeftMarketplace {
     error EscrowCreationFailed();
     error PriceAboveMax();
     error MetadataMismatch();
+    error QuoteExpired();
+    error BadQuoteSignature();
+    error QuoteReplayed();
+    error SellerKeyNotRegistered();
+    error SellerKeyNotProven();
 
     // ------------------------------------------------------------------
     // Storage
@@ -74,8 +79,17 @@ contract SweeftMarketplace {
 
     SweeftVault public immutable vault;
 
+    // QoreChain PQC precompiles (same addresses as SweeftVault).
+    IPQCVerify internal constant PQC_VERIFY = IPQCVerify(0x0000000000000000000000000000000000000a01);
+    IPQCKeyStatus internal constant PQC_KEYS = IPQCKeyStatus(0x0000000000000000000000000000000000000a02);
+
     uint256 public listingCount;
     mapping(uint256 => Listing) public listings;
+
+    /// @notice Per-(listing, buyer) quote nonce: the only nonce a seller
+    ///         signature is valid for. Advances on each quoted purchase,
+    ///         so a captured quote signature can never be replayed.
+    mapping(uint256 => mapping(address => uint256)) public quoteNonce;
 
     constructor(address vaultAddress) {
         if (vaultAddress == address(0)) revert InvalidMetadata();
@@ -214,6 +228,85 @@ contract SweeftMarketplace {
         emit ListingPurchased(listingId, escrowId, msg.sender, listing.seller, listing.price);
     }
 
+    /// @notice Build the exact signed payload for a seller quote (Phase 3).
+    ///         Returns the full payload the seller's ML-DSA-87 signature is
+    ///         verified over: the QoreChain domain prefix
+    ///         ("qorechain-msg-v1|" + chainId + "|", as in SweeftVault)
+    ///         followed by the `sweeft-quote-v1` inner message. The seller
+    ///         is read from the on-chain listing, so it cannot be forged
+    ///         separately from the signed wire; `price` is the quoted price
+    ///         (bounded by the listing price in `purchaseWithQuote`).
+    function buildQuoteMessage(uint256 listingId, address buyer, uint256 price, uint64 expiresAt, uint256 nonce)
+        external
+        view
+        returns (bytes memory)
+    {
+        return _quotePayload(listingId, buyer, price, expiresAt, nonce);
+    }
+
+    /// @notice Buy a listing at a seller-signed quoted price. The seller's
+    ///         ML-DSA-87 signature authenticates (listing, seller, buyer,
+    ///         quoted price, expiry, nonce) via the PQC precompiles; the
+    ///         nonce is the buyer's current `quoteNonce` for this listing
+    ///         and is consumed on success, so a quote cannot be replayed.
+    /// @param listingId the listing to buy
+    /// @param deliveryDeadline unix seconds; must satisfy the vault's window
+    /// @param quotePrice the seller-quoted price (must be <= listing price)
+    /// @param expiresAt unix seconds after which the quote is invalid
+    /// @param signature seller's ML-DSA-87 signature over buildQuoteMessage(...)
+    function purchaseWithQuote(
+        uint256 listingId,
+        uint64 deliveryDeadline,
+        uint256 quotePrice,
+        uint64 expiresAt,
+        bytes calldata signature
+    ) external payable returns (uint256 escrowId) {
+        Listing storage listing = listings[listingId];
+        if (listing.status != ListingStatus.Active) revert ListingNotActive();
+        if (listing.quantity == 0) revert OutOfStock();
+        if (msg.sender == listing.seller) revert InvalidBuyer();
+        if (quotePrice == 0) revert InvalidPrice();
+        if (quotePrice > listing.price) revert PriceAboveMax();
+        if (msg.value != quotePrice) revert WrongPayment();
+        if (expiresAt <= block.timestamp) revert QuoteExpired();
+
+        uint256 nonce = quoteNonce[listingId][msg.sender];
+        // `nonce` is by construction the current quoteNonce for this
+        // (listing, buyer); a signature for any other nonce fails below.
+
+        (bool registered,, bytes memory pubkey, bool proven) = PQC_KEYS.pqcKeyStatus(listing.seller);
+        if (!registered || pubkey.length == 0) revert SellerKeyNotRegistered();
+        if (!proven) revert SellerKeyNotProven();
+
+        bytes memory payload = _quotePayload(listingId, msg.sender, quotePrice, expiresAt, nonce);
+        if (!PQC_VERIFY.pqcVerify(pubkey, signature, payload)) {
+            // Distinguish a replayed quote (valid for the previous nonce)
+            // from a signature that was never valid for this buyer.
+            if (nonce > 0) {
+                bytes memory replayed =
+                    _quotePayload(listingId, msg.sender, quotePrice, expiresAt, nonce - 1);
+                if (PQC_VERIFY.pqcVerify(pubkey, signature, replayed)) revert QuoteReplayed();
+            }
+            revert BadQuoteSignature();
+        }
+
+        // Consume the nonce only after the signature verified, immediately
+        // before state changes (a revert above leaves it unconsumed).
+        quoteNonce[listingId][msg.sender] = nonce + 1;
+
+        listing.quantity -= 1;
+        if (listing.quantity == 0) {
+            listing.status = ListingStatus.Sold;
+        }
+        listing.updatedAt = uint64(block.timestamp);
+
+        escrowId = vault.createEscrowWithLogistics{ value: msg.value }(
+            msg.sender, listing.seller, listing.logisticsPartner, deliveryDeadline, msg.value, listing.logisticsFee
+        );
+
+        emit ListingPurchased(listingId, escrowId, msg.sender, listing.seller, quotePrice);
+    }
+
     // ------------------------------------------------------------------
     // Views
     // ------------------------------------------------------------------
@@ -230,4 +323,79 @@ contract SweeftMarketplace {
         if (listing.seller == address(0)) revert ListingNotActive();
         if (msg.sender != listing.seller) revert NotSeller();
     }
+
+    function _quotePayload(uint256 listingId, address buyer, uint256 price, uint64 expiresAt, uint256 nonce)
+        internal
+        view
+        returns (bytes memory)
+    {
+        address seller = listings[listingId].seller;
+        bytes memory inner = bytes(
+            string.concat(
+                "sweeft-quote-v1|marketplace=",
+                _toHexString(address(this)),
+                "|listing=",
+                _uintToString(listingId),
+                "|seller=",
+                _toHexString(seller),
+                "|buyer=",
+                _toHexString(buyer),
+                "|price=",
+                _uintToString(price),
+                "|expires=",
+                _uintToString(uint256(expiresAt)),
+                "|nonce=",
+                _uintToString(nonce)
+            )
+        );
+        return abi.encodePacked("qorechain-msg-v1|", vault.cosmosChainId(), "|", inner);
+    }
+
+    function _toHexString(address account) internal pure returns (string memory) {
+        bytes memory alphabet = "0123456789abcdef";
+        bytes20 data = bytes20(account);
+        bytes memory out = new bytes(42);
+        out[0] = "0";
+        out[1] = "x";
+        for (uint256 i = 0; i < 20; i++) {
+            out[2 + i * 2] = alphabet[uint8(data[i] >> 4)];
+            out[3 + i * 2] = alphabet[uint8(data[i] & 0x0f)];
+        }
+        return string(out);
+    }
+
+    function _uintToString(uint256 value) internal pure returns (string memory) {
+        if (value == 0) return "0";
+        uint256 temp = value;
+        uint256 digits;
+        while (temp != 0) {
+            digits++;
+            temp /= 10;
+        }
+        bytes memory buffer = new bytes(digits);
+        while (value != 0) {
+            digits -= 1;
+            buffer[digits] = bytes1(uint8(48 + (value % 10)));
+            value /= 10;
+        }
+        return string(buffer);
+    }
+}
+
+// ----------------------------------------------------------------------
+// Precompile interfaces (minimal duplicates of SweeftVault's)
+// ----------------------------------------------------------------------
+
+interface IPQCVerify {
+    function pqcVerify(bytes calldata pubkey, bytes calldata signature, bytes calldata message)
+        external
+        view
+        returns (bool);
+}
+
+interface IPQCKeyStatus {
+    function pqcKeyStatus(address account)
+        external
+        view
+        returns (bool registered, uint8 algorithmId, bytes memory pubkey, bool proven);
 }
