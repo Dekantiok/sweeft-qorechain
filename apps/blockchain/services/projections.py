@@ -101,6 +101,44 @@ DEMO_CATALOG = {
     },
 }
 
+# Seed-catalog fallback (tools/seed_marketplace_100.py): the same product
+# table, keyed by slug, used until the Render static path is live.
+_SEED_PRODUCTS = [
+    ("physical", "Wireless Noise-Cancelling Headphones", "Over-ear Bluetooth 5.3 headphones with 40h battery, sealed in box."),
+    ("physical", "Mechanical Keyboard 75%", "Hot-swappable 75% keyboard, silent linear switches, QMK/VIA."),
+    ("physical", "Ergonomic Desk Lamp", "Adjustable brass desk lamp with warm dimmable LED."),
+    ("physical", "Portable USB-C Hub", "7-in-1 hub: HDMI 4K, 2xUSB-C PD 100W, SD reader."),
+    ("physical", "Laptop Stand Aluminium", "Foldable CNC aluminium stand, fits 10-16 inch laptops."),
+    ("physical", "Ceramic Pour-Over Set", "Hand-glazed ceramic dripper + carafe, 600ml."),
+    ("physical", "Trail Backpack 25L", "Water-resistant roll-top backpack with padded 15in sleeve."),
+    ("physical", "Smart Plug 4-Pack", "Wi-Fi smart plugs with energy monitoring, voice assistant ready."),
+    ("physical", "Leather Card Wallet", "Full-grain leather bifold, RFID shielding, 8 card slots."),
+    ("physical", "Desk Organiser Oak", "Solid oak desk organiser with cable routing and phone dock."),
+    ("digital", "Software Licence Pro Key", "One-year pro licence for photo editing suite, delivered by email."),
+    ("digital", "UI Kit Design Assets", "480 component Figma kit with auto-layout and tokens."),
+    ("digital", "E-book: Quantum Safety", "120-page ebook on post-quantum migration, PDF + EPUB."),
+    ("digital", "Game Key Steam", "Sealed activation key for indie adventure, delivered in-chat."),
+    ("digital", "Music Sample Pack", "2GB royalty-free sample pack, WAV 24-bit."),
+    ("digital", "Notion Template Bundle", "10 productivity templates with setup guide."),
+    ("digital", "Icon Pack 2000", "2000 SVG icons, SaaS-ready, MIT licence."),
+    ("digital", "Video LUTs Collection", "35 cinematic LUTs for DaVinci/Premiere."),
+    ("digital", "Data Analysis Course", "6h video course: Python + pandas + stats, lifetime access."),
+    ("digital", "Fonts Family Display", "Display serif family, 8 weights, OTF/WOFF2."),
+    ("service", "Smart-Contract Audit", "Solidity security review with written report, 5-day turnaround."),
+    ("service", "Logo Design Package", "3 logo concepts + source files, 2 revision rounds."),
+    ("service", "Website Security Audit", "Web app security audit with remediation call."),
+    ("service", "Tutoring: Cryptography", "Two 90-min sessions on ML-KEM / ML-DSA fundamentals."),
+    ("service", "Resume Review + Mock Interview", "CV rewrite and one mock interview session."),
+    ("service", "Motion Graphics Intro", "Animated logo intro, 5s, 4K render."),
+    ("service", "Containerisation Workshop", "Half-day Docker/K8s workshop for a team of 4."),
+    ("service", "Data Pipeline Setup", "ETL pipeline setup with documentation."),
+    ("service", "Translations EN-DE", "10,000-word technical translation, native speaker."),
+    ("service", "Voiceover Recording", "30 min studio voiceover, broadcast quality."),
+]
+for _n in range(100):
+    _cat, _t, _d = _SEED_PRODUCTS[_n % len(_SEED_PRODUCTS)]
+    DEMO_CATALOG[f"seed-{_n:03d}-{_cat}"] = {"title": _t, "description": _d}
+
 
 def _catalog_entry(uri: str) -> dict:
     """Fallback product info for demo fixture listings (display-only)."""
@@ -222,6 +260,14 @@ def _handle_listing_cancelled(event) -> dict:
     if listing:
         listing.status = Listing.Status.CANCELLED
         listing.save(update_fields=["status", "updated_at"])
+    return {"listing_id": event.args["listingId"]}
+
+
+def _handle_listing_price_updated(event) -> dict:
+    listing = Listing.objects.filter(on_chain_id=int(event.args["listingId"])).first()
+    if listing:
+        listing.price_uqor = _wei_to_uqor(event.args["price"])
+        listing.save(update_fields=["price_uqor", "updated_at"])
     return {"listing_id": event.args["listingId"]}
 
 
@@ -810,6 +856,7 @@ def _handle_registry_noop(event) -> dict:
 HANDLERS = {
     ("SweeftMarketplace", "ListingCreated"): _handle_listing_created,
     ("SweeftMarketplace", "ListingPurchased"): _handle_listing_purchased,
+    ("SweeftMarketplace", "ListingPriceUpdated"): _handle_listing_price_updated,
     ("SweeftMarketplace", "ListingCancelled"): _handle_listing_cancelled,
     ("SweeftVault", "EscrowCreated"): _handle_escrow_created,
     ("SweeftVault", "CarrierAttested"): _handle_carrier_attested,

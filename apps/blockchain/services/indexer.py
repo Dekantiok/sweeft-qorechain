@@ -40,7 +40,7 @@ CONTRACTS = ACTIVE_CONTRACTS  # default sync set (back-compat alias)
 HEAD_LAG_BLOCKS = 8
 
 EVENTS = {
-    "SweeftMarketplace": ["ListingCreated", "ListingPurchased", "ListingCancelled"],
+    "SweeftMarketplace": ["ListingCreated", "ListingPurchased", "ListingCancelled", "ListingPriceUpdated"],
     "SweeftVault": [
         "EscrowCreated",
         "EscrowFunded",
