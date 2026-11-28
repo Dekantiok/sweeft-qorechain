@@ -8,8 +8,7 @@
         <span class="text-[11px] uppercase tracking-wider text-muted">{% if api_ready %}Model connected{% else %}Demo mode{% endif %}</span>
     </div>
 
-    {% if wallet_attached %}
-    <div class="p-5">
+    <div id="ai-chat-connected" class="p-5 {% if not wallet_attached %}hidden{% endif %}">
         <div id="chat-log" class="space-y-4 text-sm max-h-[420px] overflow-y-auto pr-2">
             {% for m in recent_messages %}
             <div class="flex gap-3 {% if m.role == 'user' %}flex-row-reverse{% endif %}">
@@ -52,17 +51,25 @@
         </div>
         {% endif %}
     </div>
-    {% else %}
-    <div class="p-5 flex flex-col items-start gap-3">
+    <div id="ai-chat-guest" class="p-5 flex flex-col items-start gap-3 {% if wallet_attached %}hidden{% endif %}">
         <p class="text-[14px] leading-[21px] text-muted">Connect your wallet to chat with the assistant. It will search live listings, check escrow status and seller trust, and draft purchases inside your budget.</p>
         <button type="button" class="btn ai-connect">Connect wallet</button>
         <p class="text-[11px] text-muted">Set your AI budget afterwards from the wallet menu at the top right.</p>
     </div>
-    {% endif %}
 </div>
 
 <script nonce="{{ csp_nonce }}">
 (function () {
+    // Sync with the account menu in the nav, which is rendered from the same
+    // session. If the nav shows a connected wallet, the chat must never ask
+    // to connect again, whatever any single view context said.
+    var connected = !!document.getElementById("account-menu-button");
+    var chatBox = document.getElementById("ai-chat-connected");
+    var guestBox = document.getElementById("ai-chat-guest");
+    if (chatBox && guestBox) {
+        chatBox.classList.toggle("hidden", !connected);
+        guestBox.classList.toggle("hidden", connected);
+    }
     document.querySelectorAll(".ai-connect").forEach(function (btn) {
         btn.addEventListener("click", function () {
             if (window.SweeftWallet) SweeftWallet.openModal();

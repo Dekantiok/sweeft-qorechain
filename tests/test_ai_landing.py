@@ -37,13 +37,16 @@ class AiLandingTests(TestCase):
         r = self.client.get("/")
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, "Connect your wallet to chat")
-        self.assertNotContains(r, 'id="chat-input"')
+        # Chat markup exists but starts hidden; the guest prompt is shown.
+        self.assertContains(r, 'id="ai-chat-connected" class="p-5 hidden"')
+        self.assertContains(r, 'id="hero-connect" class="btn "')
 
     def test_landing_shows_chat_when_connected(self):
         self._connect()
         r = self.client.get("/")
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, 'id="chat-input"')
+        self.assertContains(r, 'id="ai-chat-connected" class="p-5 "')
         self.assertContains(r, "AI assistant budget")
         self.assertContains(r, "0.5 QOR")
 
@@ -57,7 +60,7 @@ class AiLandingTests(TestCase):
         session.save()
         r = self.client.get("/")
         self.assertContains(r, 'id="chat-input"')
-        self.assertNotContains(r, "Connect your wallet to chat")
+        self.assertContains(r, 'id="ai-chat-connected" class="p-5 "')
         # First AI use provisions the participant so the budget form works.
         r = self.client.post(
             "/api/ai/mandate/", {"per_tx_qor": "0.5", "daily_qor": "2", "days": "7"}

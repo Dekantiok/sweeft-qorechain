@@ -14,13 +14,9 @@
                 A post-quantum marketplace on QoreChain. Buyers fund escrow, carriers and verifiers prove delivery, and every release needs the buyer's ML-DSA-87 signature. A stolen classical key moves nothing.
             </p>
             <div class="mt-8 flex flex-col sm:flex-row items-start gap-5 motion-safe:animate-rise motion-safe:[animation-delay:220ms]">
-                {% if wallet_attached %}
-                <a href="/escrow/new/" class="btn btn-accent">New escrow</a>
+                <a id="hero-escrow-link" href="/escrow/new/" class="btn btn-accent {% if not wallet_attached %}hidden{% endif %}">New escrow</a>
+                <button id="hero-connect" class="btn {% if wallet_attached %}hidden{% endif %}">Connect wallet</button>
                 <a href="/marketplace/" class="btn-ghost">Browse the marketplace</a>
-                {% else %}
-                <button id="hero-connect" class="btn">Connect wallet</button>
-                <a href="/marketplace/" class="btn-ghost">Browse the marketplace</a>
-                {% endif %}
             </div>
             <div class="mt-8 flex flex-wrap gap-x-8 gap-y-2 text-[13px] text-muted motion-safe:animate-rise motion-safe:[animation-delay:320ms]">
                 <span><strong class="text-ink tabular-nums">{{ stats.listings_live }}</strong> listings live</span>
@@ -165,6 +161,13 @@
     var heroConnect = document.getElementById("hero-connect");
     if (heroConnect && window.SweeftWallet) {
         heroConnect.addEventListener("click", function () { SweeftWallet.openModal(); });
+    }
+    // Same sync as the AI section: nav account menu is the ground truth.
+    var navConnected = !!document.getElementById("account-menu-button");
+    var escrowLink = document.getElementById("hero-escrow-link");
+    if (escrowLink && heroConnect) {
+        escrowLink.classList.toggle("hidden", !navConnected);
+        heroConnect.classList.toggle("hidden", navConnected);
     }
     // Story player: autoplays and loops through the four steps.
     var steps = document.querySelectorAll("#story .story-step");
