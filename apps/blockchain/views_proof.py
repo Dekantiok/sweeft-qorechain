@@ -164,7 +164,7 @@ def escrow_proof(request, escrow_id: int):
 
 
 def drill_page(request):
-    """Live Q-Day drill: keeper attack attempts and their on-chain refusals."""
+    """Independent attack drill (own simulations, not an official drill participation)."""
     attacks = [
         {"name": "Release with a wrong ML-DSA-87 key", "response": "refused (status 0)", "tx": ""},
         {"name": "Release with a tampered amount", "response": "refused (status 0)", "tx": ""},

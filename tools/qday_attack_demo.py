@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Sweeft — reproducible Q-Day attack demonstration.
+"""Sweeft — independent attack demonstration.
+
+Not an official Q-Day drill participation: these are Sweeft's own attack
+simulations run against live Diana escrows.
 
 Covers 6 attacks. Each result is labeled LIVE DIANA (eth_call against the
 deployed Vault at latest block on https://evm-testnet.qore.host, no funds

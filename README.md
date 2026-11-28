@@ -248,11 +248,23 @@ QoreX must be set to **Testnet (Diana)** for signing: mobile app →
 Settings → "Use testnet (developers)". QoreX never switches networks on a
 request's behalf.
 
+## Fest verification
+
+| Feature | Where it lives |
+|---|---|
+| QoreChain SDK + PQC kits | `requirements.txt` (`qorechain-sdk`, `qorechain-pqc`, `qorechain-qoresign`), used in `integrations/qorechain/` |
+| Solidity PQC key status | `SweeftVault.sol:686,759`, `SweeftOracleRegistry.sol:114,133` call `pqcKeyStatus` (0x…0a02) |
+| Solidity PQC signature check | `SweeftVault.sol` `_requirePqcSignature` calls `pqcVerify` (0x…0a01) on every release/refund |
+| Smart accounts + spending rules | Scoped EVM windows (`integrations/qorechain/window.py`, 4000 blocks / 160 txs / 20 QOR cap) plus AI mandate caps (`apps/ai/`, per-tx + rolling daily, enforced in code) |
+| Hybrid ML-DSA-87 transactions | Relayer submits hybrid-signed `MsgCrossVMCall` (`apps/blockchain/services/relayer.py`) |
+| MCP server | `packages/mcp/` (read-only Sweeft tools for agents) |
+| QoreSign | `qorechain-qoresign`, `verify_message` in `apps/participants/wallet.py:106` |
+
 ## Evidence
 
 - **136 Foundry tests** (unit, fuzz, invariants) + **70+ Django tests**. `forge coverage` cannot compile this stack: the vault's via-IR stack depth fails the coverage build, so no coverage percentage is claimed. Test count and invariant coverage are the evidence.
 - **Re-verifiable on demand.** `python tools/reverify.py` re-checks every recorded hash against Diana: last run 48 passed, 0 failed (41 deployment and attack transactions plus the v9 releases, plus bytecode checks for all 5 live v9 contracts).
-- **Live drill.** `/drill/` lists the keeper attack attempts and their on-chain refusals with explorer links.
+- **Independent attack drill.** `/drill/` lists our own attack simulations (wrong-key, tampered-amount, non-carrier) and their on-chain refusals with explorer links. Sweeft did not participate in any official drill.
 - **Proof pages.** `/proof/tx/<hash>/` and `/proof/escrow/<id>/` decode live state in the browser.
 
 ## Documentation
