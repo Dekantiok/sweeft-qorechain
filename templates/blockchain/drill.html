@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Q-Day drill: Sweeft{% endblock %}
+
+{% block content %}
+<div>
+    <h1 class="font-serif text-[28px] leading-[1.1] lg:text-[34px]">Q-Day drill: thieves try, the chain refuses</h1>
+    <p class="mt-2 max-w-3xl text-sm leading-[21px] text-muted">
+        Every attempt below used a stolen classical key or an unauthorized account against a live
+        Sweeft escrow. The chain refused all of them with status 0. Each refused transaction is
+        recorded on Diana and links to the explorer, so you can see the refusal yourself.
+    </p>
+</div>
+
+<div class="mt-8 border border-line">
+    <div class="border-b border-line px-5 py-4 flex items-center justify-between gap-3">
+        <h2 class="font-serif text-[22px] leading-[1.15]">Attacks attempted</h2>
+        <span class="text-[11px] uppercase tracking-wider text-muted">Keeper log 2026-11-23</span>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-[13px]">
+            <thead>
+                <tr class="border-b border-line text-left uppercase tracking-wider text-muted text-[11px]">
+                    <th class="px-5 py-3">Attack</th>
+                    <th class="px-5 py-3">Chain response</th>
+                    <th class="px-5 py-3">Transaction</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for attack in attacks %}
+                <tr class="border-b border-line last:border-0">
+                    <td class="px-5 py-4">{{ attack.name }}</td>
+                    <td class="px-5 py-4"><span class="badge badge-refunded">{{ attack.response }}</span></td>
+                    <td class="px-5 py-4">
+                        {% if attack.tx %}
+                        <a class="hash text-ink underline underline-offset-4 hover:decoration-white" href="{{ network.explorer_url }}/tx/{{ attack.tx }}" target="_blank" rel="noopener">{{ attack.tx|truncatechars:26 }}</a>
+                        {% else %}
+                        <span class="text-muted">recorded in the keeper log</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="mt-8 border border-line p-5">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <h2 class="font-serif text-[22px] leading-[1.15]">Live re-verification</h2>
+        <span class="badge badge-active">46 passed, 0 failed</span>
+    </div>
+    <p class="mt-3 text-[14px] leading-[21px] text-muted">
+        <span class="hash">tools/reverify.py</span> re-checks every recorded hash against Diana
+        on demand and prints the same summary. Run it yourself and compare.
+    </p>
+</div>
+
+<div class="mt-8 border border-line p-5">
+    <h2 class="font-serif text-[22px] leading-[1.15]">Why a stolen key moves nothing</h2>
+    <ul class="mt-3 list-disc list-inside space-y-2 text-[14px] leading-[21px] text-muted">
+        <li>Release and refund need the buyer's ML-DSA-87 signature, verified on-chain by pqcVerify against the key registered with proof of possession.</li>
+        <li>The signed message binds escrow, recipient, amount, and nonce, so a signature cannot be replayed or retargeted.</li>
+        <li>Only authorized roles may act. A direct buyer or seller call cannot freeze an escrow without a bond.</li>
+        <li>Carrier proof binds escrow, carrier, status, and nonce. One verifier alone cannot block a refund.</li>
+    </ul>
+    <p class="mt-4 text-[13px] text-muted">
+        Verify every hash yourself with <span class="hash">python tools/reverify.py</span> or open the explorer links above.
+        Full log and method in <span class="hash">docs/proofs/keeper-2026-11-23.md</span>.
+    </p>
+</div>
+{% endblock %}

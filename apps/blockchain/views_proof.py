@@ -163,6 +163,24 @@ def escrow_proof(request, escrow_id: int):
     )
 
 
+def drill_page(request):
+    """Live Q-Day drill: keeper attack attempts and their on-chain refusals."""
+    attacks = [
+        {"name": "Release with a wrong ML-DSA-87 key", "response": "refused (status 0)", "tx": ""},
+        {"name": "Release with a tampered amount", "response": "refused (status 0)", "tx": ""},
+        {
+            "name": "Carrier attestation by a non-carrier",
+            "response": "refused (status 0)",
+            "tx": "0x531f3ba7561f669e0480f7124cebbe5a41425a998282e48d4618eb8cd92d0a66",
+        },
+    ]
+    return render(
+        request,
+        "blockchain/drill.html",
+        {"attacks": attacks, "network": get_network()},
+    )
+
+
 def security_page(request):
     """Who can move money — every gate with its on-chain proof."""
     import os

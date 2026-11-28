@@ -248,6 +248,13 @@ QoreX must be set to **Testnet (Diana)** for signing: mobile app →
 Settings → "Use testnet (developers)". QoreX never switches networks on a
 request's behalf.
 
+## Evidence
+
+- **136 Foundry tests** (unit, fuzz, invariants) + **70+ Django tests**. `forge coverage` cannot compile this stack: the vault's via-IR stack depth fails the coverage build, so no coverage percentage is claimed. Test count and invariant coverage are the evidence.
+- **Re-verifiable on demand.** `python tools/reverify.py` re-checks every recorded hash against Diana: last run 46 passed, 0 failed (41 deployment and attack transactions plus bytecode checks for all 5 v8 contracts).
+- **Live drill.** `/drill/` lists the keeper attack attempts and their on-chain refusals with explorer links.
+- **Proof pages.** `/proof/tx/<hash>/` and `/proof/escrow/<id>/` decode live state in the browser.
+
 ## Documentation
 
 - [`docs/implementation-blueprint.md`](docs/implementation-blueprint.md) — original implementation blueprint
