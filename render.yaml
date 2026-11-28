@@ -1,15 +1,15 @@
 # Sweeft demo on Render (native Python env).
 # Dashboard alternative: create a Web Service from this repo, then set the
-# sync:false vars below. All contract addresses point at the live v8 stack.
+# sync:false vars below. All contract addresses point at the live v9 stack.
 services:
   - type: web
     name: sweeft
     env: python
     buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
     # SQLite on the demo: ephemeral by default, so `seed_from_chain`
-    # rebuilds the projection from the v8 deployment block on every boot
-    # (idempotent, ~5k blocks — seconds, not minutes).
-    startCommand: python manage.py migrate && (python manage.py seed_from_chain --from-block 10773353 || echo "seed failed, starting with an empty projection that will sync on demand") && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
+    # rebuilds the projection from the v9 deployment block on every boot
+    # (idempotent, ~tens of thousands of blocks — seconds, not minutes).
+    startCommand: python manage.py migrate && (python manage.py seed_from_chain --from-block 10842200 || echo "seed failed, starting with an empty projection that will sync on demand") && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
     healthCheckPath: /
     envVars:
       - key: DJANGO_SETTINGS_MODULE
@@ -37,17 +37,17 @@ services:
       - key: QORECHAIN_EXPLORER_URL
         value: https://explore.qore.network
       - key: SWEEFT_VAULT_ADDRESS
-        value: 0x820CE1C670D26A2fF6ca5ce53f5a9EFdf3dC869a
+        value: 0x21b8a243bf96340ebe5b78b296004f1bf76862ce
       - key: SWEEFT_MARKETPLACE_ADDRESS
-        value: 0xf5cC7Bf4EECC160E23b4fF615E68D716bEFCd47C
+        value: 0x1d60eb9325a9c3da7b95f21171a2187b1480fb55
       - key: SWEEFT_ORACLE_REGISTRY_ADDRESS
-        value: 0x76D4F6D164C688b319eE0A16003a9c06f5b1AB7A
+        value: 0x35720a83daaa400ae404b20b3769d9afc56253fc
       - key: SWEEFT_DISPUTE_BOARD_ADDRESS
-        value: 0x50a74dD32647bcf456DcE09b76849C5EBD2A0508
+        value: 0x7f7c0f74f86dcc49e8373d2c140dfa5213b08001
       - key: SWEEFT_DAO2_ADDRESS
-        value: 0x91d0eCCE908bec0FcF06fB8d419ad9edb43Cf59b
+        value: 0x428370F58AbF859672EB4516ce81cF58EcDAC91A
       - key: SWEEFT_DAO_ADDRESS
-        value: 0x91d0eCCE908bec0FcF06fB8d419ad9edb43Cf59b
+        value: 0x428370F58AbF859672EB4516ce81cF58EcDAC91A
       - key: MODEL_API_KEY
         sync: false
       - key: SWEEFT_INTERNAL_TOKEN
