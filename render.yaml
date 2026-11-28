@@ -9,7 +9,7 @@ services:
     # SQLite on the demo: ephemeral by default, so `seed_from_chain`
     # rebuilds the projection from the v8 deployment block on every boot
     # (idempotent, ~5k blocks — seconds, not minutes).
-    startCommand: python manage.py migrate && python manage.py seed_from_chain --from-block 10773353 && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
+    startCommand: python manage.py migrate && (python manage.py seed_from_chain --from-block 10773353 || echo "seed failed, starting with an empty projection that will sync on demand") && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
     healthCheckPath: /
     envVars:
       - key: DJANGO_SETTINGS_MODULE

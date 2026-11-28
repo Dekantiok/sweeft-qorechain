@@ -73,17 +73,24 @@ class Command(BaseCommand):
 
         results: dict = {}
         total = 0
-        for attempt in range(1, max(1, options["retries"]) + 1):
-            results = sync_all()
-            total = sum(results.values())
+        attempts = max(1, options["retries"])
+        for attempt in range(1, attempts + 1):
+            try:
+                results = sync_all()
+                total = sum(results.values())
+            except Exception as exc:  # RPC down or rate-limited: back off, retry
+                results, total = {}, 0
+                self.stdout.write(self.style.WARNING(f"attempt {attempt}: sync raised {exc}"))
             if total > 0:
                 break
-            self.stdout.write(
-                self.style.WARNING(
-                    f"attempt {attempt}: 0 events handled — retrying in {attempt * 5}s"
+            if attempt < attempts:
+                delay = min(60, attempt * 15)
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"attempt {attempt}: 0 events handled, retrying in {delay}s"
+                    )
                 )
-            )
-            time.sleep(attempt * 5)
+                time.sleep(delay)
         for name, count in results.items():
             self.stdout.write(f"{name:24s} {count} event(s) handled")
         if total == 0:

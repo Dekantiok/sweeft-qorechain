@@ -174,7 +174,14 @@ def sync_all(*, max_blocks: int | None = None, max_rounds: int = 15, include_leg
     for _ in range(max_rounds):
         before = {c.contract_name: c.last_processed_block for c in IndexerCursor.objects.all()}
         for name in names:
-            results[name] += sync_contract(name, max_blocks=max_blocks)
+            try:
+                results[name] += sync_contract(name, max_blocks=max_blocks)
+            except Exception:
+                # A rate-limited or unreachable RPC (429 from the public
+                # endpoint is common on shared egress) must not abort the
+                # whole sync or the demo boot seed. Other contracts continue,
+                # and callers can retry the whole pass with backoff.
+                logger.exception("sync failed for %s (RPC unavailable?)", name)
         after = {c.contract_name: c.last_processed_block for c in IndexerCursor.objects.all()}
         if after == before:
             break
