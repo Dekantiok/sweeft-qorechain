@@ -198,13 +198,12 @@ def ai_recommendation(listing=None) -> dict:
 
 
 def build_quote(listing, buyer_evm: str, price_uqor: int, expires_minutes: int = 30) -> dict:
-    """Build a signed seller quote for purchaseWithQuote (testnet demo).
+    """Build an UNSIGNED seller quote for purchaseWithQuote.
 
-    The seller's ML-DSA-87 signature is produced server-side ONLY for
-    demo wallets derived from SWEEFT_DEPLOYER_MNEMONIC (testnet-only,
-    same custody as the rest of the demo relayer). Real QoreX users
-    sign the returned buildQuoteMessage bytes in their wallet instead;
-    the endpoint returns needs_seller_signature in that case.
+    The seller signs the returned message bytes with their ML-DSA-87 key
+    in QoreX (wallet-side). The server never signs on the seller's behalf.
+    The signed bytes are submitted via submit_seller_signature() and then
+    returned to the buyer for purchaseWithQuote.
     """
     import time
     from apps.marketplace.models import Listing
@@ -230,21 +229,51 @@ def build_quote(listing, buyer_evm: str, price_uqor: int, expires_minutes: int =
     except Exception as exc:
         return {"error": f"quote build failed: {exc}"}
 
-    # Demo-seller signing (testnet mnemonic wallets only).
-    import os
-    mnemonic = os.getenv("SWEEFT_DEPLOYER_MNEMONIC", "").strip()
-    from qorsdk import derive_unified_account, pqc_sign
-    for idx in range(30):
-        try:
-            acct = derive_unified_account(mnemonic, index=idx)
-        except Exception:
-            break
-        if acct.evm.lower() == (listing.seller.evm_address or "").lower():
-            sig = pqc_sign(acct.pqc.secret_key, message)
-            return {"ok": True, "listing_id": listing.on_chain_id, "price_wei": str(price_wei),
-                    "expires_at": expires_at, "nonce": nonce, "message_hex": "0x" + message.hex(),
-                    "signature_hex": "0x" + bytes(sig).hex(), "needs_seller_signature": False}
     return {"ok": True, "listing_id": listing.on_chain_id, "price_wei": str(price_wei),
             "expires_at": expires_at, "nonce": nonce, "message_hex": "0x" + message.hex(),
             "signature_hex": None, "needs_seller_signature": True,
-            "note": "Seller signs message_hex (ML-DSA-87) in QoreX, then calls purchaseWithQuote."}
+            "note": "Seller signs message_hex with ML-DSA-87 in QoreX, then the buyer calls purchaseWithQuote."}
+
+
+def submit_seller_signature(listing, seller_evm: str, message_hex: str, signature_hex: str) -> dict:
+    """Verify a wallet-side seller quote signature and store it for the buyer.
+
+    Verification uses the seller's chain-registered key via the PQC
+    precompile-adjacent helper (same authority the contract uses on-chain).
+    """
+    from apps.ai.models import SellerAgentMandate
+    from integrations.qorechain.pqc import get_pqc_account_status
+
+    mandate = SellerAgentMandate.objects.filter(
+        listing=listing, seller__evm_address__iexact=seller_evm).order_by("-created_at").first()
+    if mandate is None:
+        return {"error": "no seller mandate for this listing"}
+    msg_hex = (message_hex or "").strip()
+    sig_hex = (signature_hex or "").strip()
+    if not msg_hex.startswith("0x") or not sig_hex.startswith("0x"):
+        return {"error": "message and signature must be 0x hex strings"}
+    try:
+        message = bytes.fromhex(msg_hex[2:])
+        signature = bytes.fromhex(sig_hex[2:])
+    except ValueError:
+        return {"error": "invalid hex"}
+    try:
+        status = get_pqc_account_status(seller_evm)
+    except Exception as exc:
+        return {"error": f"key lookup failed: {exc}"}
+    # pqc_verify against the registered key; the contract re-checks on-chain.
+    from qorsdk import pqc_verify
+    pubkey = b""
+    try:
+        raw = (status or {}).get("account", status or {})
+        pubkey = bytes.fromhex(str(raw.get("public_key", "")).replace("0x", ""))
+    except Exception:
+        pubkey = b""
+    if not pubkey:
+        return {"error": "seller key not registered"}
+    if not pqc_verify(pubkey, message, signature):
+        return {"error": "signature does not verify under the seller's registered key"}
+    mandate.quote_message_hex = msg_hex
+    mandate.quote_signature_hex = sig_hex
+    mandate.save(update_fields=["quote_message_hex", "quote_signature_hex", "updated_at"])
+    return {"ok": True}

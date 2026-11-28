@@ -140,6 +140,12 @@ class SellerAgentMandate(models.Model):
     auto_accept = models.BooleanField(default=False)
     state = models.CharField(max_length=16, choices=State.choices, default=State.ACTIVE)
     expires_at = models.DateTimeField()
+    # Wallet-signed quote cache: the seller signs the quote bytes in QoreX;
+    # the signature is verified against the seller's chain-registered key
+    # (pqc_verify) and stored here for the buyer's purchaseWithQuote call.
+    # The server never signs on the seller's behalf.
+    quote_signature_hex = models.TextField(blank=True)
+    quote_message_hex = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

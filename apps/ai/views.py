@@ -298,7 +298,37 @@ def seller_quote(request, listing_id: int):
         price_uqor = int(listing.price_uqor or 0)
     from .services.seller_agent import build_quote
 
-    return JsonResponse(build_quote(listing, participant.evm_address, price_uqor))
+    quote = build_quote(listing, participant.evm_address, price_uqor)
+    if quote.get("ok"):
+        # If the seller already wallet-signed this exact message, include it.
+        mandate = SellerAgentMandate.objects.filter(
+            listing=listing, seller__evm_address__iexact=listing.seller.evm_address
+        ).order_by("-created_at").first()
+        if mandate and mandate.quote_signature_hex and mandate.quote_message_hex == quote.get("message_hex"):
+            quote["signature_hex"] = mandate.quote_signature_hex
+            quote["needs_seller_signature"] = False
+    return JsonResponse(quote)
+
+
+@require_POST
+def seller_quote_sign(request, listing_id: int):
+    """Submit the seller's wallet-side quote signature (seller wallet only)."""
+    from apps.marketplace.models import Listing
+
+    participant = _participant_for(request)
+    if not participant:
+        return JsonResponse({"error": "connect your wallet first"}, status=401)
+    listing = Listing.objects.filter(on_chain_id=int(listing_id)).first()
+    if not listing:
+        return JsonResponse({"error": "listing not found"}, status=404)
+    if (listing.seller.evm_address or "").lower() != participant.evm_address.lower():
+        return JsonResponse({"error": "only the seller may sign this quote"}, status=403)
+    data = _parse_json_body(request)
+    from .services.seller_agent import submit_seller_signature
+
+    return JsonResponse(submit_seller_signature(
+        listing, participant.evm_address,
+        data.get("message_hex", ""), data.get("signature_hex", "")))
 
 
 @require_POST
